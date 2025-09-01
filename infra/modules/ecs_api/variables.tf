@@ -22,3 +22,13 @@ variable "container_port" {
   type    = number
   default = 8080
 }
+
+variable "db_secret_arn" { 
+  type = string 
+}
+
+# ACM / HTTPS
+variable "domain_name" {
+  description = "FQDN for the API (e.g., api.dev.yourdomain.com)"
+  type        = string
+}

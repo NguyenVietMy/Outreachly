@@ -14,6 +14,13 @@ resource "aws_security_group" "alb" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -59,9 +66,9 @@ resource "aws_lb_target_group" "api" {
   health_check {
     path                = "/health"
     healthy_threshold   = 2
-    unhealthy_threshold = 2
-    timeout             = 5
-    interval            = 15
+    unhealthy_threshold = 5
+    timeout             = 10
+    interval            = 30
     matcher             = "200-399"
   }
 }
@@ -72,8 +79,12 @@ resource "aws_lb_listener" "http" {
   protocol          = "HTTP"
 
   default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.api.arn
+    type = "redirect"
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
   }
 }
 
@@ -89,6 +100,13 @@ data "aws_iam_policy_document" "task_assume" {
   }
 }
 
+data "aws_iam_policy_document" "secrets_read" {
+  statement {
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = [var.db_secret_arn]
+  }
+}
+
 resource "aws_iam_role" "task_exec" {
   name               = "${local.name}-exec-role"
   assume_role_policy = data.aws_iam_policy_document.task_assume.json
@@ -97,6 +115,16 @@ resource "aws_iam_role" "task_exec" {
 resource "aws_iam_role_policy_attachment" "task_exec_attach" {
   role       = aws_iam_role.task_exec.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+resource "aws_iam_policy" "secrets_read" {
+  name   = "${local.name}-secrets-read"
+  policy = data.aws_iam_policy_document.secrets_read.json
+}
+
+resource "aws_iam_role_policy_attachment" "task_exec_read_secret" {
+  role       = aws_iam_role.task_exec.name
+  policy_arn = aws_iam_policy.secrets_read.arn
 }
 
 # ---------- Cluster, Task, Service ----------
@@ -130,6 +158,14 @@ resource "aws_ecs_task_definition" "api" {
           protocol      = "tcp"
         }
       ]
+      
+      # Use Secrets Manager for sensitive values
+      secrets = [
+        { name = "DB_USER",     valueFrom = "${var.db_secret_arn}:username::" },
+        { name = "DB_PASSWORD", valueFrom = "${var.db_secret_arn}:password::" },
+        { name = "JDBC_URL",    valueFrom = "${var.db_secret_arn}:jdbc_url::" }
+      ]
+
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -152,6 +188,8 @@ resource "aws_ecs_service" "api" {
   desired_count   = 1
   launch_type     = "FARGATE"
 
+  health_check_grace_period_seconds = 30
+
   network_configuration {
     subnets          = var.public_subnet_ids
     security_groups  = [aws_security_group.ecs.id]
@@ -167,15 +205,4 @@ resource "aws_ecs_service" "api" {
   depends_on = [aws_lb_listener.http]
 }
 
-# ---------- Outputs ----------
-output "alb_dns" {
-  value = aws_lb.this.dns_name
-}
 
-output "cluster_name" {
-  value = aws_ecs_cluster.this.name
-}
-
-output "service_name" {
-  value = aws_ecs_service.api.name
-}
