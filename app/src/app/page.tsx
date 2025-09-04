@@ -1,102 +1,250 @@
-import Image from "next/image";
+import React from "react";
+import HeroSection from "@/components/HeroSection";
+import FeatureGrid from "@/components/FeatureGrid";
+import ProcessFlow from "@/components/ProcessFlow";
+import PricingCards from "@/components/PricingCards";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import {
+  ArrowRight,
+  CheckCircle,
+  ExternalLink,
+  Github,
+  Twitter,
+} from "lucide-react";
 
 export default function Home() {
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="min-h-screen bg-background">
+      {/* Hero Section */}
+      <HeroSection />
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      {/* Social Proof Bar */}
+      <section className="w-full py-12 bg-muted/50">
+        <div className="container px-4 md:px-6">
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <h3 className="text-center text-sm font-medium text-muted-foreground">
+              TRUSTED BY INNOVATIVE SALES TEAMS WORLDWIDE
+            </h3>
+            <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12 opacity-70">
+              <img
+                src="https://api.dicebear.com/7.x/initials/svg?seed=Acme"
+                alt="Acme Inc"
+                className="h-8 w-auto"
+              />
+              <img
+                src="https://api.dicebear.com/7.x/initials/svg?seed=Globex"
+                alt="Globex"
+                className="h-8 w-auto"
+              />
+              <img
+                src="https://api.dicebear.com/7.x/initials/svg?seed=Stark"
+                alt="Stark Industries"
+                className="h-8 w-auto"
+              />
+              <img
+                src="https://api.dicebear.com/7.x/initials/svg?seed=Wayne"
+                alt="Wayne Enterprises"
+                className="h-8 w-auto"
+              />
+              <img
+                src="https://api.dicebear.com/7.x/initials/svg?seed=Hooli"
+                alt="Hooli"
+                className="h-8 w-auto"
+              />
+              <img
+                src="https://api.dicebear.com/7.x/initials/svg?seed=Initech"
+                alt="Initech"
+                className="h-8 w-auto"
+              />
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+      </section>
+
+      {/* Feature Grid */}
+      <FeatureGrid />
+
+      {/* Process Flow */}
+      <ProcessFlow />
+
+      {/* Metrics Highlight */}
+      <section className="w-full py-20 bg-primary text-primary-foreground">
+        <div className="container px-4 md:px-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+            <div className="space-y-2">
+              <h3 className="text-4xl font-bold">{"<1%"}</h3>
+              <p className="text-lg text-primary-foreground/80">
+                Bounce rate with our verified emails
+              </p>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-4xl font-bold">{"<30"}</h3>
+              <p className="text-lg text-primary-foreground/80">
+                Minutes to fully onboard your team
+              </p>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-4xl font-bold">70%</h3>
+              <p className="text-lg text-primary-foreground/80">
+                Personalization efficiency with AI
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Cards */}
+      <PricingCards />
+
+      {/* CTA Section */}
+      <section className="w-full py-20 bg-muted/30">
+        <div className="container px-4 md:px-6">
+          <div className="flex flex-col items-center justify-center space-y-6 text-center">
+            <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">
+              Ready to transform your outreach?
+            </h2>
+            <p className="max-w-[700px] text-muted-foreground md:text-xl/relaxed">
+              Join thousands of sales teams who've improved their response rates
+              with Outreachly AI.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button size="lg" className="h-12 px-8">
+                Get Started Free
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+              <Button size="lg" variant="outline" className="h-12 px-8">
+                Book a Demo
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="w-full py-12 bg-background border-t">
+        <div className="container px-4 md:px-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            <div className="space-y-4">
+              <h4 className="text-lg font-semibold">Outreachly AI</h4>
+              <p className="text-sm text-muted-foreground">
+                Smarter lead enrichment and cold outreach that actually gets
+                replies.
+              </p>
+              <div className="flex space-x-4">
+                <Twitter className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
+                <Github className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
+              </div>
+            </div>
+            <div className="space-y-4">
+              <h4 className="text-sm font-semibold">Product</h4>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <a
+                    href="#"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Features
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Pricing
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    API
+                  </a>
+                </li>
+              </ul>
+            </div>
+            <div className="space-y-4">
+              <h4 className="text-sm font-semibold">Resources</h4>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <a
+                    href="#"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Documentation
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Guides
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Support
+                  </a>
+                </li>
+              </ul>
+            </div>
+            <div className="space-y-4">
+              <h4 className="text-sm font-semibold">Legal</h4>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <a
+                    href="#"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Terms
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Privacy
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Compliance
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <Separator className="my-8" />
+          <div className="flex flex-col md:flex-row items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              © 2023 Outreachly AI. All rights reserved.
+            </p>
+            <div className="flex items-center space-x-4 mt-4 md:mt-0">
+              <a
+                href="#"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center"
+              >
+                <CheckCircle className="mr-1 h-3 w-3" /> GDPR Compliant
+              </a>
+              <a
+                href="#"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center"
+              >
+                <CheckCircle className="mr-1 h-3 w-3" /> SOC 2 Certified
+              </a>
+            </div>
+          </div>
+        </div>
       </footer>
     </div>
   );
