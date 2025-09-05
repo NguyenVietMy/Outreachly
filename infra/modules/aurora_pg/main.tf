@@ -25,7 +25,10 @@ resource "aws_security_group" "db" {
 
 resource "random_password" "master" {
   length  = 24
-  special = true
+  special = false
+  upper = true
+  lower = true
+  number = true
 }
 
 resource "aws_rds_cluster" "this" {

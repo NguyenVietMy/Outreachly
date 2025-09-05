@@ -24,10 +24,22 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // Chain 1: the rest of the app
+    // Chain 1: OAuth2 endpoints - handled by OAuth2Config
     @Bean
     @Order(1)
+    public SecurityFilterChain oauth2Chain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher("/oauth2/**", "/login/**", "/auth/**")
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                .csrf(csrf -> csrf.disable());
+        return http.build();
+    }
+
+    // Chain 2: the rest of the app - now uses OAuth2Config
+    @Bean
+    @Order(2)
     public SecurityFilterChain appChain(HttpSecurity http) throws Exception {
+        // This will be overridden by OAuth2Config, but keeping for fallback
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/health").permitAll()
