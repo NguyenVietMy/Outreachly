@@ -77,6 +77,21 @@ resource "aws_secretsmanager_secret_version" "db" {
   })
 }
 
+#---- OAuth2 Secrets ----
+resource "aws_secretsmanager_secret" "oauth2" {
+  name = "${local.name}-oauth2"
+}
+
+resource "aws_secretsmanager_secret_version" "oauth2" {
+  secret_id     = aws_secretsmanager_secret.oauth2.id
+  secret_string = jsonencode({
+    google_client_id     = "REPLACE_WITH_YOUR_GOOGLE_CLIENT_ID"
+    google_client_secret = "REPLACE_WITH_YOUR_GOOGLE_CLIENT_SECRET"
+    frontend_url         = "https://outreach-ly.com"
+  })
+}
+
 output "db_endpoint"     { value = aws_rds_cluster.this.endpoint }
 output "db_secret_arn"   { value = aws_secretsmanager_secret.db.arn }
+output "oauth2_secret_arn" { value = aws_secretsmanager_secret.oauth2.arn }
 output "db_name"         { value = "outreachly" }

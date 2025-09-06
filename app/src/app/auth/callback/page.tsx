@@ -19,9 +19,9 @@ export default function AuthCallback() {
     if (success === "true") {
       setStatus("success");
       setMessage("Authentication successful! Redirecting...");
-      // Redirect to dashboard or main app
+      // Redirect to main app
       setTimeout(() => {
-        router.push("/dashboard");
+        router.push("/");
       }, 2000);
     } else if (error) {
       setStatus("error");

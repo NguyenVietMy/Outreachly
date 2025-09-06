@@ -35,6 +35,7 @@ module "ecs_api" {
   container_image   = "158954238800.dkr.ecr.us-east-1.amazonaws.com/outreachly/api:dev"
   container_port    = 8080
   db_secret_arn     = module.aurora_pg.db_secret_arn
+  oauth2_secret_arn = module.aurora_pg.oauth2_secret_arn
   domain_name       = "api.outreach-ly.com"
 }
 

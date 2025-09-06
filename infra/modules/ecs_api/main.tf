@@ -103,7 +103,7 @@ data "aws_iam_policy_document" "task_assume" {
 data "aws_iam_policy_document" "secrets_read" {
   statement {
     actions   = ["secretsmanager:GetSecretValue"]
-    resources = [var.db_secret_arn]
+    resources = [var.db_secret_arn, var.oauth2_secret_arn]
   }
 }
 
@@ -163,7 +163,10 @@ resource "aws_ecs_task_definition" "api" {
       secrets = [
         { name = "DB_USER",     valueFrom = "${var.db_secret_arn}:username::" },
         { name = "DB_PASSWORD", valueFrom = "${var.db_secret_arn}:password::" },
-        { name = "JDBC_URL",    valueFrom = "${var.db_secret_arn}:jdbc_url::" }
+        { name = "JDBC_URL",    valueFrom = "${var.db_secret_arn}:jdbc_url::" },
+        { name = "GOOGLE_CLIENT_ID",     valueFrom = "${var.oauth2_secret_arn}:google_client_id::" },
+        { name = "GOOGLE_CLIENT_SECRET", valueFrom = "${var.oauth2_secret_arn}:google_client_secret::" },
+        { name = "FRONTEND_URL",         valueFrom = "${var.oauth2_secret_arn}:frontend_url::" }
       ]
 
       logConfiguration = {
