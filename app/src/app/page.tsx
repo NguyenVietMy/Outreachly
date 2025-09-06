@@ -1,10 +1,14 @@
+"use client";
+
 import React from "react";
+import Header from "@/components/Header";
 import HeroSection from "@/components/HeroSection";
 import FeatureGrid from "@/components/FeatureGrid";
 import ProcessFlow from "@/components/ProcessFlow";
 import PricingCards from "@/components/PricingCards";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   ArrowRight,
   CheckCircle,
@@ -14,10 +18,57 @@ import {
 } from "lucide-react";
 
 export default function Home() {
+  const { user } = useAuth();
+
   return (
     <div className="min-h-screen bg-background">
+      <Header />
       {/* Hero Section */}
       <HeroSection />
+
+      {/* User Dashboard (if logged in) */}
+      {user && (
+        <section className="w-full py-12 bg-muted/30">
+          <div className="container px-4 md:px-6">
+            <div className="max-w-4xl mx-auto">
+              <div className="bg-white rounded-lg shadow-sm border p-6">
+                <h2 className="text-2xl font-bold mb-4">
+                  Welcome back, {user.firstName}!
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="text-center p-4 bg-blue-50 rounded-lg">
+                    <h3 className="text-lg font-semibold text-blue-900">
+                      Leads Enriched
+                    </h3>
+                    <p className="text-3xl font-bold text-blue-600">0</p>
+                  </div>
+                  <div className="text-center p-4 bg-green-50 rounded-lg">
+                    <h3 className="text-lg font-semibold text-green-900">
+                      Campaigns Sent
+                    </h3>
+                    <p className="text-3xl font-bold text-green-600">0</p>
+                  </div>
+                  <div className="text-center p-4 bg-purple-50 rounded-lg">
+                    <h3 className="text-lg font-semibold text-purple-900">
+                      Response Rate
+                    </h3>
+                    <p className="text-3xl font-bold text-purple-600">0%</p>
+                  </div>
+                </div>
+                <div className="mt-6 text-center">
+                  <Button size="lg" className="mr-4">
+                    Start New Campaign
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                  <Button size="lg" variant="outline">
+                    Enrich Leads
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Social Proof Bar */}
       <section className="w-full py-12 bg-muted/50">

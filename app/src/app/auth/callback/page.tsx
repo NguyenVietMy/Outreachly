@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function AuthCallback() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { checkAuth } = useAuth();
   const [status, setStatus] = useState<"loading" | "success" | "error">(
     "loading"
   );
@@ -19,10 +21,12 @@ export default function AuthCallback() {
     if (success === "true") {
       setStatus("success");
       setMessage("Authentication successful! Redirecting...");
-      // Redirect to main app
-      setTimeout(() => {
-        router.push("/");
-      }, 2000);
+      // Check auth status and redirect
+      checkAuth().then(() => {
+        setTimeout(() => {
+          router.push("/");
+        }, 2000);
+      });
     } else if (error) {
       setStatus("error");
       setMessage(errorMessage || "Authentication failed");
@@ -30,7 +34,7 @@ export default function AuthCallback() {
       setStatus("error");
       setMessage("Invalid callback parameters");
     }
-  }, [searchParams, router]);
+  }, [searchParams, router, checkAuth]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
