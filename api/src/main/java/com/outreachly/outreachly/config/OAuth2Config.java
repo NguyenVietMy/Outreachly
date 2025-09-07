@@ -24,6 +24,11 @@ public class OAuth2Config {
                 http
                                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                                 .csrf(csrf -> csrf.disable())
+                                .sessionManagement(session -> session
+                                                .sessionCreationPolicy(
+                                                                org.springframework.security.config.http.SessionCreationPolicy.IF_REQUIRED)
+                                                .maximumSessions(1)
+                                                .maxSessionsPreventsLogin(false))
                                 .authorizeHttpRequests(authz -> authz
                                                 .requestMatchers("/", "/login", "/oauth2/**", "/actuator/**", "/api/**")
                                                 .permitAll()

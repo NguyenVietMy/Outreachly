@@ -23,8 +23,9 @@ export default function AuthCallback() {
       setMessage("Authentication successful! Redirecting...");
       // Check auth status and redirect
       checkAuth().then(() => {
+        // Wait a bit longer to ensure session is established
         setTimeout(() => {
-          router.push("/");
+          router.push("/dashboard");
         }, 2000);
       });
     } else if (error) {
