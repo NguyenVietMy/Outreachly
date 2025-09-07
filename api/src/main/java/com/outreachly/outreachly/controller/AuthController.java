@@ -2,6 +2,8 @@ package com.outreachly.outreachly.controller;
 
 import com.outreachly.outreachly.entity.User;
 import com.outreachly.outreachly.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -48,14 +50,30 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Map<String, String>> logout() {
-        SecurityContextHolder.clearContext();
+    public ResponseEntity<Map<String, String>> logout(HttpServletRequest request, HttpServletResponse response) {
+        try {
+            // Clear the security context
+            SecurityContextHolder.clearContext();
 
-        Map<String, String> response = new HashMap<>();
-        response.put("message", "Logged out successfully");
-        response.put("redirectUrl", "http://localhost:3000/");
+            // Invalidate the session
+            if (request.getSession(false) != null) {
+                request.getSession().invalidate();
+            }
 
-        return ResponseEntity.ok(response);
+            // Clear any cookies
+            response.setHeader("Set-Cookie", "JSESSIONID=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");
+
+            Map<String, String> responseBody = new HashMap<>();
+            responseBody.put("message", "Logged out successfully");
+            responseBody.put("redirectUrl", "http://localhost:3000/");
+
+            return ResponseEntity.ok(responseBody);
+        } catch (Exception e) {
+            Map<String, String> responseBody = new HashMap<>();
+            responseBody.put("message", "Logout completed");
+            responseBody.put("redirectUrl", "http://localhost:3000/");
+            return ResponseEntity.ok(responseBody);
+        }
     }
 
     @GetMapping("/login")

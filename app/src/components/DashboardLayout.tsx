@@ -19,7 +19,7 @@ interface DashboardLayoutProps {
 }
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
-  const { user, logout } = useAuth();
+  const { user, logout, loading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const navigation = [
@@ -104,9 +104,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               variant="outline"
               size="sm"
               className="w-full justify-start"
+              disabled={loading}
             >
               <LogOut className="h-4 w-4 mr-2" />
-              Sign out
+              {loading ? "Signing out..." : "Sign out"}
             </Button>
           </div>
         </div>
