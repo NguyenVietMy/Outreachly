@@ -34,19 +34,7 @@ module "ecs_api" {
   public_subnet_ids = module.network.public_subnet_ids
   container_image   = "158954238800.dkr.ecr.us-east-1.amazonaws.com/outreachly/api:dev"
   container_port    = 8080
-  db_secret_arn     = module.aurora_pg.db_secret_arn
-  oauth2_secret_arn = module.aurora_pg.oauth2_secret_arn
   domain_name       = "api.outreach-ly.com"
-}
-
-
-module "aurora_pg" {
-  source      = "../../modules/aurora_pg"
-  project     = local.project
-  env         = local.env
-  vpc_id      = module.network.vpc_id
-  subnet_ids  = module.network.public_subnet_ids   # ideally PRIVATE subnets in prod
-  ecs_sg_id   = module.ecs_api.ecs_sg_id
 }
 
 resource "aws_route53_record" "api_alias" {

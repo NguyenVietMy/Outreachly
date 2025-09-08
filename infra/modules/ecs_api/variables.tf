@@ -23,13 +23,6 @@ variable "container_port" {
   default = 8080
 }
 
-variable "db_secret_arn" { 
-  type = string 
-}
-
-variable "oauth2_secret_arn" { 
-  type = string 
-}
 
 # ACM / HTTPS
 variable "domain_name" {

@@ -100,12 +100,6 @@ data "aws_iam_policy_document" "task_assume" {
   }
 }
 
-data "aws_iam_policy_document" "secrets_read" {
-  statement {
-    actions   = ["secretsmanager:GetSecretValue"]
-    resources = [var.db_secret_arn, var.oauth2_secret_arn]
-  }
-}
 
 resource "aws_iam_role" "task_exec" {
   name               = "${local.name}-exec-role"
@@ -117,15 +111,6 @@ resource "aws_iam_role_policy_attachment" "task_exec_attach" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-resource "aws_iam_policy" "secrets_read" {
-  name   = "${local.name}-secrets-read"
-  policy = data.aws_iam_policy_document.secrets_read.json
-}
-
-resource "aws_iam_role_policy_attachment" "task_exec_read_secret" {
-  role       = aws_iam_role.task_exec.name
-  policy_arn = aws_iam_policy.secrets_read.arn
-}
 
 # ---------- Cluster, Task, Service ----------
 resource "aws_ecs_cluster" "this" {
@@ -159,15 +144,8 @@ resource "aws_ecs_task_definition" "api" {
         }
       ]
       
-      # Use Secrets Manager for sensitive values
-      secrets = [
-        { name = "DB_USER",     valueFrom = "${var.db_secret_arn}:username::" },
-        { name = "DB_PASSWORD", valueFrom = "${var.db_secret_arn}:password::" },
-        { name = "JDBC_URL",    valueFrom = "${var.db_secret_arn}:jdbc_url::" },
-        { name = "GOOGLE_CLIENT_ID",     valueFrom = "${var.oauth2_secret_arn}:google_client_id::" },
-        { name = "GOOGLE_CLIENT_SECRET", valueFrom = "${var.oauth2_secret_arn}:google_client_secret::" },
-        { name = "FRONTEND_URL",         valueFrom = "${var.oauth2_secret_arn}:frontend_url::" }
-      ]
+      # OAuth2 configuration via environment variables
+      # Note: In production, consider using AWS Secrets Manager for these values
 
       logConfiguration = {
         logDriver = "awslogs"
@@ -178,7 +156,10 @@ resource "aws_ecs_task_definition" "api" {
         }
       }
       environment = [
-        { name = "JAVA_OPTS", value = "-XX:+ExitOnOutOfMemoryError" }
+        { name = "JAVA_OPTS", value = "-XX:+ExitOnOutOfMemoryError" },
+        { name = "GOOGLE_CLIENT_ID", value = "11164249925-1d31lg1eibv43f910rs068aq4f3a30tu.apps.googleusercontent.com" },
+        { name = "GOOGLE_CLIENT_SECRET", value = "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" },
+        { name = "FRONTEND_URL", value = "https://outreach-ly.com" }
       ]
     }
   ])
