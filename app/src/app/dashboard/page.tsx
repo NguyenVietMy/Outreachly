@@ -4,6 +4,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
+import HeroKPIs from "@/components/dashboard/HeroKPIs";
+import OnboardingChecklist from "@/components/dashboard/OnboardingChecklist";
+import CampaignSnapshot from "@/components/dashboard/CampaignSnapshot";
+import EngagementTrends from "@/components/dashboard/EngagementTrends";
+import LeadListOverview from "@/components/dashboard/LeadListOverview";
+import SendingProfileHealth from "@/components/dashboard/SendingProfileHealth";
+import RecentActivityFeed from "@/components/dashboard/RecentActivityFeed";
+import ComplianceTrustCues from "@/components/dashboard/ComplianceTrustCues";
 
 export default function Dashboard() {
   const { user, loading } = useAuth();
@@ -27,10 +35,61 @@ export default function Dashboard() {
     return null;
   }
 
+  const handleOnboardingComplete = (itemId: string) => {
+    console.log(`Onboarding item completed: ${itemId}`);
+    // Add your onboarding completion logic here
+  };
+
+  const handleViewCampaignDetails = (campaignId: string) => {
+    console.log(`View campaign details: ${campaignId}`);
+    // Navigate to campaign details page
+  };
+
+  const handleImportLeads = () => {
+    console.log("Import leads clicked");
+    // Navigate to import leads page
+  };
+
+  const handleViewLeadList = (listId: string) => {
+    console.log(`View lead list: ${listId}`);
+    // Navigate to lead list details
+  };
+
+  const handleConfigureDomain = (profileId: string) => {
+    console.log(`Configure domain: ${profileId}`);
+    // Navigate to domain configuration
+  };
+
+  const handleViewProfileDetails = (profileId: string) => {
+    console.log(`View profile details: ${profileId}`);
+    // Navigate to profile details
+  };
+
+  const handleViewActivityDetails = (activityId: string) => {
+    console.log(`View activity details: ${activityId}`);
+    // Navigate to activity details
+  };
+
+  const handleViewPrivacyPolicy = () => {
+    console.log("View privacy policy");
+    // Open privacy policy
+  };
+
+  const handleViewTerms = () => {
+    console.log("View terms of service");
+    // Open terms of service
+  };
+
+  const handleViewDPA = () => {
+    console.log("View data processing agreement");
+    // Open DPA
+  };
+
   return (
     <DashboardLayout>
       <div className="p-6">
-        <div className="mb-8">
+        {/* Header */}
+        <div className="mb-8 mt-[100px]">
           <h1 className="text-3xl font-bold text-gray-900">
             Welcome back, {user.firstName}!
           </h1>
@@ -39,68 +98,48 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {/* Dashboard Content */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Leads Enriched
-            </h3>
-            <p className="text-3xl font-bold text-blue-600">0</p>
-            <p className="text-sm text-gray-500 mt-1">This month</p>
+        {/* Hero KPIs */}
+        <HeroKPIs />
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Column - Main Content */}
+          <div className="lg:col-span-2 space-y-8">
+            {/* Onboarding Checklist */}
+            <OnboardingChecklist onComplete={handleOnboardingComplete} />
+
+            {/* Campaign Snapshot */}
+            <CampaignSnapshot onViewDetails={handleViewCampaignDetails} />
+
+            {/* Engagement Trends */}
+            <EngagementTrends />
+
+            {/* Lead List Overview */}
+            <LeadListOverview
+              onImportLeads={handleImportLeads}
+              onViewList={handleViewLeadList}
+            />
+
+            {/* Sending Profile Health */}
+            <SendingProfileHealth
+              onConfigureDomain={handleConfigureDomain}
+              onViewDetails={handleViewProfileDetails}
+            />
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Campaigns Sent
-            </h3>
-            <p className="text-3xl font-bold text-green-600">0</p>
-            <p className="text-sm text-gray-500 mt-1">This month</p>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Response Rate
-            </h3>
-            <p className="text-3xl font-bold text-purple-600">0%</p>
-            <p className="text-sm text-gray-500 mt-1">Average</p>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            Quick Actions
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left">
-              <h3 className="font-medium text-gray-900">Start New Campaign</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                Create and launch a new outreach campaign
-              </p>
-            </button>
-
-            <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left">
-              <h3 className="font-medium text-gray-900">Enrich Leads</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                Add contact information to your leads
-              </p>
-            </button>
-
-            <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left">
-              <h3 className="font-medium text-gray-900">View Analytics</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                Check campaign performance metrics
-              </p>
-            </button>
-
-            <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left">
-              <h3 className="font-medium text-gray-900">Manage Templates</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                Create and edit email templates
-              </p>
-            </button>
+          {/* Right Column - Sidebar */}
+          <div className="space-y-8">
+            {/* Recent Activity Feed */}
+            <RecentActivityFeed onViewDetails={handleViewActivityDetails} />
           </div>
         </div>
+
+        {/* Compliance & Trust Cues */}
+        <ComplianceTrustCues
+          onViewPrivacyPolicy={handleViewPrivacyPolicy}
+          onViewTerms={handleViewTerms}
+          onViewDPA={handleViewDPA}
+        />
       </div>
     </DashboardLayout>
   );
