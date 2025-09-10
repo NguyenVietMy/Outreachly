@@ -1,7 +1,9 @@
 package com.outreachly.outreachly.controller;
 
 import com.outreachly.outreachly.entity.ImportJob;
+import com.outreachly.outreachly.entity.User;
 import com.outreachly.outreachly.service.CsvImportService;
+import com.outreachly.outreachly.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +23,7 @@ import java.util.UUID;
 public class ImportController {
 
     private final CsvImportService csvImportService;
+    private final UserService userService;
 
     @PostMapping("/validate")
     public ResponseEntity<Map<String, Object>> validateCsvFile(
@@ -61,8 +64,14 @@ public class ImportController {
             Authentication authentication) {
 
         try {
-            // String userEmail = authentication.getName();
-            // UUID userId = getUserIdFromEmail(userEmail);
+            // Get user ID from authentication
+            String userEmail = authentication.getName();
+            User user = userService.findByEmail(userEmail);
+
+            if (user == null) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "User not found"));
+            }
 
             // Validate file first
             CsvImportService.CsvValidationResult validationResult = csvImportService.validateCsvFile(file);
@@ -72,12 +81,11 @@ public class ImportController {
                         .body(Map.of("error", "CSV validation failed", "errors", validationResult.getErrors()));
             }
 
-            // Create import job
-            // TODO: Get actual user ID and org ID from authentication context
-            UUID placeholderOrgId = csvImportService.getOrCreateDefaultOrganization();
+            // Create import job with actual user ID and org ID
+            UUID orgId = user.getOrgId() != null ? user.getOrgId() : csvImportService.getOrCreateDefaultOrganization();
             ImportJob importJob = csvImportService.createImportJob(
-                    1L, // Placeholder - implement proper user ID lookup
-                    placeholderOrgId,
+                    user.getId(),
+                    orgId,
                     file.getOriginalFilename(),
                     validationResult.getData().size());
 
@@ -101,11 +109,15 @@ public class ImportController {
     @GetMapping("/jobs")
     public ResponseEntity<List<ImportJob>> getImportHistory(Authentication authentication) {
         try {
-            // String userEmail = authentication.getName();
-            // UUID userId = getUserIdFromEmail(userEmail);
-            UUID orgId = UUID.randomUUID(); // Placeholder - implement proper org ID lookup
+            // Get user ID from authentication
+            String userEmail = authentication.getName();
+            User user = userService.findByEmail(userEmail);
 
-            List<ImportJob> jobs = csvImportService.getImportHistory(orgId);
+            if (user == null) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            List<ImportJob> jobs = csvImportService.getImportHistoryByUserId(user.getId());
             return ResponseEntity.ok(jobs);
 
         } catch (Exception e) {
@@ -117,8 +129,22 @@ public class ImportController {
     @GetMapping("/jobs/{jobId}")
     public ResponseEntity<ImportJob> getImportJob(@PathVariable UUID jobId, Authentication authentication) {
         try {
+            // Get user ID from authentication
+            String userEmail = authentication.getName();
+            User user = userService.findByEmail(userEmail);
+
+            if (user == null) {
+                return ResponseEntity.badRequest().build();
+            }
+
             ImportJob job = csvImportService.getImportJob(jobId);
-            return ResponseEntity.ok(job);
+
+            // Check if the job belongs to the current user
+            if (job.getUserId().equals(user.getId())) {
+                return ResponseEntity.ok(job);
+            } else {
+                return ResponseEntity.notFound().build();
+            }
 
         } catch (Exception e) {
             log.error("Error getting import job", e);
@@ -126,16 +152,4 @@ public class ImportController {
         }
     }
 
-    // Helper methods - you'll need to implement these based on your user service
-    // private UUID getUserIdFromEmail(String email) {
-    // // TODO: Implement this method to get user ID from email
-    // // This should query your user repository
-    // return UUID.randomUUID(); // Placeholder
-    // }
-
-    // private UUID getOrgIdFromUserId(UUID userId) {
-    // // TODO: Implement this method to get org ID from user ID
-    // // This should query your user repository
-    // return UUID.randomUUID(); // Placeholder
-    // }
 }

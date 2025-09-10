@@ -322,6 +322,10 @@ public class CsvImportService {
         return importJobRepository.findByOrgIdOrderByCreatedAtDesc(orgId);
     }
 
+    public List<ImportJob> getImportHistoryByUserId(Long userId) {
+        return importJobRepository.findByUserIdOrderByCreatedAtDesc(userId);
+    }
+
     public ImportJob getImportJob(UUID jobId) {
         return importJobRepository.findById(jobId).orElseThrow(() -> new RuntimeException("Import job not found"));
     }

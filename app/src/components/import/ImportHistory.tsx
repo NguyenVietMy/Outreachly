@@ -52,8 +52,10 @@ export function ImportHistory() {
 
       if (response.ok) {
         const jobs = await response.json();
+        console.log("Import history response:", jobs);
         setImportJobs(jobs);
       } else {
+        console.error("Failed to load import history:", response.status);
         setError("Failed to load import history");
       }
     } catch (err) {
@@ -69,7 +71,8 @@ export function ImportHistory() {
   }, []);
 
   const getStatusIcon = (status: string) => {
-    switch (status) {
+    const normalizedStatus = status?.toLowerCase();
+    switch (normalizedStatus) {
       case "completed":
         return <CheckCircle className="h-4 w-4 text-green-500" />;
       case "failed":
@@ -82,6 +85,7 @@ export function ImportHistory() {
   };
 
   const getStatusBadge = (status: string) => {
+    const normalizedStatus = status?.toLowerCase();
     const variants = {
       pending: "secondary",
       processing: "default",
@@ -90,8 +94,12 @@ export function ImportHistory() {
     } as const;
 
     return (
-      <Badge variant={variants[status as keyof typeof variants] || "secondary"}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+      <Badge
+        variant={
+          variants[normalizedStatus as keyof typeof variants] || "secondary"
+        }
+      >
+        {normalizedStatus?.charAt(0).toUpperCase() + normalizedStatus?.slice(1)}
       </Badge>
     );
   };
@@ -179,7 +187,7 @@ export function ImportHistory() {
                     </TableCell>
                     <TableCell>{getStatusBadge(job.status)}</TableCell>
                     <TableCell>
-                      {job.status === "processing" ? (
+                      {job.status?.toLowerCase() === "processing" ? (
                         <div className="text-sm">
                           {job.processedRows} / {job.totalRows}
                         </div>
@@ -190,7 +198,7 @@ export function ImportHistory() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {job.status === "completed" && (
+                      {job.status?.toLowerCase() === "completed" && (
                         <div className="text-sm">
                           <div className="text-green-600">
                             ✓ {job.processedRows} imported
@@ -202,14 +210,15 @@ export function ImportHistory() {
                           )}
                         </div>
                       )}
-                      {job.status === "failed" && job.errorMessage && (
-                        <div
-                          className="text-sm text-red-600 max-w-xs truncate"
-                          title={job.errorMessage}
-                        >
-                          {job.errorMessage}
-                        </div>
-                      )}
+                      {job.status?.toLowerCase() === "failed" &&
+                        job.errorMessage && (
+                          <div
+                            className="text-sm text-red-600 max-w-xs truncate"
+                            title={job.errorMessage}
+                          >
+                            {job.errorMessage}
+                          </div>
+                        )}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {formatDate(job.createdAt)}
