@@ -293,7 +293,7 @@ public class CsvImportService {
                 .city(trimValue(getValueFromRow(row, "city", "town")))
                 .customTextField(trimValue(getValueFromRow(row, "custom_text_field", "notes", "comments", "custom")))
                 .source("csv_import")
-                .verifiedStatus(Lead.VerifiedStatus.UNKNOWN)
+                .verifiedStatus(Lead.VerifiedStatus.unknown)
                 .enrichedJson("{}")
                 .build();
     }
