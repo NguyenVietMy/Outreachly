@@ -11,6 +11,7 @@ import {
   Menu,
   X,
   Upload,
+  FileText,
 } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
@@ -28,6 +29,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { name: "Campaigns", href: "/dashboard/campaigns", icon: Mail },
     { name: "Leads", href: "/dashboard/leads", icon: Users },
     { name: "Import Leads", href: "/import", icon: Upload },
+    { name: "Templates", href: "/templates", icon: FileText },
     { name: "Settings", href: "/dashboard/settings", icon: Settings },
   ];
 
