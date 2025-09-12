@@ -12,6 +12,10 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
 @RequiredArgsConstructor
@@ -23,11 +27,16 @@ public class HunterClient {
     @Value("${HUNTER_API_KEY:}")
     private String apiKey;
 
+    @Value("${HUNTER_API_KEYS:}")
+    private String apiKeysCsv;
+
     @Value("${HUNTER_BASE_URL:https://api.hunter.io/v2}")
     private String baseUrl;
 
     @Value("${HUNTER_TIMEOUT_MS:500}")
     private int timeoutMs;
+
+    private final AtomicInteger nextKeyIndex = new AtomicInteger(0);
 
     private RestTemplate buildClient() {
         var rt = new RestTemplate();
@@ -37,32 +46,71 @@ public class HunterClient {
     }
 
     public JsonNode emailFinder(String domain, String firstName, String lastName) throws Exception {
-        URI uri = UriComponentsBuilder.fromHttpUrl(baseUrl + "/email-finder")
-                .queryParam("domain", domain)
-                .queryParam("first_name", firstName)
-                .queryParam("last_name", lastName)
-                .queryParam("api_key", apiKey)
-                .build(true)
-                .toUri();
-
-        ResponseEntity<String> res = buildClient().getForEntity(uri, String.class);
-        if (res.getStatusCode() != HttpStatus.OK) {
-            throw new RuntimeException("Hunter finder failed: " + res.getStatusCode());
-        }
+        ResponseEntity<String> res = getWithRotation("/email-finder", Map.of(
+                "domain", domain,
+                "first_name", firstName,
+                "last_name", lastName));
         return objectMapper.readTree(res.getBody());
     }
 
     public JsonNode emailVerifier(String email) throws Exception {
-        URI uri = UriComponentsBuilder.fromHttpUrl(baseUrl + "/email-verifier")
-                .queryParam("email", email)
-                .queryParam("api_key", apiKey)
-                .build(true)
-                .toUri();
-
-        ResponseEntity<String> res = buildClient().getForEntity(uri, String.class);
-        if (res.getStatusCode() != HttpStatus.OK) {
-            throw new RuntimeException("Hunter verifier failed: " + res.getStatusCode());
-        }
+        ResponseEntity<String> res = getWithRotation("/email-verifier", Map.of("email", email));
         return objectMapper.readTree(res.getBody());
+    }
+
+    private ResponseEntity<String> getWithRotation(String path, Map<String, String> params) throws Exception {
+        List<String> keys = getConfiguredKeys();
+        if (keys.isEmpty()) {
+            throw new IllegalStateException("No Hunter API key configured");
+        }
+
+        int start = Math.floorMod(nextKeyIndex.get(), keys.size());
+        for (int i = 0; i < keys.size(); i++) {
+            int idx = (start + i) % keys.size();
+            String key = keys.get(idx);
+
+            UriComponentsBuilder b = UriComponentsBuilder.fromHttpUrl(baseUrl + path);
+            for (Map.Entry<String, String> e : params.entrySet()) {
+                if (e.getValue() != null) {
+                    b.queryParam(e.getKey(), e.getValue());
+                }
+            }
+            b.queryParam("api_key", key);
+            URI uri = b.build(true).toUri();
+
+            ResponseEntity<String> res = buildClient().getForEntity(uri, String.class);
+            if (res.getStatusCode().value() == HttpStatus.OK.value()) {
+                nextKeyIndex.set((idx + 1) % keys.size());
+                return res;
+            }
+
+            if (!isKeyExhaustedStatus(res.getStatusCode().value())) {
+                throw new RuntimeException("Hunter request failed: " + res.getStatusCode());
+            }
+
+            log.warn("Hunter key limited/unauthorized (status={}), rotating to next key", res.getStatusCode());
+        }
+
+        throw new RuntimeException("All Hunter API keys exhausted or unauthorized");
+    }
+
+    private List<String> getConfiguredKeys() {
+        if (apiKeysCsv != null && !apiKeysCsv.isBlank()) {
+            return Arrays.stream(apiKeysCsv.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .toList();
+        }
+        if (apiKey != null && !apiKey.isBlank()) {
+            return List.of(apiKey);
+        }
+        return List.of();
+    }
+
+    private static boolean isKeyExhaustedStatus(int statusCode) {
+        return statusCode == HttpStatus.UNAUTHORIZED.value()
+                || statusCode == HttpStatus.PAYMENT_REQUIRED.value()
+                || statusCode == HttpStatus.FORBIDDEN.value()
+                || statusCode == HttpStatus.TOO_MANY_REQUESTS.value();
     }
 }
