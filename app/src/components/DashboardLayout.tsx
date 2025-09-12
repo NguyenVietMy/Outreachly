@@ -27,7 +27,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
     { name: "Campaigns", href: "/dashboard/campaigns", icon: Mail },
-    { name: "Leads", href: "/dashboard/leads", icon: Users },
+    { name: "Leads", href: "/leads", icon: Users },
     { name: "Import Leads", href: "/import", icon: Upload },
     { name: "Templates", href: "/templates", icon: FileText },
     { name: "Settings", href: "/dashboard/settings", icon: Settings },
