@@ -63,6 +63,10 @@ public class Lead {
     @JdbcTypeCode(SqlTypes.JSON)
     private String enrichedJson;
 
+    @Column(name = "enrichment_history", columnDefinition = "jsonb DEFAULT '[]'::jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    private String enrichmentHistory;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

@@ -58,6 +58,23 @@ public class HunterClient {
         return objectMapper.readTree(res.getBody());
     }
 
+    public JsonNode domainSearch(String domain, int limit) throws Exception {
+        ResponseEntity<String> res = getWithRotation("/domain-search", Map.of(
+                "domain", domain,
+                "limit", String.valueOf(limit)));
+        return objectMapper.readTree(res.getBody());
+    }
+
+    public JsonNode companySearch(String domain) throws Exception {
+        ResponseEntity<String> res = getWithRotation("/companies/find", Map.of("domain", domain));
+        return objectMapper.readTree(res.getBody());
+    }
+
+    public JsonNode accountInfo() throws Exception {
+        ResponseEntity<String> res = getWithRotation("/account", Map.of());
+        return objectMapper.readTree(res.getBody());
+    }
+
     private ResponseEntity<String> getWithRotation(String path, Map<String, String> params) throws Exception {
         List<String> keys = getConfiguredKeys();
         if (keys.isEmpty()) {

@@ -7,6 +7,7 @@ import com.outreachly.outreachly.repository.LeadRepository;
 import com.outreachly.outreachly.entity.Lead;
 import com.outreachly.outreachly.service.CsvImportService;
 import com.outreachly.outreachly.service.EnrichmentService;
+import com.outreachly.outreachly.service.EnrichmentPreviewService;
 import com.outreachly.outreachly.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +24,7 @@ import java.util.*;
 public class LeadEnrichmentController {
 
     private final EnrichmentService enrichmentService;
+    private final EnrichmentPreviewService enrichmentPreviewService;
     private final EnrichmentJobRepository jobRepository;
     private final UserService userService;
     private final CsvImportService csvImportService;
@@ -69,6 +71,93 @@ public class LeadEnrichmentController {
         UUID orgId = resolveOrgId(user);
         List<EnrichmentJob> jobs = jobRepository.findByOrgIdAndLeadIdOrderByCreatedAtDesc(orgId, id);
         return ResponseEntity.ok(jobs);
+    }
+
+    @PostMapping("/{id}/enrich/preview")
+    public ResponseEntity<?> previewEnrichment(@PathVariable UUID id, Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null)
+            return ResponseEntity.status(401).build();
+
+        try {
+            // TODO: Add per-user rate limiting (commented out for MVP)
+            // if (isUserRateLimited(user.getId())) {
+            // return ResponseEntity.status(429).body(Map.of("error", "Rate limit
+            // exceeded"));
+            // }
+
+            var preview = enrichmentPreviewService.getEnrichmentPreview(id);
+            return ResponseEntity.ok(preview);
+        } catch (Exception e) {
+            log.error("Enrichment preview failed for lead {}: {}", id, e.getMessage());
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{id}/enrich/apply")
+    public ResponseEntity<?> applyEnrichment(@PathVariable UUID id, @RequestBody Map<String, Object> request,
+            Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null)
+            return ResponseEntity.status(401).build();
+
+        try {
+            // TODO: Add per-user rate limiting (commented out for MVP)
+            // if (isUserRateLimited(user.getId())) {
+            // return ResponseEntity.status(429).body(Map.of("error", "Rate limit
+            // exceeded"));
+            // }
+
+            var acceptedChanges = request.get("acceptedChanges");
+            if (acceptedChanges == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "acceptedChanges is required"));
+            }
+
+            var result = enrichmentPreviewService.applyEnrichment(id,
+                    new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(acceptedChanges));
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("Enrichment application failed for lead {}: {}", id, e.getMessage());
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{id}/enrich/revert")
+    public ResponseEntity<?> revertEnrichment(@PathVariable UUID id, @RequestParam int historyIndex,
+            Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null)
+            return ResponseEntity.status(401).build();
+
+        try {
+            var result = enrichmentPreviewService.revertEnrichment(id, historyIndex);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("Enrichment revert failed for lead {}: {}", id, e.getMessage());
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/enrichment-history")
+    public ResponseEntity<?> getEnrichmentHistory(@PathVariable UUID id, Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null)
+            return ResponseEntity.status(401).build();
+
+        try {
+            Lead lead = leadRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Lead not found"));
+
+            var history = lead.getEnrichmentHistory();
+            if (history == null || history.isBlank()) {
+                return ResponseEntity.ok(Map.of("history", "[]"));
+            }
+
+            return ResponseEntity
+                    .ok(Map.of("history", new com.fasterxml.jackson.databind.ObjectMapper().readTree(history)));
+        } catch (Exception e) {
+            log.error("Failed to get enrichment history for lead {}: {}", id, e.getMessage());
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
     }
 
     private User getUser(Authentication authentication) {

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import AuthGuard from "@/components/AuthGuard";
+import EnrichmentPreview from "@/components/EnrichmentPreview";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,7 @@ export default function LeadsPage() {
   const [listId, setListId] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   const enrichLead = async () => {
     if (!leadId) return;
@@ -31,6 +33,11 @@ export default function LeadsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const previewEnrichment = () => {
+    if (!leadId) return;
+    setShowPreview(true);
   };
 
   const enrichList = async () => {
@@ -77,9 +84,21 @@ export default function LeadsPage() {
                   value={leadId}
                   onChange={(e) => setLeadId(e.target.value)}
                 />
-                <Button onClick={enrichLead} disabled={!leadId || loading}>
-                  {loading ? "Processing..." : "Enrich Lead"}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={previewEnrichment}
+                    disabled={!leadId || loading}
+                  >
+                    Preview Enrichment
+                  </Button>
+                  <Button
+                    onClick={enrichLead}
+                    disabled={!leadId || loading}
+                    variant="outline"
+                  >
+                    {loading ? "Processing..." : "Auto Enrich Lead"}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
@@ -106,6 +125,13 @@ export default function LeadsPage() {
             )}
           </div>
         </div>
+
+        {showPreview && (
+          <EnrichmentPreview
+            leadId={leadId}
+            onClose={() => setShowPreview(false)}
+          />
+        )}
       </DashboardLayout>
     </AuthGuard>
   );
