@@ -2,6 +2,8 @@ package com.outreachly.outreachly.controller;
 
 import com.outreachly.outreachly.entity.ImportJob;
 import com.outreachly.outreachly.entity.User;
+import com.outreachly.outreachly.entity.Campaign;
+import com.outreachly.outreachly.repository.CampaignRepository;
 import com.outreachly.outreachly.service.CsvImportService;
 import com.outreachly.outreachly.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ public class ImportController {
 
     private final CsvImportService csvImportService;
     private final UserService userService;
+    private final CampaignRepository campaignRepository;
 
     @PostMapping("/validate")
     public ResponseEntity<Map<String, Object>> validateCsvFile(
@@ -61,6 +64,7 @@ public class ImportController {
     @PostMapping("/process")
     public ResponseEntity<Map<String, Object>> processCsvImport(
             @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "campaignId", required = false) String campaignId,
             Authentication authentication) {
 
         try {
@@ -81,6 +85,25 @@ public class ImportController {
                         .body(Map.of("error", "CSV validation failed", "errors", validationResult.getErrors()));
             }
 
+            // Validate campaign if provided
+            UUID campaignUuid = null;
+            if (campaignId != null && !campaignId.trim().isEmpty() && !campaignId.equals("default")) {
+                try {
+                    campaignUuid = UUID.fromString(campaignId);
+                    UUID orgId = user.getOrgId() != null ? user.getOrgId()
+                            : csvImportService.getOrCreateDefaultOrganization();
+
+                    // Validate campaign exists and belongs to user's organization
+                    Campaign campaign = campaignRepository.findByIdAndOrgId(campaignUuid, orgId)
+                            .orElseThrow(() -> new IllegalArgumentException("Campaign not found or access denied"));
+
+                    log.info("Importing leads to campaign: {} for user: {}", campaign.getName(), user.getEmail());
+                } catch (IllegalArgumentException e) {
+                    return ResponseEntity.badRequest()
+                            .body(Map.of("error", "Invalid campaign ID or access denied"));
+                }
+            }
+
             // Create import job with actual user ID and org ID
             UUID orgId = user.getOrgId() != null ? user.getOrgId() : csvImportService.getOrCreateDefaultOrganization();
             ImportJob importJob = csvImportService.createImportJob(
@@ -89,8 +112,8 @@ public class ImportController {
                     file.getOriginalFilename(),
                     validationResult.getData().size());
 
-            // Process import asynchronously
-            csvImportService.processImportJob(importJob.getId(), validationResult.getData());
+            // Process import asynchronously with campaign assignment
+            csvImportService.processImportJob(importJob.getId(), validationResult.getData(), campaignUuid);
 
             Map<String, Object> response = new HashMap<>();
             response.put("jobId", importJob.getId());

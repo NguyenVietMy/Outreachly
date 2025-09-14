@@ -197,6 +197,11 @@ public class CsvImportService {
 
     @Async
     public CompletableFuture<Void> processImportJob(UUID jobId, List<Map<String, String>> data) {
+        return processImportJob(jobId, data, null);
+    }
+
+    @Async
+    public CompletableFuture<Void> processImportJob(UUID jobId, List<Map<String, String>> data, UUID campaignId) {
         ImportJob job = importJobRepository.findById(jobId)
                 .orElseThrow(() -> new RuntimeException("Import job not found"));
 
@@ -224,7 +229,7 @@ public class CsvImportService {
                         continue; // Skip existing leads
                     }
 
-                    Lead lead = buildLeadFromRow(row, job.getOrgId());
+                    Lead lead = buildLeadFromRow(row, job.getOrgId(), campaignId);
                     leadRepository.save(lead);
                     processedRows++;
 
@@ -267,6 +272,10 @@ public class CsvImportService {
     }
 
     private Lead buildLeadFromRow(Map<String, String> row, UUID orgId) {
+        return buildLeadFromRow(row, orgId, null);
+    }
+
+    private Lead buildLeadFromRow(Map<String, String> row, UUID orgId, UUID campaignId) {
         // Get email flexibly (including BOM versions)
         String email = getValueFromRow(row, "email", "?email", "e-mail", "email address", "mail");
         String domain = extractDomainFromEmail(email);
@@ -279,6 +288,7 @@ public class CsvImportService {
 
         return Lead.builder()
                 .orgId(orgId)
+                .campaignId(campaignId)
                 .firstName(trimValue(
                         getValueFromRow(row, "first_name", "?first_name", "firstname", "first name", "fname")))
                 .lastName(trimValue(getValueFromRow(row, "last_name", "lastname", "last name", "lname")))

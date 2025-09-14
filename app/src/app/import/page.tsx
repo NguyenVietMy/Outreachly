@@ -25,6 +25,22 @@ import { ImportHistory } from "@/components/import/ImportHistory";
 import DashboardLayout from "@/components/DashboardLayout";
 import AuthGuard from "@/components/AuthGuard";
 import { API_BASE_URL } from "@/lib/config";
+import { useCampaigns } from "@/hooks/useCampaigns";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
 
 interface ValidationResult {
   valid: boolean;
@@ -53,6 +69,11 @@ export default function ImportPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [importJob, setImportJob] = useState<ImportJob | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showCampaignSelection, setShowCampaignSelection] = useState(false);
+  const [selectedCampaignId, setSelectedCampaignId] =
+    useState<string>("default");
+  const [campaignSearchTerm, setCampaignSearchTerm] = useState("");
+  const { campaigns, loading: campaignsLoading } = useCampaigns();
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const selectedFile = acceptedFiles[0];
@@ -109,12 +130,25 @@ export default function ImportPage() {
   const handleImport = async () => {
     if (!file || !validationResult?.valid) return;
 
+    // Show campaign selection modal instead of directly importing
+    setShowCampaignSelection(true);
+  };
+
+  const handleCampaignSelection = async () => {
+    if (!file || !validationResult?.valid) return;
+
     setIsImporting(true);
     setError(null);
+    setShowCampaignSelection(false);
 
     try {
       const formData = new FormData();
       formData.append("file", file);
+
+      // Add campaign ID if not default
+      if (selectedCampaignId !== "default") {
+        formData.append("campaignId", selectedCampaignId);
+      }
 
       const response = await fetch(`${API_BASE_URL}/api/import/process`, {
         method: "POST",
@@ -395,6 +429,75 @@ export default function ImportPage() {
               isImporting={isImporting}
             />
           )}
+
+          {/* Campaign Selection Modal */}
+          <Dialog
+            open={showCampaignSelection}
+            onOpenChange={setShowCampaignSelection}
+          >
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Select Campaign for Import</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Choose where to import your leads
+                  </label>
+                  <div className="space-y-2">
+                    <Input
+                      placeholder="Search campaigns..."
+                      value={campaignSearchTerm}
+                      onChange={(e) => setCampaignSearchTerm(e.target.value)}
+                      className="mb-2"
+                    />
+                    <Select
+                      value={selectedCampaignId}
+                      onValueChange={setSelectedCampaignId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select campaign..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="default">
+                          Default (No Campaign)
+                        </SelectItem>
+                        {campaigns
+                          .filter((campaign) =>
+                            campaign.name
+                              .toLowerCase()
+                              .includes(campaignSearchTerm.toLowerCase())
+                          )
+                          .map((campaign) => (
+                            <SelectItem key={campaign.id} value={campaign.id}>
+                              {campaign.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {validationResult?.totalRows} lead(s) will be imported to the
+                  selected campaign.
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowCampaignSelection(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleCampaignSelection}
+                    disabled={isImporting}
+                  >
+                    {isImporting ? "Importing..." : "Import Leads"}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </DashboardLayout>
     </AuthGuard>
