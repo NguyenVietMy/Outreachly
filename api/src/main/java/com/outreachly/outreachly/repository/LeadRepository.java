@@ -17,6 +17,10 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
 
     List<Lead> findByOrgIdAndListId(UUID orgId, UUID listId);
 
+    List<Lead> findByOrgIdAndCampaignId(UUID orgId, UUID campaignId);
+
+    List<Lead> findByOrgIdAndCampaignIdIsNull(UUID orgId);
+
     Optional<Lead> findByEmailAndOrgId(String email, UUID orgId);
 
     @Query("SELECT COUNT(l) FROM Lead l WHERE l.orgId = :orgId")

@@ -160,6 +160,83 @@ public class LeadEnrichmentController {
         }
     }
 
+    @GetMapping
+    public ResponseEntity<?> getAllLeads(
+            @RequestParam(required = false) UUID campaignId,
+            Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null)
+            return ResponseEntity.status(401).build();
+
+        UUID orgId = resolveOrgId(user);
+        List<Lead> leads;
+
+        if (campaignId != null) {
+            leads = leadRepository.findByOrgIdAndCampaignId(orgId, campaignId);
+        } else {
+            leads = leadRepository.findByOrgId(orgId);
+        }
+
+        return ResponseEntity.ok(leads);
+    }
+
+    @PutMapping("/bulk-campaign")
+    public ResponseEntity<?> assignLeadsToCampaign(
+            @RequestBody BulkCampaignAssignmentRequest request,
+            Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null)
+            return ResponseEntity.status(401).build();
+
+        UUID orgId = resolveOrgId(user);
+
+        try {
+            List<Lead> leads = leadRepository.findAllById(request.getLeadIds());
+
+            // Filter leads that belong to the user's organization
+            List<Lead> userLeads = leads.stream()
+                    .filter(lead -> lead.getOrgId().equals(orgId))
+                    .toList();
+
+            // Update campaign_id for all leads
+            userLeads.forEach(lead -> lead.setCampaignId(request.getCampaignId()));
+            leadRepository.saveAll(userLeads);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Leads assigned to campaign successfully",
+                    "assignedCount", userLeads.size()));
+        } catch (Exception e) {
+            log.error("Error assigning leads to campaign: {}", e.getMessage());
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to assign leads to campaign"));
+        }
+    }
+
+    @PutMapping("/{id}/campaign")
+    public ResponseEntity<?> assignLeadToCampaign(
+            @PathVariable UUID id,
+            @RequestBody CampaignAssignmentRequest request,
+            Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null)
+            return ResponseEntity.status(401).build();
+
+        UUID orgId = resolveOrgId(user);
+
+        try {
+            Lead lead = leadRepository.findById(id)
+                    .filter(l -> l.getOrgId().equals(orgId))
+                    .orElseThrow(() -> new IllegalArgumentException("Lead not found"));
+
+            lead.setCampaignId(request.getCampaignId());
+            leadRepository.save(lead);
+
+            return ResponseEntity.ok(Map.of("message", "Lead assigned to campaign successfully"));
+        } catch (Exception e) {
+            log.error("Error assigning lead to campaign: {}", e.getMessage());
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to assign lead to campaign"));
+        }
+    }
+
     private User getUser(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated())
             return null;
@@ -168,5 +245,39 @@ public class LeadEnrichmentController {
 
     private UUID resolveOrgId(User user) {
         return user.getOrgId() != null ? user.getOrgId() : csvImportService.getOrCreateDefaultOrganization();
+    }
+
+    // Request DTOs
+    public static class BulkCampaignAssignmentRequest {
+        private List<UUID> leadIds;
+        private UUID campaignId;
+
+        public List<UUID> getLeadIds() {
+            return leadIds;
+        }
+
+        public void setLeadIds(List<UUID> leadIds) {
+            this.leadIds = leadIds;
+        }
+
+        public UUID getCampaignId() {
+            return campaignId;
+        }
+
+        public void setCampaignId(UUID campaignId) {
+            this.campaignId = campaignId;
+        }
+    }
+
+    public static class CampaignAssignmentRequest {
+        private UUID campaignId;
+
+        public UUID getCampaignId() {
+            return campaignId;
+        }
+
+        public void setCampaignId(UUID campaignId) {
+            this.campaignId = campaignId;
+        }
     }
 }

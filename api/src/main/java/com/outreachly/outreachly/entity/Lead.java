@@ -31,6 +31,9 @@ public class Lead {
     @Column(name = "list_id")
     private UUID listId;
 
+    @Column(name = "campaign_id")
+    private UUID campaignId;
+
     @Column(name = "first_name")
     private String firstName;
 

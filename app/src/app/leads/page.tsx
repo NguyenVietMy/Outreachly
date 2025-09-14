@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import AuthGuard from "@/components/AuthGuard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,38 +39,12 @@ import {
   History,
   Download,
   Users,
+  Loader2,
 } from "lucide-react";
+import { useLeads, Lead } from "@/hooks/useLeads";
+import { useCampaigns, Campaign } from "@/hooks/useCampaigns";
 
-// Mock data for demonstration
-const mockLeads = [
-  {
-    id: "1",
-    firstName: "John",
-    lastName: "Doe",
-    company: "Tech Corp",
-    title: "CEO",
-    email: "john.doe@techcorp.com",
-    customTextField: "VIP Client",
-  },
-  {
-    id: "2",
-    firstName: "Jane",
-    lastName: "Smith",
-    company: "Design Studio",
-    title: "Designer",
-    email: "jane@designstudio.com",
-    customTextField: "",
-  },
-  {
-    id: "3",
-    firstName: "Bob",
-    lastName: "Wilson",
-    company: "Marketing Inc",
-    title: "Marketing Manager",
-    email: "bob.wilson@marketinginc.com",
-    customTextField: "Cold Lead",
-  },
-];
+// Mock data for demonstration (keeping for templates and activities)
 
 const mockTemplates = [
   { id: "1", name: "Welcome Email", description: "Initial outreach template" },
@@ -102,17 +76,137 @@ const mockActivities = [
   },
 ];
 
+interface FilterState {
+  verifiedStatus: string;
+  company: string;
+  source: string;
+  dateRange: string;
+  hasEmail: boolean;
+  hasPhone: boolean;
+  hasLinkedIn: boolean;
+}
+
 export default function LeadsPage() {
+  const [selectedCampaignId, setSelectedCampaignId] = useState<
+    string | undefined
+  >(undefined);
+  const {
+    campaigns,
+    loading: campaignsLoading,
+    createCampaign,
+  } = useCampaigns();
+  const { leads, loading, error, refetch } = useLeads(selectedCampaignId);
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [showLeadModal, setShowLeadModal] = useState(false);
-  const [selectedLead, setSelectedLead] = useState<any>(null);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showTemplatePreview, setShowTemplatePreview] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [showCreateCampaign, setShowCreateCampaign] = useState(false);
+  const [showCampaignImport, setShowCampaignImport] = useState(false);
+  const [campaignForm, setCampaignForm] = useState({
+    name: "",
+    description: "",
+  });
+  const [filters, setFilters] = useState<FilterState>({
+    verifiedStatus: "all",
+    company: "",
+    source: "",
+    dateRange: "all",
+    hasEmail: false,
+    hasPhone: false,
+    hasLinkedIn: false,
+  });
+
+  // Filter leads based on search term and filters
+  const filteredLeads = useMemo(() => {
+    let filtered = leads;
+
+    // Apply search term filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(
+        (lead) =>
+          lead.firstName?.toLowerCase().includes(term) ||
+          lead.lastName?.toLowerCase().includes(term) ||
+          lead.email?.toLowerCase().includes(term) ||
+          lead.company?.toLowerCase().includes(term) ||
+          lead.title?.toLowerCase().includes(term)
+      );
+    }
+
+    // Apply verified status filter
+    if (filters.verifiedStatus !== "all") {
+      filtered = filtered.filter(
+        (lead) => lead.verifiedStatus === filters.verifiedStatus
+      );
+    }
+
+    // Apply company filter
+    if (filters.company) {
+      const companyTerm = filters.company.toLowerCase();
+      filtered = filtered.filter((lead) =>
+        lead.company?.toLowerCase().includes(companyTerm)
+      );
+    }
+
+    // Apply source filter
+    if (filters.source) {
+      const sourceTerm = filters.source.toLowerCase();
+      filtered = filtered.filter((lead) =>
+        lead.source?.toLowerCase().includes(sourceTerm)
+      );
+    }
+
+    // Apply date range filter
+    if (filters.dateRange !== "all") {
+      const now = new Date();
+      const daysAgo =
+        filters.dateRange === "today"
+          ? 1
+          : filters.dateRange === "week"
+            ? 7
+            : filters.dateRange === "month"
+              ? 30
+              : 0;
+
+      if (daysAgo > 0) {
+        const cutoffDate = new Date(
+          now.getTime() - daysAgo * 24 * 60 * 60 * 1000
+        );
+        filtered = filtered.filter((lead) => {
+          const leadDate = new Date(lead.createdAt);
+          return leadDate >= cutoffDate;
+        });
+      }
+    }
+
+    // Apply contact information filters
+    if (filters.hasEmail) {
+      filtered = filtered.filter(
+        (lead) => lead.email && lead.email.trim() !== ""
+      );
+    }
+
+    if (filters.hasPhone) {
+      filtered = filtered.filter(
+        (lead) => lead.phone && lead.phone.trim() !== ""
+      );
+    }
+
+    if (filters.hasLinkedIn) {
+      filtered = filtered.filter(
+        (lead) => lead.linkedinUrl && lead.linkedinUrl.trim() !== ""
+      );
+    }
+
+    return filtered;
+  }, [leads, searchTerm, filters]);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedLeads(mockLeads.map((lead) => lead.id));
+      setSelectedLeads(filteredLeads.map((lead) => lead.id));
     } else {
       setSelectedLeads([]);
     }
@@ -126,7 +220,7 @@ export default function LeadsPage() {
     }
   };
 
-  const handleLeadClick = (lead: any) => {
+  const handleLeadClick = (lead: Lead) => {
     setSelectedLead(lead);
     setShowLeadModal(true);
   };
@@ -134,6 +228,64 @@ export default function LeadsPage() {
   const handleTemplatePreview = (template: any) => {
     setSelectedTemplate(template);
     setShowTemplatePreview(true);
+  };
+
+  const handleFilterChange = (
+    key: keyof FilterState,
+    value: string | boolean
+  ) => {
+    setFilters((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
+
+  const resetFilters = () => {
+    setFilters({
+      verifiedStatus: "all",
+      company: "",
+      source: "",
+      dateRange: "all",
+      hasEmail: false,
+      hasPhone: false,
+      hasLinkedIn: false,
+    });
+    setSearchTerm("");
+  };
+
+  const getActiveFiltersCount = () => {
+    let count = 0;
+    if (filters.verifiedStatus !== "all") count++;
+    if (filters.company) count++;
+    if (filters.source) count++;
+    if (filters.dateRange !== "all") count++;
+    if (filters.hasEmail) count++;
+    if (filters.hasPhone) count++;
+    if (filters.hasLinkedIn) count++;
+    return count;
+  };
+
+  const handleCreateCampaign = async () => {
+    if (!campaignForm.name.trim()) return;
+
+    try {
+      await createCampaign(campaignForm.name, campaignForm.description);
+      setCampaignForm({ name: "", description: "" });
+      setShowCreateCampaign(false);
+    } catch (error) {
+      console.error("Error creating campaign:", error);
+    }
+  };
+
+  const handleCampaignChange = (campaignId: string) => {
+    setSelectedCampaignId(campaignId === "all" ? undefined : campaignId);
+    setSelectedLeads([]); // Clear selected leads when switching campaigns
+  };
+
+  const getCurrentCampaignName = () => {
+    if (!selectedCampaignId) return "All Leads";
+    const campaign = campaigns.find((c) => c.id === selectedCampaignId);
+    return campaign ? campaign.name : "Unknown Campaign";
   };
 
   const getStatusBadge = (status: string) => {
@@ -151,18 +303,62 @@ export default function LeadsPage() {
     <AuthGuard>
       <DashboardLayout>
         <div className="p-6 max-w-7xl mx-auto">
-          {/* Header with Create Campaign Button */}
-          <div className="flex justify-between items-center mb-6 mt-[100px]">
-            <div>
-              <h1 className="text-3xl font-bold">Leads</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Manage your leads, track activities, and create campaigns
-              </p>
+          {/* Header with Campaign Switcher and Create Campaign Button */}
+          <div className="mb-6 mt-[100px]">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h1 className="text-3xl font-bold">Leads</h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Manage your leads, track activities, and create campaigns
+                  {!loading && leads.length > 0 && (
+                    <span className="ml-2">• {leads.length} total leads</span>
+                  )}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={refetch} disabled={loading}>
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : null}
+                  Refresh
+                </Button>
+                <Button
+                  className="bg-blue-600 hover:bg-blue-700"
+                  onClick={() => setShowCreateCampaign(true)}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Campaign
+                </Button>
+              </div>
             </div>
-            <Button className="bg-blue-600 hover:bg-blue-700">
-              <Plus className="w-4 h-4 mr-2" />
-              Create Campaign
-            </Button>
+
+            {/* Campaign Switcher */}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium">Campaign:</label>
+                <Select
+                  value={selectedCampaignId || "all"}
+                  onValueChange={handleCampaignChange}
+                  disabled={campaignsLoading}
+                >
+                  <SelectTrigger className="w-64">
+                    <SelectValue placeholder="Select campaign..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Leads</SelectItem>
+                    {campaigns.map((campaign) => (
+                      <SelectItem key={campaign.id} value={campaign.id}>
+                        {campaign.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Currently viewing:{" "}
+                <span className="font-medium">{getCurrentCampaignName()}</span>
+              </div>
+            </div>
           </div>
 
           {/* Leads Table Section */}
@@ -180,14 +376,277 @@ export default function LeadsPage() {
                       className="pl-8 w-64"
                     />
                   </div>
-                  <Button variant="outline">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowFilters(!showFilters)}
+                  >
                     <Filter className="w-4 h-4 mr-2" />
                     Filter
+                    {getActiveFiltersCount() > 0 && (
+                      <Badge variant="secondary" className="ml-2">
+                        {getActiveFiltersCount()}
+                      </Badge>
+                    )}
                   </Button>
                 </div>
               </div>
             </CardHeader>
+
+            {/* Filter Panel */}
+            {showFilters && (
+              <div className="px-6 py-4 border-b bg-gray-50">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Verified Status Filter */}
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Verification Status
+                    </label>
+                    <Select
+                      value={filters.verifiedStatus}
+                      onValueChange={(value) =>
+                        handleFilterChange("verifiedStatus", value)
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="All statuses" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        <SelectItem value="valid">Valid</SelectItem>
+                        <SelectItem value="risky">Risky</SelectItem>
+                        <SelectItem value="invalid">Invalid</SelectItem>
+                        <SelectItem value="unknown">Unknown</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Company Filter */}
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Company
+                    </label>
+                    <Input
+                      placeholder="Filter by company..."
+                      value={filters.company}
+                      onChange={(e) =>
+                        handleFilterChange("company", e.target.value)
+                      }
+                    />
+                  </div>
+
+                  {/* Source Filter */}
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Source
+                    </label>
+                    <Input
+                      placeholder="Filter by source..."
+                      value={filters.source}
+                      onChange={(e) =>
+                        handleFilterChange("source", e.target.value)
+                      }
+                    />
+                  </div>
+
+                  {/* Date Range Filter */}
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Date Added
+                    </label>
+                    <Select
+                      value={filters.dateRange}
+                      onValueChange={(value) =>
+                        handleFilterChange("dateRange", value)
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="All time" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Time</SelectItem>
+                        <SelectItem value="today">Today</SelectItem>
+                        <SelectItem value="week">This Week</SelectItem>
+                        <SelectItem value="month">This Month</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Contact Information Filters */}
+                <div className="mt-4">
+                  <label className="text-sm font-medium mb-2 block">
+                    Contact Information
+                  </label>
+                  <div className="flex flex-wrap gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="hasEmail"
+                        checked={filters.hasEmail}
+                        onCheckedChange={(checked) =>
+                          handleFilterChange("hasEmail", checked as boolean)
+                        }
+                      />
+                      <label htmlFor="hasEmail" className="text-sm">
+                        Has Email
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="hasPhone"
+                        checked={filters.hasPhone}
+                        onCheckedChange={(checked) =>
+                          handleFilterChange("hasPhone", checked as boolean)
+                        }
+                      />
+                      <label htmlFor="hasPhone" className="text-sm">
+                        Has Phone
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="hasLinkedIn"
+                        checked={filters.hasLinkedIn}
+                        onCheckedChange={(checked) =>
+                          handleFilterChange("hasLinkedIn", checked as boolean)
+                        }
+                      />
+                      <label htmlFor="hasLinkedIn" className="text-sm">
+                        Has LinkedIn
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filter Actions */}
+                <div className="flex justify-between items-center mt-4">
+                  <div className="text-sm text-muted-foreground">
+                    {getActiveFiltersCount() > 0 && (
+                      <span>{getActiveFiltersCount()} filter(s) applied</span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={resetFilters}>
+                      Clear All
+                    </Button>
+                    <Button size="sm" onClick={() => setShowFilters(false)}>
+                      Apply Filters
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <CardContent>
+              {/* Active Filter Chips */}
+              {getActiveFiltersCount() > 0 && (
+                <div className="mb-4">
+                  <div className="flex flex-wrap gap-2">
+                    {filters.verifiedStatus !== "all" && (
+                      <Badge
+                        variant="secondary"
+                        className="flex items-center gap-1"
+                      >
+                        Status: {filters.verifiedStatus}
+                        <button
+                          onClick={() =>
+                            handleFilterChange("verifiedStatus", "all")
+                          }
+                          className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    )}
+                    {filters.company && (
+                      <Badge
+                        variant="secondary"
+                        className="flex items-center gap-1"
+                      >
+                        Company: {filters.company}
+                        <button
+                          onClick={() => handleFilterChange("company", "")}
+                          className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    )}
+                    {filters.source && (
+                      <Badge
+                        variant="secondary"
+                        className="flex items-center gap-1"
+                      >
+                        Source: {filters.source}
+                        <button
+                          onClick={() => handleFilterChange("source", "")}
+                          className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    )}
+                    {filters.dateRange !== "all" && (
+                      <Badge
+                        variant="secondary"
+                        className="flex items-center gap-1"
+                      >
+                        Date: {filters.dateRange}
+                        <button
+                          onClick={() => handleFilterChange("dateRange", "all")}
+                          className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    )}
+                    {filters.hasEmail && (
+                      <Badge
+                        variant="secondary"
+                        className="flex items-center gap-1"
+                      >
+                        Has Email
+                        <button
+                          onClick={() => handleFilterChange("hasEmail", false)}
+                          className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    )}
+                    {filters.hasPhone && (
+                      <Badge
+                        variant="secondary"
+                        className="flex items-center gap-1"
+                      >
+                        Has Phone
+                        <button
+                          onClick={() => handleFilterChange("hasPhone", false)}
+                          className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    )}
+                    {filters.hasLinkedIn && (
+                      <Badge
+                        variant="secondary"
+                        className="flex items-center gap-1"
+                      >
+                        Has LinkedIn
+                        <button
+                          onClick={() =>
+                            handleFilterChange("hasLinkedIn", false)
+                          }
+                          className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-2 mb-4">
                 <Button
                   variant={selectedLeads.length > 1 ? "default" : "outline"}
@@ -207,87 +666,169 @@ export default function LeadsPage() {
                 >
                   {selectedLeads.length > 1 ? "Bulk " : ""}Export
                 </Button>
+                <Button
+                  variant={selectedLeads.length > 1 ? "default" : "outline"}
+                  disabled={selectedLeads.length === 0}
+                  onClick={() => setShowCampaignImport(true)}
+                >
+                  {selectedLeads.length > 1 ? "Bulk " : ""}Campaign Lead Import
+                </Button>
               </div>
 
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">
-                      <Checkbox
-                        checked={selectedLeads.length === mockLeads.length}
-                        onCheckedChange={handleSelectAll}
-                      />
-                    </TableHead>
-                    <TableHead>First Name</TableHead>
-                    <TableHead>Last Name</TableHead>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Custom Field</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mockLeads.map((lead) => (
-                    <TableRow
-                      key={lead.id}
-                      className="cursor-pointer hover:bg-gray-50"
-                    >
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedLeads.includes(lead.id)}
-                          onCheckedChange={(checked) =>
-                            handleSelectLead(lead.id, checked as boolean)
-                          }
-                        />
-                      </TableCell>
-                      <TableCell onClick={() => handleLeadClick(lead)}>
-                        {lead.firstName}
-                      </TableCell>
-                      <TableCell onClick={() => handleLeadClick(lead)}>
-                        {lead.lastName}
-                      </TableCell>
-                      <TableCell onClick={() => handleLeadClick(lead)}>
-                        {lead.company}
-                      </TableCell>
-                      <TableCell onClick={() => handleLeadClick(lead)}>
-                        {lead.title}
-                      </TableCell>
-                      <TableCell onClick={() => handleLeadClick(lead)}>
-                        {lead.email}
-                      </TableCell>
-                      <TableCell onClick={() => handleLeadClick(lead)}>
-                        {lead.customTextField || "-"}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button size="sm" variant="ghost">
-                            <Eye className="w-4 h-4" />
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin mr-2" />
+                  <span>Loading leads...</span>
+                </div>
+              ) : error ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-center">
+                    <p className="text-red-600 mb-2">
+                      Error loading leads: {error}
+                    </p>
+                    <Button onClick={refetch} variant="outline">
+                      Try Again
+                    </Button>
+                  </div>
+                </div>
+              ) : filteredLeads.length === 0 ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-center">
+                    <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600 mb-2">
+                      {searchTerm || getActiveFiltersCount() > 0
+                        ? "No leads match your search or filters"
+                        : "No leads found"}
+                    </p>
+                    {searchTerm || getActiveFiltersCount() > 0 ? (
+                      <div className="flex gap-2 justify-center">
+                        <Button onClick={resetFilters} variant="outline">
+                          Clear All Filters
+                        </Button>
+                        {!searchTerm && (
+                          <Button
+                            onClick={() => (window.location.href = "/import")}
+                            variant="outline"
+                          >
+                            Import Leads
                           </Button>
-                          <Button size="sm" variant="ghost">
-                            <Mail className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                        )}
+                      </div>
+                    ) : (
+                      <Button
+                        onClick={() => (window.location.href = "/import")}
+                        variant="outline"
+                      >
+                        Import Leads
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">
+                          <Checkbox
+                            checked={
+                              selectedLeads.length === filteredLeads.length &&
+                              filteredLeads.length > 0
+                            }
+                            onCheckedChange={handleSelectAll}
+                          />
+                        </TableHead>
+                        <TableHead>First Name</TableHead>
+                        <TableHead>Last Name</TableHead>
+                        <TableHead>Company</TableHead>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Custom Field</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredLeads.map((lead) => (
+                        <TableRow
+                          key={lead.id}
+                          className="cursor-pointer hover:bg-gray-50"
+                        >
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedLeads.includes(lead.id)}
+                              onCheckedChange={(checked) =>
+                                handleSelectLead(lead.id, checked as boolean)
+                              }
+                            />
+                          </TableCell>
+                          <TableCell onClick={() => handleLeadClick(lead)}>
+                            {lead.firstName || "-"}
+                          </TableCell>
+                          <TableCell onClick={() => handleLeadClick(lead)}>
+                            {lead.lastName || "-"}
+                          </TableCell>
+                          <TableCell onClick={() => handleLeadClick(lead)}>
+                            {lead.company || "-"}
+                          </TableCell>
+                          <TableCell onClick={() => handleLeadClick(lead)}>
+                            {lead.title || "-"}
+                          </TableCell>
+                          <TableCell onClick={() => handleLeadClick(lead)}>
+                            {lead.email || "-"}
+                          </TableCell>
+                          <TableCell onClick={() => handleLeadClick(lead)}>
+                            <Badge
+                              variant={
+                                lead.verifiedStatus === "valid"
+                                  ? "default"
+                                  : lead.verifiedStatus === "risky"
+                                    ? "secondary"
+                                    : lead.verifiedStatus === "invalid"
+                                      ? "destructive"
+                                      : "outline"
+                              }
+                            >
+                              {lead.verifiedStatus}
+                            </Badge>
+                          </TableCell>
+                          <TableCell onClick={() => handleLeadClick(lead)}>
+                            {lead.customTextField || "-"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="ghost">
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button size="sm" variant="ghost">
+                                <Mail className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
 
-              {/* Pagination Placeholder */}
-              <div className="flex justify-between items-center mt-4">
-                <div className="text-sm text-muted-foreground">
-                  Showing 1-3 of 3 leads
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" disabled>
-                    Previous
-                  </Button>
-                  <Button variant="outline" disabled>
-                    Next
-                  </Button>
-                </div>
-              </div>
+                  {/* Pagination Placeholder */}
+                  <div className="flex justify-between items-center mt-4">
+                    <div className="text-sm text-muted-foreground">
+                      Showing {filteredLeads.length} of {leads.length} leads
+                      {getActiveFiltersCount() > 0 && (
+                        <span className="ml-2 text-blue-600">(filtered)</span>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" disabled>
+                        Previous
+                      </Button>
+                      <Button variant="outline" disabled>
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -413,8 +954,8 @@ export default function LeadsPage() {
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
-                Lead Details - {selectedLead?.firstName}{" "}
-                {selectedLead?.lastName}
+                Lead Details - {selectedLead?.firstName || "Unknown"}{" "}
+                {selectedLead?.lastName || ""}
               </DialogTitle>
             </DialogHeader>
             <Tabs defaultValue="details" className="w-full">
@@ -427,32 +968,98 @@ export default function LeadsPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium">First Name</label>
-                    <Input value={selectedLead?.firstName || ""} />
+                    <Input value={selectedLead?.firstName || ""} readOnly />
                   </div>
                   <div>
                     <label className="text-sm font-medium">Last Name</label>
-                    <Input value={selectedLead?.lastName || ""} />
+                    <Input value={selectedLead?.lastName || ""} readOnly />
                   </div>
                   <div>
                     <label className="text-sm font-medium">Company</label>
-                    <Input value={selectedLead?.company || ""} />
+                    <Input value={selectedLead?.company || ""} readOnly />
                   </div>
                   <div>
                     <label className="text-sm font-medium">Title</label>
-                    <Input value={selectedLead?.title || ""} />
+                    <Input value={selectedLead?.title || ""} readOnly />
                   </div>
                   <div>
                     <label className="text-sm font-medium">Email</label>
-                    <Input value={selectedLead?.email || ""} />
+                    <Input value={selectedLead?.email || ""} readOnly />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Phone</label>
+                    <Input value={selectedLead?.phone || ""} readOnly />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Domain</label>
+                    <Input value={selectedLead?.domain || ""} readOnly />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">LinkedIn URL</label>
+                    <Input value={selectedLead?.linkedinUrl || ""} readOnly />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Country</label>
+                    <Input value={selectedLead?.country || ""} readOnly />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">State</label>
+                    <Input value={selectedLead?.state || ""} readOnly />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">City</label>
+                    <Input value={selectedLead?.city || ""} readOnly />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Source</label>
+                    <Input value={selectedLead?.source || ""} readOnly />
                   </div>
                   <div>
                     <label className="text-sm font-medium">Custom Field</label>
-                    <Input value={selectedLead?.customTextField || ""} />
+                    <Input
+                      value={selectedLead?.customTextField || ""}
+                      readOnly
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">
+                      Verified Status
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={
+                          selectedLead?.verifiedStatus === "valid"
+                            ? "default"
+                            : selectedLead?.verifiedStatus === "risky"
+                              ? "secondary"
+                              : selectedLead?.verifiedStatus === "invalid"
+                                ? "destructive"
+                                : "outline"
+                        }
+                      >
+                        {selectedLead?.verifiedStatus || "unknown"}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Created At</label>
+                    <Input
+                      value={
+                        selectedLead?.createdAt
+                          ? new Date(selectedLead.createdAt).toLocaleString()
+                          : ""
+                      }
+                      readOnly
+                    />
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button>Save Changes</Button>
-                  <Button variant="outline">Cancel</Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowLeadModal(false)}
+                  >
+                    Close
+                  </Button>
                 </div>
               </TabsContent>
               <TabsContent value="verify">
@@ -497,6 +1104,102 @@ export default function LeadsPage() {
               <div className="flex gap-2">
                 <Button>Use Template</Button>
                 <Button variant="outline">Close</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Campaign Lead Import Modal */}
+        <Dialog open={showCampaignImport} onOpenChange={setShowCampaignImport}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Import Leads to Campaign</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  Select Campaign
+                </label>
+                <Select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a campaign..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {campaigns.map((campaign) => (
+                      <SelectItem key={campaign.id} value={campaign.id}>
+                        {campaign.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {selectedLeads.length} lead(s) will be assigned to the selected
+                campaign.
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowCampaignImport(false)}
+                >
+                  Cancel
+                </Button>
+                <Button>Import to Campaign</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Campaign Modal */}
+        <Dialog open={showCreateCampaign} onOpenChange={setShowCreateCampaign}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Create New Campaign</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  Campaign Name *
+                </label>
+                <Input
+                  placeholder="Enter campaign name..."
+                  value={campaignForm.name}
+                  onChange={(e) =>
+                    setCampaignForm((prev) => ({
+                      ...prev,
+                      name: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  Description
+                </label>
+                <Input
+                  placeholder="Enter campaign description..."
+                  value={campaignForm.description}
+                  onChange={(e) =>
+                    setCampaignForm((prev) => ({
+                      ...prev,
+                      description: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowCreateCampaign(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateCampaign}
+                  disabled={!campaignForm.name.trim()}
+                >
+                  Create Campaign
+                </Button>
               </div>
             </div>
           </DialogContent>
