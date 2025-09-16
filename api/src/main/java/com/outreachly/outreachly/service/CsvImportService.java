@@ -8,6 +8,7 @@ import com.outreachly.outreachly.entity.Organization;
 import com.outreachly.outreachly.repository.ImportJobRepository;
 import com.outreachly.outreachly.repository.LeadRepository;
 import com.outreachly.outreachly.repository.OrganizationRepository;
+import com.outreachly.outreachly.service.CampaignLeadService;
 // import com.outreachly.outreachly.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,7 @@ public class CsvImportService {
     private final LeadRepository leadRepository;
     private final ImportJobRepository importJobRepository;
     private final OrganizationRepository organizationRepository;
+    private final CampaignLeadService campaignLeadService;
     // private final UserRepository userRepository; // Will be used when
     // implementing proper user lookup
     // private final EmailValidator emailValidator = EmailValidator.getInstance();
@@ -229,8 +231,14 @@ public class CsvImportService {
                         continue; // Skip existing leads
                     }
 
-                    Lead lead = buildLeadFromRow(row, job.getOrgId(), campaignId);
-                    leadRepository.save(lead);
+                    Lead lead = buildLeadFromRow(row, job.getOrgId());
+                    lead = leadRepository.save(lead);
+
+                    // If campaignId is provided, create campaign-lead relationship
+                    if (campaignId != null) {
+                        campaignLeadService.addLeadToCampaign(campaignId, lead.getId(), null);
+                    }
+
                     processedRows++;
 
                 } catch (Exception e) {
@@ -272,10 +280,6 @@ public class CsvImportService {
     }
 
     private Lead buildLeadFromRow(Map<String, String> row, UUID orgId) {
-        return buildLeadFromRow(row, orgId, null);
-    }
-
-    private Lead buildLeadFromRow(Map<String, String> row, UUID orgId, UUID campaignId) {
         // Get email flexibly (including BOM versions)
         String email = getValueFromRow(row, "email", "?email", "e-mail", "email address", "mail");
         String domain = extractDomainFromEmail(email);
@@ -288,7 +292,6 @@ public class CsvImportService {
 
         return Lead.builder()
                 .orgId(orgId)
-                .campaignId(campaignId)
                 .firstName(trimValue(
                         getValueFromRow(row, "first_name", "?first_name", "firstname", "first name", "fname")))
                 .lastName(trimValue(getValueFromRow(row, "last_name", "lastname", "last name", "lname")))
@@ -339,4 +342,5 @@ public class CsvImportService {
     public ImportJob getImportJob(UUID jobId) {
         return importJobRepository.findById(jobId).orElseThrow(() -> new RuntimeException("Import job not found"));
     }
+
 }

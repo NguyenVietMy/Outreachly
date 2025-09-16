@@ -13,19 +13,21 @@ import java.util.UUID;
 @Repository
 public interface LeadRepository extends JpaRepository<Lead, UUID> {
 
-    List<Lead> findByOrgId(UUID orgId);
+    @Query("SELECT DISTINCT l FROM Lead l LEFT JOIN FETCH l.campaignLeads cl LEFT JOIN FETCH cl.campaign WHERE l.orgId = :orgId")
+    List<Lead> findByOrgId(@Param("orgId") UUID orgId);
 
-    List<Lead> findByOrgIdAndListId(UUID orgId, UUID listId);
+    @Query("SELECT DISTINCT l FROM Lead l LEFT JOIN FETCH l.campaignLeads cl LEFT JOIN FETCH cl.campaign WHERE l.orgId = :orgId AND l.listId = :listId")
+    List<Lead> findByOrgIdAndListId(@Param("orgId") UUID orgId, @Param("listId") UUID listId);
 
-    List<Lead> findByOrgIdAndCampaignId(UUID orgId, UUID campaignId);
-
-    List<Lead> findByOrgIdAndCampaignIdIsNull(UUID orgId);
-
-    Optional<Lead> findByEmailAndOrgId(String email, UUID orgId);
+    @Query("SELECT DISTINCT l FROM Lead l LEFT JOIN FETCH l.campaignLeads cl LEFT JOIN FETCH cl.campaign WHERE l.email = :email AND l.orgId = :orgId")
+    Optional<Lead> findByEmailAndOrgId(@Param("email") String email, @Param("orgId") UUID orgId);
 
     @Query("SELECT COUNT(l) FROM Lead l WHERE l.orgId = :orgId")
     Long countByOrgId(@Param("orgId") UUID orgId);
 
     @Query("SELECT COUNT(l) FROM Lead l WHERE l.orgId = :orgId AND l.listId = :listId")
     Long countByOrgIdAndListId(@Param("orgId") UUID orgId, @Param("listId") UUID listId);
+
+    @Query("SELECT DISTINCT l FROM Lead l LEFT JOIN FETCH l.campaignLeads cl LEFT JOIN FETCH cl.campaign WHERE l.id = :id")
+    Optional<Lead> findByIdWithCampaigns(@Param("id") UUID id);
 }

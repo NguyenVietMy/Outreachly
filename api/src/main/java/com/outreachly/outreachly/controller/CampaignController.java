@@ -27,14 +27,19 @@ public class CampaignController {
 
     @GetMapping
     public ResponseEntity<?> getAllCampaigns(Authentication authentication) {
-        User user = getUser(authentication);
-        if (user == null)
-            return ResponseEntity.status(401).build();
+        try {
+            User user = getUser(authentication);
+            if (user == null)
+                return ResponseEntity.status(401).build();
 
-        UUID orgId = resolveOrgId(user);
-        List<Campaign> campaigns = campaignRepository.findByOrgIdOrderByCreatedAtDesc(orgId);
+            UUID orgId = resolveOrgId(user);
+            List<Campaign> campaigns = campaignRepository.findByOrgIdOrderByCreatedAtDescSimple(orgId);
 
-        return ResponseEntity.ok(campaigns);
+            return ResponseEntity.ok(campaigns);
+        } catch (Exception e) {
+            log.error("Error fetching campaigns: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to fetch campaigns: " + e.getMessage()));
+        }
     }
 
     @PostMapping

@@ -9,6 +9,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -43,6 +45,22 @@ public class Campaign {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    // Many-to-many relationship with Lead through CampaignLead join table
+    @OneToMany(mappedBy = "campaign", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @Builder.Default
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private List<CampaignLead> campaignLeads = new ArrayList<>();
+
+    // Helper method to get leads
+    @Transient
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public List<Lead> getLeads() {
+        return campaignLeads.stream()
+                .filter(cl -> cl.getStatus() != CampaignLead.CampaignLeadStatus.removed)
+                .map(CampaignLead::getLead)
+                .toList();
+    }
 
     public enum CampaignStatus {
         active, paused, completed, inactive

@@ -1,10 +1,12 @@
 package com.outreachly.outreachly.controller;
 
+import com.outreachly.outreachly.dto.LeadWithCampaignsDto;
 import com.outreachly.outreachly.entity.EnrichmentJob;
 import com.outreachly.outreachly.entity.User;
 import com.outreachly.outreachly.repository.EnrichmentJobRepository;
 import com.outreachly.outreachly.repository.LeadRepository;
 import com.outreachly.outreachly.entity.Lead;
+import com.outreachly.outreachly.service.CampaignLeadService;
 import com.outreachly.outreachly.service.CsvImportService;
 import com.outreachly.outreachly.service.EnrichmentService;
 import com.outreachly.outreachly.service.EnrichmentPreviewService;
@@ -29,6 +31,7 @@ public class LeadEnrichmentController {
     private final UserService userService;
     private final CsvImportService csvImportService;
     private final LeadRepository leadRepository;
+    private final CampaignLeadService campaignLeadService;
 
     @PostMapping("/{id}/enrich")
     public ResponseEntity<?> enrichLead(@PathVariable UUID id, Authentication authentication) {
@@ -164,20 +167,35 @@ public class LeadEnrichmentController {
     public ResponseEntity<?> getAllLeads(
             @RequestParam(required = false) UUID campaignId,
             Authentication authentication) {
-        User user = getUser(authentication);
-        if (user == null)
-            return ResponseEntity.status(401).build();
+        try {
+            User user = getUser(authentication);
+            if (user == null)
+                return ResponseEntity.status(401).build();
 
-        UUID orgId = resolveOrgId(user);
-        List<Lead> leads;
+            UUID orgId = resolveOrgId(user);
+            List<Lead> leads;
 
-        if (campaignId != null) {
-            leads = leadRepository.findByOrgIdAndCampaignId(orgId, campaignId);
-        } else {
-            leads = leadRepository.findByOrgId(orgId);
+            if (campaignId != null) {
+                // Get leads through campaign-lead relationship
+                leads = campaignLeadService.getActiveLeadsForCampaign(campaignId)
+                        .stream()
+                        .filter(lead -> lead.getOrgId().equals(orgId))
+                        .toList();
+            } else {
+                // Get all leads for the organization
+                leads = leadRepository.findByOrgId(orgId);
+            }
+
+            // Convert to DTO with campaign information
+            List<LeadWithCampaignsDto> leadDtos = leads.stream()
+                    .map(LeadWithCampaignsDto::fromLead)
+                    .toList();
+
+            return ResponseEntity.ok(leadDtos);
+        } catch (Exception e) {
+            log.error("Error fetching leads: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to fetch leads: " + e.getMessage()));
         }
-
-        return ResponseEntity.ok(leads);
     }
 
     @PutMapping("/bulk-campaign")
@@ -198,13 +216,13 @@ public class LeadEnrichmentController {
                     .filter(lead -> lead.getOrgId().equals(orgId))
                     .toList();
 
-            // Update campaign_id for all leads
-            userLeads.forEach(lead -> lead.setCampaignId(request.getCampaignId()));
-            leadRepository.saveAll(userLeads);
+            // Create campaign-lead relationships using service
+            List<UUID> leadIds = userLeads.stream().map(Lead::getId).toList();
+            int assignedCount = campaignLeadService.addLeadsToCampaign(request.getCampaignId(), leadIds, user.getId());
 
             return ResponseEntity.ok(Map.of(
                     "message", "Leads assigned to campaign successfully",
-                    "assignedCount", userLeads.size()));
+                    "assignedCount", assignedCount));
         } catch (Exception e) {
             log.error("Error assigning leads to campaign: {}", e.getMessage());
             return ResponseEntity.status(500).body(Map.of("error", "Failed to assign leads to campaign"));
@@ -227,8 +245,8 @@ public class LeadEnrichmentController {
                     .filter(l -> l.getOrgId().equals(orgId))
                     .orElseThrow(() -> new IllegalArgumentException("Lead not found"));
 
-            lead.setCampaignId(request.getCampaignId());
-            leadRepository.save(lead);
+            // Create campaign-lead relationship using service
+            campaignLeadService.addLeadToCampaign(request.getCampaignId(), lead.getId(), user.getId());
 
             return ResponseEntity.ok(Map.of("message", "Lead assigned to campaign successfully"));
         } catch (Exception e) {
