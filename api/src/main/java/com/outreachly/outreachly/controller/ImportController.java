@@ -130,16 +130,20 @@ public class ImportController {
                 }
             }
 
+            // Parse CSV with mapping synchronously to avoid file access issues in async
+            // method
+            List<Map<String, String>> mappedData = csvImportService.parseCsvWithMapping(file, columnMapping);
+
             // Create import job
             UUID orgId = user.getOrgId() != null ? user.getOrgId() : csvImportService.getOrCreateDefaultOrganization();
             ImportJob importJob = csvImportService.createImportJob(
                     user.getId(),
                     orgId,
                     file.getOriginalFilename(),
-                    0); // We'll update this after parsing
+                    mappedData.size());
 
-            // Process import asynchronously with mapping
-            csvImportService.processImportJobWithMapping(importJob.getId(), file, columnMapping, campaignUuid);
+            // Process import asynchronously with parsed data
+            csvImportService.processImportJob(importJob.getId(), mappedData, campaignUuid);
 
             Map<String, Object> response = new HashMap<>();
             response.put("jobId", importJob.getId());

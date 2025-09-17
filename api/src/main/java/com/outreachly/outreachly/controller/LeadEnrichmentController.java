@@ -41,7 +41,7 @@ public class LeadEnrichmentController {
         UUID orgId = resolveOrgId(user);
 
         EnrichmentJob job = enrichmentService.createJob(orgId, id);
-        enrichmentService.processJob(job.getId());
+        // Let the scheduled processor handle the job to avoid race conditions
         return ResponseEntity.ok(Map.of("jobId", job.getId(), "status", job.getStatus()));
     }
 

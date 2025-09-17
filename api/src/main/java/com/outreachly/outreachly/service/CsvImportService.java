@@ -275,75 +275,6 @@ public class CsvImportService {
     }
 
     @Async
-    public CompletableFuture<Void> processImportJobWithMapping(UUID jobId, MultipartFile file,
-            Map<String, String> columnMapping, UUID campaignId) {
-        ImportJob job = importJobRepository.findById(jobId)
-                .orElseThrow(() -> new RuntimeException("Import job not found"));
-
-        try {
-            job.setStatus(ImportJob.ImportStatus.PROCESSING);
-            importJobRepository.save(job);
-
-            // Parse CSV with user mapping
-            List<Map<String, String>> mappedData = parseCsvWithMapping(file, columnMapping);
-
-            int processedRows = 0;
-            int errorRows = 0;
-            Set<String> processedEmails = new HashSet<>();
-
-            for (Map<String, String> row : mappedData) {
-                try {
-                    String email = row.get("email");
-                    if (email == null || email.trim().isEmpty()) {
-                        log.warn("Skipping row with null or empty email in import job {}", jobId);
-                        continue;
-                    }
-                    email = email.trim().toLowerCase();
-
-                    // Skip duplicates
-                    if (processedEmails.contains(email)) {
-                        continue;
-                    }
-                    processedEmails.add(email);
-
-                    // Check if lead already exists
-                    Optional<Lead> existingLead = leadRepository.findByEmailAndOrgId(email, job.getOrgId());
-                    if (existingLead.isPresent()) {
-                        continue; // Skip existing leads
-                    }
-
-                    Lead lead = buildLeadFromMappedRow(row, job.getOrgId(), columnMapping);
-                    lead = leadRepository.save(lead);
-
-                    // If campaignId is provided, create campaign-lead relationship
-                    if (campaignId != null) {
-                        campaignLeadService.addLeadToCampaign(campaignId, lead.getId(), null);
-                    }
-
-                    processedRows++;
-
-                } catch (Exception e) {
-                    log.error("Error processing row in import job {}: {}", jobId, e.getMessage());
-                    errorRows++;
-                }
-            }
-
-            job.setProcessedRows(processedRows);
-            job.setErrorRows(errorRows);
-            job.setStatus(ImportJob.ImportStatus.COMPLETED);
-            importJobRepository.save(job);
-
-        } catch (Exception e) {
-            log.error("Error processing import job {}: {}", jobId, e.getMessage());
-            job.setStatus(ImportJob.ImportStatus.FAILED);
-            job.setErrorMessage(e.getMessage());
-            importJobRepository.save(job);
-        }
-
-        return CompletableFuture.completedFuture(null);
-    }
-
-    @Async
     public CompletableFuture<Void> processImportJob(UUID jobId, List<Map<String, String>> data, UUID campaignId) {
         ImportJob job = importJobRepository.findById(jobId)
                 .orElseThrow(() -> new RuntimeException("Import job not found"));
@@ -673,7 +604,7 @@ public class CsvImportService {
         return "email".equals(fieldType) || "first_name".equals(fieldType);
     }
 
-    private List<Map<String, String>> parseCsvWithMapping(MultipartFile file, Map<String, String> columnMapping) {
+    public List<Map<String, String>> parseCsvWithMapping(MultipartFile file, Map<String, String> columnMapping) {
         List<Map<String, String>> mappedData = new ArrayList<>();
 
         try {

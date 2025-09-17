@@ -76,8 +76,20 @@ public class EnrichmentService {
             log.info("Found {} pending enrichment jobs", pendingJobs.size());
         }
 
-        for (EnrichmentJob job : pendingJobs) {
-            processJob(job.getId());
+        // Rate limiting: only process one job at a time to respect Hunter's rate limits
+        if (!pendingJobs.isEmpty()) {
+            EnrichmentJob job = pendingJobs.get(0);
+            try {
+                processJob(job.getId());
+
+                // Add delay between jobs to respect rate limits
+                if (ratePerMin > 0) {
+                    long delayMs = 60000L / ratePerMin; // Convert per-minute to per-job delay
+                    Thread.sleep(Math.max(delayMs, 1000)); // Minimum 1 second between calls
+                }
+            } catch (Exception e) {
+                log.error("Failed to process enrichment job {}: {}", job.getId(), e.getMessage(), e);
+            }
         }
     }
 
