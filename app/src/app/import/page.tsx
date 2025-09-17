@@ -21,6 +21,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { CsvPreviewModal } from "@/components/import/CsvPreviewModal";
+import { ColumnMappingModal } from "@/components/import/ColumnMappingModal";
 import { ImportHistory } from "@/components/import/ImportHistory";
 import DashboardLayout from "@/components/DashboardLayout";
 import AuthGuard from "@/components/AuthGuard";
@@ -49,6 +50,30 @@ interface ValidationResult {
   totalRows: number;
 }
 
+interface CsvColumn {
+  name: string;
+  displayName: string;
+  sampleValue: string;
+  isRequired: boolean;
+  currentMapping: string | null;
+}
+
+interface FieldOption {
+  value: string;
+  label: string;
+  description: string;
+  isRequired: boolean;
+  category: string;
+}
+
+interface ColumnMappingData {
+  detectedColumns: CsvColumn[];
+  availableFields: FieldOption[];
+  mapping: Record<string, string>;
+  hasRequiredFields: boolean;
+  missingRequiredFields: string[];
+}
+
 interface ImportJob {
   id: string;
   filename: string;
@@ -64,9 +89,13 @@ export default function ImportPage() {
   const [file, setFile] = useState<File | null>(null);
   const [validationResult, setValidationResult] =
     useState<ValidationResult | null>(null);
+  const [columnMappingData, setColumnMappingData] =
+    useState<ColumnMappingData | null>(null);
+  const [isDetectingColumns, setIsDetectingColumns] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [showColumnMapping, setShowColumnMapping] = useState(false);
   const [importJob, setImportJob] = useState<ImportJob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showCampaignSelection, setShowCampaignSelection] = useState(false);
@@ -81,7 +110,8 @@ export default function ImportPage() {
       setFile(selectedFile);
       setError(null);
       setValidationResult(null);
-      validateFile(selectedFile);
+      setColumnMappingData(null);
+      detectColumns(selectedFile);
     }
   }, []);
 
@@ -94,6 +124,39 @@ export default function ImportPage() {
     maxSize: 25 * 1024 * 1024, // 25MB
     multiple: false,
   });
+
+  const detectColumns = async (file: File) => {
+    setIsDetectingColumns(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/import/detect-columns`,
+        {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        }
+      );
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setColumnMappingData(result);
+        setShowColumnMapping(true);
+      } else {
+        setError(result.error || "Column detection failed");
+      }
+    } catch (err) {
+      setError("Error detecting columns. Please try again.");
+      console.error("Column detection error:", err);
+    } finally {
+      setIsDetectingColumns(false);
+    }
+  };
 
   const validateFile = async (file: File) => {
     setIsValidating(true);
@@ -127,6 +190,21 @@ export default function ImportPage() {
     }
   };
 
+  const handleColumnMappingConfirm = async (
+    mapping: Record<string, string>
+  ) => {
+    if (!file) return;
+
+    // Store the mapping for later use
+    setColumnMappingData((prev) => (prev ? { ...prev, mapping } : null));
+
+    // Close the mapping modal
+    setShowColumnMapping(false);
+
+    // Show campaign selection modal
+    setShowCampaignSelection(true);
+  };
+
   const handleImport = async () => {
     if (!file || !validationResult?.valid) return;
 
@@ -135,7 +213,7 @@ export default function ImportPage() {
   };
 
   const handleCampaignSelection = async () => {
-    if (!file || !validationResult?.valid) return;
+    if (!file) return;
 
     setIsImporting(true);
     setError(null);
@@ -145,12 +223,25 @@ export default function ImportPage() {
       const formData = new FormData();
       formData.append("file", file);
 
+      // Add column mapping if available
+      if (columnMappingData?.mapping) {
+        formData.append(
+          "columnMapping",
+          JSON.stringify(columnMappingData.mapping)
+        );
+      }
+
       // Add campaign ID if not default
       if (selectedCampaignId !== "default") {
         formData.append("campaignId", selectedCampaignId);
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/import/process`, {
+      // Use the new endpoint if we have column mapping, otherwise use the old one
+      const endpoint = columnMappingData?.mapping
+        ? `${API_BASE_URL}/api/import/process-with-mapping`
+        : `${API_BASE_URL}/api/import/process`;
+
+      const response = await fetch(endpoint, {
         method: "POST",
         body: formData,
         credentials: "include",
@@ -298,6 +389,13 @@ export default function ImportPage() {
                   </div>
                 )}
 
+                {isDetectingColumns && (
+                  <div className="mt-4 flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    <span>Detecting columns...</span>
+                  </div>
+                )}
+
                 {isValidating && (
                   <div className="mt-4 flex items-center gap-2">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
@@ -419,6 +517,17 @@ export default function ImportPage() {
             {/* Import History */}
             <ImportHistory />
           </div>
+
+          {/* Column Mapping Modal */}
+          {showColumnMapping && columnMappingData && (
+            <ColumnMappingModal
+              isOpen={showColumnMapping}
+              onClose={() => setShowColumnMapping(false)}
+              onConfirm={handleColumnMappingConfirm}
+              data={columnMappingData}
+              isLoading={isImporting}
+            />
+          )}
 
           {/* Preview Modal */}
           {showPreview && validationResult && (

@@ -61,7 +61,8 @@ public class LeadEnrichmentController {
         for (Lead l : leads) {
             EnrichmentJob job = enrichmentService.createJob(orgId, l.getId());
             jobIds.add(job.getId());
-            enrichmentService.processJob(job.getId());
+            // Don't call processJob immediately - let the scheduler handle it
+            // This prevents duplicate API calls for the same lead
         }
         return ResponseEntity.ok(Map.of("status", "queued", "count", leads.size(), "jobIds", jobIds));
     }
@@ -297,5 +298,101 @@ public class LeadEnrichmentController {
         public void setCampaignId(UUID campaignId) {
             this.campaignId = campaignId;
         }
+    }
+
+    public static class ExportRequest {
+        private List<UUID> leadIds;
+
+        public List<UUID> getLeadIds() {
+            return leadIds;
+        }
+
+        public void setLeadIds(List<UUID> leadIds) {
+            this.leadIds = leadIds;
+        }
+    }
+
+    @PostMapping("/{id}/verify")
+    public ResponseEntity<?> verifyLead(@PathVariable UUID id, Authentication authentication) {
+        try {
+            User user = getUser(authentication);
+            if (user == null)
+                return ResponseEntity.status(401).build();
+
+            UUID orgId = resolveOrgId(user);
+            leadRepository.findById(id)
+                    .filter(l -> l.getOrgId().equals(orgId))
+                    .orElseThrow(() -> new IllegalArgumentException("Lead not found"));
+
+            // For now, just return success - verification logic can be implemented later
+            return ResponseEntity.ok(Map.of("message", "Lead verification initiated", "leadId", id));
+        } catch (Exception e) {
+            log.error("Error verifying lead: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to verify lead: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/export")
+    public ResponseEntity<?> exportLeads(@RequestBody ExportRequest request, Authentication authentication) {
+        try {
+            User user = getUser(authentication);
+            if (user == null)
+                return ResponseEntity.status(401).build();
+
+            UUID orgId = resolveOrgId(user);
+            List<Lead> leads;
+
+            if (request.getLeadIds() != null && !request.getLeadIds().isEmpty()) {
+                // Export specific leads
+                leads = leadRepository.findAllById(request.getLeadIds())
+                        .stream()
+                        .filter(lead -> lead.getOrgId().equals(orgId))
+                        .toList();
+            } else {
+                // Export all leads for organization
+                leads = leadRepository.findByOrgId(orgId);
+            }
+
+            // Convert to CSV
+            StringBuilder csv = new StringBuilder();
+            csv.append(
+                    "ID,First Name,Last Name,Company,Title,Email,Phone,Domain,LinkedIn URL,Country,State,City,Source,Verified Status,Created At\n");
+
+            for (Lead lead : leads) {
+                csv.append(String.format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n",
+                        lead.getId(),
+                        escapeCsv(lead.getFirstName()),
+                        escapeCsv(lead.getLastName()),
+                        escapeCsv(lead.getCompany()),
+                        escapeCsv(lead.getTitle()),
+                        escapeCsv(lead.getEmail()),
+                        escapeCsv(lead.getPhone()),
+                        escapeCsv(lead.getDomain()),
+                        escapeCsv(lead.getLinkedinUrl()),
+                        escapeCsv(lead.getCountry()),
+                        escapeCsv(lead.getState()),
+                        escapeCsv(lead.getCity()),
+                        escapeCsv(lead.getSource()),
+                        lead.getVerifiedStatus(),
+                        lead.getCreatedAt()));
+            }
+
+            return ResponseEntity.ok()
+                    .header("Content-Type", "text/csv")
+                    .header("Content-Disposition", "attachment; filename=leads-export.csv")
+                    .body(csv.toString());
+        } catch (Exception e) {
+            log.error("Error exporting leads: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to export leads: " + e.getMessage()));
+        }
+    }
+
+    private String escapeCsv(String value) {
+        if (value == null)
+            return "";
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
     }
 }

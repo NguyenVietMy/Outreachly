@@ -1,5 +1,7 @@
 package com.outreachly.outreachly.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.outreachly.outreachly.dto.CsvColumnMappingDto;
 import com.outreachly.outreachly.entity.ImportJob;
 import com.outreachly.outreachly.entity.User;
 import com.outreachly.outreachly.entity.Campaign;
@@ -27,6 +29,27 @@ public class ImportController {
     private final CsvImportService csvImportService;
     private final UserService userService;
     private final CampaignRepository campaignRepository;
+    private final ObjectMapper objectMapper;
+
+    @PostMapping("/detect-columns")
+    public ResponseEntity<CsvColumnMappingDto> detectCsvColumns(
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) {
+
+        try {
+            // Validate file size (25MB limit)
+            if (file.getSize() > 25 * 1024 * 1024) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            CsvColumnMappingDto result = csvImportService.detectCsvColumns(file);
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            log.error("Error detecting CSV columns", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
 
     @PostMapping("/validate")
     public ResponseEntity<Map<String, Object>> validateCsvFile(
@@ -58,6 +81,77 @@ public class ImportController {
             log.error("Error validating CSV file", e);
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", "Error validating CSV file: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/process-with-mapping")
+    public ResponseEntity<Map<String, Object>> processCsvImportWithMapping(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("columnMapping") String columnMappingJson,
+            @RequestParam(value = "campaignId", required = false) String campaignId,
+            Authentication authentication) {
+
+        try {
+            // Get user ID from authentication
+            String userEmail = authentication.getName();
+            User user = userService.findByEmail(userEmail);
+
+            if (user == null) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "User not found"));
+            }
+
+            // Parse column mapping JSON
+            Map<String, String> columnMapping;
+            try {
+                columnMapping = objectMapper.readValue(columnMappingJson,
+                        objectMapper.getTypeFactory().constructMapType(Map.class, String.class, String.class));
+            } catch (Exception e) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Invalid column mapping format"));
+            }
+
+            // Validate campaign if provided
+            UUID campaignUuid = null;
+            if (campaignId != null && !campaignId.trim().isEmpty() && !campaignId.equals("default")) {
+                try {
+                    campaignUuid = UUID.fromString(campaignId);
+                    UUID orgId = user.getOrgId() != null ? user.getOrgId()
+                            : csvImportService.getOrCreateDefaultOrganization();
+
+                    // Validate campaign exists and belongs to user's organization
+                    Campaign campaign = campaignRepository.findByIdAndOrgId(campaignUuid, orgId)
+                            .orElseThrow(() -> new IllegalArgumentException("Campaign not found or access denied"));
+
+                    log.info("Importing leads to campaign: {} for user: {}", campaign.getName(), user.getEmail());
+                } catch (IllegalArgumentException e) {
+                    return ResponseEntity.badRequest()
+                            .body(Map.of("error", "Invalid campaign ID or access denied"));
+                }
+            }
+
+            // Create import job
+            UUID orgId = user.getOrgId() != null ? user.getOrgId() : csvImportService.getOrCreateDefaultOrganization();
+            ImportJob importJob = csvImportService.createImportJob(
+                    user.getId(),
+                    orgId,
+                    file.getOriginalFilename(),
+                    0); // We'll update this after parsing
+
+            // Process import asynchronously with mapping
+            csvImportService.processImportJobWithMapping(importJob.getId(), file, columnMapping, campaignUuid);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("jobId", importJob.getId());
+            response.put("status", importJob.getStatus());
+            response.put("message", "Import job created successfully");
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("Error processing CSV import with mapping", e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Error processing CSV import: " + e.getMessage()));
         }
     }
 

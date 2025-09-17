@@ -12,4 +12,6 @@ public interface EnrichmentJobRepository extends JpaRepository<EnrichmentJob, UU
     List<EnrichmentJob> findByOrgIdAndLeadIdOrderByCreatedAtDesc(UUID orgId, UUID leadId);
 
     long countByOrgIdAndStatus(UUID orgId, EnrichmentJob.Status status);
+
+    List<EnrichmentJob> findByStatus(EnrichmentJob.Status status);
 }

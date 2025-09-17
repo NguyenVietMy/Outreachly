@@ -95,7 +95,16 @@ export default function LeadsPage() {
     loading: campaignsLoading,
     createCampaign,
   } = useCampaigns();
-  const { leads, loading, error, refetch } = useLeads(selectedCampaignId);
+  const {
+    leads,
+    loading,
+    error,
+    refetch,
+    enrichLeads,
+    verifyLeads,
+    exportLeads,
+    assignLeadsToCampaign,
+  } = useLeads(selectedCampaignId);
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [showLeadModal, setShowLeadModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -109,6 +118,14 @@ export default function LeadsPage() {
     name: "",
     description: "",
   });
+  const [buttonLoading, setButtonLoading] = useState({
+    enrich: false,
+    verify: false,
+    export: false,
+    campaignImport: false,
+  });
+  const [selectedCampaignForImport, setSelectedCampaignForImport] =
+    useState<string>("");
   const [filters, setFilters] = useState<FilterState>({
     verifiedStatus: "all",
     company: "",
@@ -286,6 +303,73 @@ export default function LeadsPage() {
     if (!selectedCampaignId) return "All Leads";
     const campaign = campaigns.find((c) => c.id === selectedCampaignId);
     return campaign ? campaign.name : "Unknown Campaign";
+  };
+
+  // Button handlers
+  const handleEnrich = async () => {
+    if (selectedLeads.length === 0) return;
+
+    setButtonLoading((prev) => ({ ...prev, enrich: true }));
+    try {
+      await enrichLeads(selectedLeads);
+      setSelectedLeads([]);
+      // Show success message or toast
+    } catch (error) {
+      console.error("Error enriching leads:", error);
+      // Show error message or toast
+    } finally {
+      setButtonLoading((prev) => ({ ...prev, enrich: false }));
+    }
+  };
+
+  const handleVerify = async () => {
+    if (selectedLeads.length === 0) return;
+
+    setButtonLoading((prev) => ({ ...prev, verify: true }));
+    try {
+      await verifyLeads(selectedLeads);
+      setSelectedLeads([]);
+      // Show success message or toast
+    } catch (error) {
+      console.error("Error verifying leads:", error);
+      // Show error message or toast
+    } finally {
+      setButtonLoading((prev) => ({ ...prev, verify: false }));
+    }
+  };
+
+  const handleExport = async () => {
+    if (selectedLeads.length === 0) return;
+
+    setButtonLoading((prev) => ({ ...prev, export: true }));
+    try {
+      await exportLeads(selectedLeads);
+      setSelectedLeads([]);
+      // Show success message or toast
+    } catch (error) {
+      console.error("Error exporting leads:", error);
+      // Show error message or toast
+    } finally {
+      setButtonLoading((prev) => ({ ...prev, export: false }));
+    }
+  };
+
+  const handleCampaignImport = async () => {
+    if (selectedLeads.length === 0 || !selectedCampaignForImport) return;
+
+    setButtonLoading((prev) => ({ ...prev, campaignImport: true }));
+    try {
+      await assignLeadsToCampaign(selectedLeads, selectedCampaignForImport);
+      setSelectedLeads([]);
+      setShowCampaignImport(false);
+      setSelectedCampaignForImport("");
+      // Show success message or toast
+    } catch (error) {
+      console.error("Error assigning leads to campaign:", error);
+      // Show error message or toast
+    } finally {
+      setButtonLoading((prev) => ({ ...prev, campaignImport: false }));
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -650,20 +734,32 @@ export default function LeadsPage() {
               <div className="flex gap-2 mb-4">
                 <Button
                   variant={selectedLeads.length > 1 ? "default" : "outline"}
-                  disabled={selectedLeads.length === 0}
+                  disabled={selectedLeads.length === 0 || buttonLoading.enrich}
+                  onClick={handleEnrich}
                 >
+                  {buttonLoading.enrich ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : null}
                   {selectedLeads.length > 1 ? "Bulk " : ""}Enrich
                 </Button>
                 <Button
                   variant={selectedLeads.length > 1 ? "default" : "outline"}
-                  disabled={selectedLeads.length === 0}
+                  disabled={selectedLeads.length === 0 || buttonLoading.verify}
+                  onClick={handleVerify}
                 >
+                  {buttonLoading.verify ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : null}
                   {selectedLeads.length > 1 ? "Bulk " : ""}Verify
                 </Button>
                 <Button
                   variant={selectedLeads.length > 1 ? "default" : "outline"}
-                  disabled={selectedLeads.length === 0}
+                  disabled={selectedLeads.length === 0 || buttonLoading.export}
+                  onClick={handleExport}
                 >
+                  {buttonLoading.export ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : null}
                   {selectedLeads.length > 1 ? "Bulk " : ""}Export
                 </Button>
                 <Button
@@ -1120,7 +1216,10 @@ export default function LeadsPage() {
                 <label className="text-sm font-medium mb-2 block">
                   Select Campaign
                 </label>
-                <Select>
+                <Select
+                  value={selectedCampaignForImport}
+                  onValueChange={setSelectedCampaignForImport}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Choose a campaign..." />
                   </SelectTrigger>
@@ -1141,10 +1240,21 @@ export default function LeadsPage() {
                 <Button
                   variant="outline"
                   onClick={() => setShowCampaignImport(false)}
+                  disabled={buttonLoading.campaignImport}
                 >
                   Cancel
                 </Button>
-                <Button>Import to Campaign</Button>
+                <Button
+                  onClick={handleCampaignImport}
+                  disabled={
+                    !selectedCampaignForImport || buttonLoading.campaignImport
+                  }
+                >
+                  {buttonLoading.campaignImport ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : null}
+                  Import to Campaign
+                </Button>
               </div>
             </div>
           </DialogContent>

@@ -18,9 +18,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.scheduling.annotation.Scheduled;
 
 @Service
 @RequiredArgsConstructor
@@ -47,6 +50,13 @@ public class EnrichmentService {
 
     @Transactional
     public EnrichmentJob createJob(UUID orgId, UUID leadId) {
+        // Check if there's already a pending job for this lead
+        List<EnrichmentJob> existingJobs = jobRepository.findByOrgIdAndLeadIdOrderByCreatedAtDesc(orgId, leadId);
+        if (!existingJobs.isEmpty() && existingJobs.get(0).getStatus() == EnrichmentJob.Status.pending) {
+            log.info("Job already pending for lead {}, skipping creation", leadId);
+            return existingJobs.get(0);
+        }
+
         EnrichmentJob job = EnrichmentJob.builder()
                 .orgId(orgId)
                 .leadId(leadId)
@@ -55,6 +65,20 @@ public class EnrichmentService {
                 .attempts(0)
                 .build();
         return jobRepository.save(job);
+    }
+
+    @Scheduled(fixedDelay = 5000) // Run every 5 seconds
+    public void processPendingJobs() {
+        List<EnrichmentJob> pendingJobs = jobRepository.findByStatus(EnrichmentJob.Status.pending);
+
+        // Only log when there are pending jobs
+        if (!pendingJobs.isEmpty()) {
+            log.info("Found {} pending enrichment jobs", pendingJobs.size());
+        }
+
+        for (EnrichmentJob job : pendingJobs) {
+            processJob(job.getId());
+        }
     }
 
     @Async
@@ -69,6 +93,7 @@ public class EnrichmentService {
 
         try {
             Lead lead = leadRepository.findById(job.getLeadId()).orElseThrow();
+            log.info("Processing enrichment job {} for lead {} (email: {})", jobId, lead.getId(), lead.getEmail());
 
             // Cache key: provider + email or name+domain
             String keyString = lead.getEmail() != null && !lead.getEmail().isBlank()
@@ -89,7 +114,15 @@ public class EnrichmentService {
             JsonNode finder = null;
             if (lead.getEmail() == null || lead.getEmail().isBlank()) {
                 if (lead.getFirstName() != null && lead.getLastName() != null && lead.getDomain() != null) {
-                    finder = hunterClient.emailFinder(lead.getDomain(), lead.getFirstName(), lead.getLastName());
+                    try {
+                        log.info("Calling Hunter email finder for {} {} at {}", lead.getFirstName(), lead.getLastName(),
+                                lead.getDomain());
+                        finder = hunterClient.emailFinder(lead.getDomain(), lead.getFirstName(), lead.getLastName());
+                        log.info("Hunter email finder response: {}", finder);
+                    } catch (Exception e) {
+                        log.error("Hunter email finder failed: {}", e.getMessage(), e);
+                        throw e;
+                    }
                 }
             }
 
@@ -103,13 +136,21 @@ public class EnrichmentService {
 
             JsonNode verifier = null;
             if (email != null && !email.isBlank()) {
-                verifier = hunterClient.emailVerifier(email);
+                try {
+                    log.info("Calling Hunter email verifier for {}", email);
+                    verifier = hunterClient.emailVerifier(email);
+                    log.info("Hunter email verifier response: {}", verifier);
+                } catch (Exception e) {
+                    log.error("Hunter email verifier failed: {}", e.getMessage(), e);
+                    throw e;
+                }
             }
 
             // Build consolidated result json
-            JsonNode result = objectMapper.valueToTree(Map.of(
-                    "finder", finder,
-                    "verifier", verifier));
+            Map<String, Object> resultMap = new HashMap<>();
+            resultMap.put("finder", finder);
+            resultMap.put("verifier", verifier);
+            JsonNode result = objectMapper.valueToTree(resultMap);
 
             // Cache forever (TTL=0)
             cacheRepository.save(EnrichmentCache.builder()
@@ -120,12 +161,18 @@ public class EnrichmentService {
                     .fetchedAt(LocalDateTime.now())
                     .build());
 
-            applyResult(lead, result);
-            leadRepository.save(lead);
-            finalizeJob(job, null);
+            try {
+                applyResult(lead, result);
+                leadRepository.save(lead);
+                log.info("Enrichment job {} completed successfully for lead {}", jobId, lead.getId());
+                finalizeJob(job, null);
+            } catch (Exception e) {
+                log.error("Error in applyResult for job {}: {}", jobId, e.getMessage(), e);
+                throw e;
+            }
 
         } catch (Exception e) {
-            log.error("Enrichment job failed {}", jobId, e);
+            log.error("Enrichment job failed {}: {}", jobId, e.getMessage(), e);
             job.setAttempts(job.getAttempts() + 1);
             job.setError(e.getMessage());
             job.setStatus(EnrichmentJob.Status.failed);
@@ -143,8 +190,12 @@ public class EnrichmentService {
 
     private void applyResult(Lead lead, JsonNode result) {
         try {
+            log.info("Applying enrichment result to lead {}: {}", lead.getId(), result);
+
             String newEmail = null;
             Double score = null;
+
+            // Handle finder results (for finding new emails)
             if (result.has("finder") && result.get("finder") != null) {
                 JsonNode data = result.get("finder").get("data");
                 if (data != null) {
@@ -155,6 +206,45 @@ public class EnrichmentService {
                 }
             }
 
+            // Handle verifier results (for verifying existing emails)
+            if (result.has("verifier") && result.get("verifier") != null) {
+                JsonNode verifierData = result.get("verifier").get("data");
+                if (verifierData != null) {
+                    // Update verification status
+                    if (verifierData.has("status")) {
+                        String status = verifierData.get("status").asText();
+                        if ("deliverable".equals(status)) {
+                            lead.setVerifiedStatus(Lead.VerifiedStatus.valid);
+                        } else if ("undeliverable".equals(status)) {
+                            lead.setVerifiedStatus(Lead.VerifiedStatus.invalid);
+                        } else if ("risky".equals(status) || "unknown".equals(status) || "accept_all".equals(status)) {
+                            lead.setVerifiedStatus(Lead.VerifiedStatus.risky);
+                        }
+                    }
+
+                    // Also check the deprecated 'result' field as fallback
+                    if (verifierData.has("result")) {
+                        String resultStatus = verifierData.get("result").asText();
+                        if ("deliverable".equals(resultStatus)) {
+                            lead.setVerifiedStatus(Lead.VerifiedStatus.valid);
+                        } else if ("undeliverable".equals(resultStatus)) {
+                            lead.setVerifiedStatus(Lead.VerifiedStatus.invalid);
+                        } else if ("risky".equals(resultStatus) || "unknown".equals(resultStatus)) {
+                            lead.setVerifiedStatus(Lead.VerifiedStatus.risky);
+                        }
+                    }
+
+                    // Update confidence score
+                    if (verifierData.has("score")) {
+                        Double verifierScore = verifierData.get("score").asDouble() / 100.0;
+                        if (score == null || verifierScore > score) {
+                            score = verifierScore;
+                        }
+                    }
+                }
+            }
+
+            // Apply new email if found and meets confidence threshold
             if (newEmail != null && (score == null || score >= confidenceMin)) {
                 if (lead.getEmail() != null && !lead.getEmail().isBlank()) {
                     // keep previous
@@ -164,14 +254,18 @@ public class EnrichmentService {
                     lead.setEnrichedJson(prev.toString());
                 }
                 lead.setEmail(newEmail);
+                log.info("Updated lead {} email to: {} (confidence: {})", lead.getId(), newEmail, score);
             }
 
             // store raw providers
             var root = objectMapper.readTree(lead.getEnrichedJson() == null ? "{}" : lead.getEnrichedJson());
             ((com.fasterxml.jackson.databind.node.ObjectNode) root.with("providers")).set("hunter", result);
             lead.setEnrichedJson(root.toString());
+
+            log.info("Lead {} enrichment applied successfully. Email: {}, Verified Status: {}",
+                    lead.getId(), lead.getEmail(), lead.getVerifiedStatus());
         } catch (Exception e) {
-            log.warn("applyResult error", e);
+            log.error("applyResult error for lead {}", lead.getId(), e);
         }
     }
 
