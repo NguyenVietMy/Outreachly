@@ -101,7 +101,6 @@ export default function LeadsPage() {
     error,
     refetch,
     enrichLeads,
-    verifyLeads,
     exportLeads,
     assignLeadsToCampaign,
   } = useLeads(selectedCampaignId);
@@ -120,7 +119,6 @@ export default function LeadsPage() {
   });
   const [buttonLoading, setButtonLoading] = useState({
     enrich: false,
-    verify: false,
     export: false,
     campaignImport: false,
   });
@@ -319,22 +317,6 @@ export default function LeadsPage() {
       // Show error message or toast
     } finally {
       setButtonLoading((prev) => ({ ...prev, enrich: false }));
-    }
-  };
-
-  const handleVerify = async () => {
-    if (selectedLeads.length === 0) return;
-
-    setButtonLoading((prev) => ({ ...prev, verify: true }));
-    try {
-      await verifyLeads(selectedLeads);
-      setSelectedLeads([]);
-      // Show success message or toast
-    } catch (error) {
-      console.error("Error verifying leads:", error);
-      // Show error message or toast
-    } finally {
-      setButtonLoading((prev) => ({ ...prev, verify: false }));
     }
   };
 
@@ -740,17 +722,7 @@ export default function LeadsPage() {
                   {buttonLoading.enrich ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : null}
-                  {selectedLeads.length > 1 ? "Bulk " : ""}Enrich
-                </Button>
-                <Button
-                  variant={selectedLeads.length > 1 ? "default" : "outline"}
-                  disabled={selectedLeads.length === 0 || buttonLoading.verify}
-                  onClick={handleVerify}
-                >
-                  {buttonLoading.verify ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : null}
-                  {selectedLeads.length > 1 ? "Bulk " : ""}Verify
+                  {selectedLeads.length > 1 ? "Bulk " : ""}Enrich and Verify
                 </Button>
                 <Button
                   variant={selectedLeads.length > 1 ? "default" : "outline"}

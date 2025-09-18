@@ -121,36 +121,6 @@ export function useLeads(campaignId?: string) {
     }
   };
 
-  // Verify leads
-  const verifyLeads = async (leadIds: string[]) => {
-    try {
-      const promises = leadIds.map(async (leadId) => {
-        const response = await fetch(`${API_URL}/api/leads/${leadId}/verify`, {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error(
-            `Failed to verify lead ${leadId}: ${response.statusText}`
-          );
-        }
-
-        return response.json();
-      });
-
-      const results = await Promise.all(promises);
-      await fetchLeads(); // Refresh leads after verification
-      return results;
-    } catch (err) {
-      console.error("Error verifying leads:", err);
-      throw err;
-    }
-  };
-
   // Export leads to CSV
   const exportLeads = async (leadIds: string[]) => {
     try {
@@ -221,7 +191,6 @@ export function useLeads(campaignId?: string) {
     error,
     refetch: fetchLeads,
     enrichLeads,
-    verifyLeads,
     exportLeads,
     assignLeadsToCampaign,
   };
