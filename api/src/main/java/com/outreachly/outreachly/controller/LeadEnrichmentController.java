@@ -256,6 +256,37 @@ public class LeadEnrichmentController {
         }
     }
 
+    @DeleteMapping("/bulk-campaign-remove")
+    public ResponseEntity<?> removeLeadsFromCampaign(
+            @RequestBody BulkCampaignRemovalRequest request,
+            Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null)
+            return ResponseEntity.status(401).build();
+
+        UUID orgId = resolveOrgId(user);
+
+        try {
+            List<Lead> leads = leadRepository.findAllById(request.getLeadIds());
+
+            // Filter leads that belong to the user's organization
+            List<Lead> userLeads = leads.stream()
+                    .filter(lead -> lead.getOrgId().equals(orgId))
+                    .toList();
+
+            // Remove campaign-lead relationships using service
+            List<UUID> leadIds = userLeads.stream().map(Lead::getId).toList();
+            int removedCount = campaignLeadService.removeLeadsFromCampaign(request.getCampaignId(), leadIds);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Leads removed from campaign successfully",
+                    "removedCount", removedCount));
+        } catch (Exception e) {
+            log.error("Error removing leads from campaign: {}", e.getMessage());
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to remove leads from campaign"));
+        }
+    }
+
     private User getUser(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated())
             return null;
@@ -290,6 +321,27 @@ public class LeadEnrichmentController {
 
     public static class CampaignAssignmentRequest {
         private UUID campaignId;
+
+        public UUID getCampaignId() {
+            return campaignId;
+        }
+
+        public void setCampaignId(UUID campaignId) {
+            this.campaignId = campaignId;
+        }
+    }
+
+    public static class BulkCampaignRemovalRequest {
+        private List<UUID> leadIds;
+        private UUID campaignId;
+
+        public List<UUID> getLeadIds() {
+            return leadIds;
+        }
+
+        public void setLeadIds(List<UUID> leadIds) {
+            this.leadIds = leadIds;
+        }
 
         public UUID getCampaignId() {
             return campaignId;

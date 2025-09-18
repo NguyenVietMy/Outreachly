@@ -185,6 +185,39 @@ export function useLeads(campaignId?: string) {
     }
   };
 
+  // Remove leads from campaign
+  const removeLeadsFromCampaign = async (
+    leadIds: string[],
+    campaignId: string
+  ) => {
+    try {
+      const response = await fetch(
+        `${API_URL}/api/leads/bulk-campaign-remove`,
+        {
+          method: "DELETE",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ leadIds, campaignId }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to remove leads from campaign: ${response.statusText}`
+        );
+      }
+
+      const result = await response.json();
+      await fetchLeads(); // Refresh leads after removal
+      return result;
+    } catch (err) {
+      console.error("Error removing leads from campaign:", err);
+      throw err;
+    }
+  };
+
   return {
     leads,
     loading,
@@ -193,5 +226,6 @@ export function useLeads(campaignId?: string) {
     enrichLeads,
     exportLeads,
     assignLeadsToCampaign,
+    removeLeadsFromCampaign,
   };
 }

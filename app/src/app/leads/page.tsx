@@ -103,6 +103,7 @@ export default function LeadsPage() {
     enrichLeads,
     exportLeads,
     assignLeadsToCampaign,
+    removeLeadsFromCampaign,
   } = useLeads(selectedCampaignId);
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [showLeadModal, setShowLeadModal] = useState(false);
@@ -121,6 +122,7 @@ export default function LeadsPage() {
     enrich: false,
     export: false,
     campaignImport: false,
+    removeFromCampaign: false,
   });
   const [selectedCampaignForImport, setSelectedCampaignForImport] =
     useState<string>("");
@@ -354,6 +356,22 @@ export default function LeadsPage() {
     }
   };
 
+  const handleRemoveFromCampaign = async () => {
+    if (selectedLeads.length === 0 || !selectedCampaignId) return;
+
+    setButtonLoading((prev) => ({ ...prev, removeFromCampaign: true }));
+    try {
+      await removeLeadsFromCampaign(selectedLeads, selectedCampaignId);
+      setSelectedLeads([]);
+      // Show success message or toast
+    } catch (error) {
+      console.error("Error removing leads from campaign:", error);
+      // Show error message or toast
+    } finally {
+      setButtonLoading((prev) => ({ ...prev, removeFromCampaign: false }));
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const variants: any = {
       sent: "default",
@@ -428,7 +446,7 @@ export default function LeadsPage() {
           </div>
 
           {/* Leads Table Section */}
-          <Card className="mb-6">
+          <Card className="mb-6 overflow-hidden">
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle>Your Leads</CardTitle>
@@ -741,6 +759,25 @@ export default function LeadsPage() {
                 >
                   {selectedLeads.length > 1 ? "Bulk " : ""}Campaign Lead Import
                 </Button>
+                {/* Only show Remove from Campaign button when viewing a specific campaign */}
+                {selectedCampaignId && (
+                  <Button
+                    variant={
+                      selectedLeads.length > 1 ? "destructive" : "outline"
+                    }
+                    disabled={
+                      selectedLeads.length === 0 ||
+                      buttonLoading.removeFromCampaign
+                    }
+                    onClick={handleRemoveFromCampaign}
+                  >
+                    {buttonLoading.removeFromCampaign ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : null}
+                    {selectedLeads.length > 1 ? "Bulk " : ""}Remove from
+                    Campaign
+                  </Button>
+                )}
               </div>
 
               {loading ? (
@@ -794,89 +831,162 @@ export default function LeadsPage() {
                 </div>
               ) : (
                 <>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-12">
-                          <Checkbox
-                            checked={
-                              selectedLeads.length === filteredLeads.length &&
-                              filteredLeads.length > 0
-                            }
-                            onCheckedChange={handleSelectAll}
-                          />
-                        </TableHead>
-                        <TableHead>First Name</TableHead>
-                        <TableHead>Last Name</TableHead>
-                        <TableHead>Company</TableHead>
-                        <TableHead>Title</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Custom Field</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredLeads.map((lead) => (
-                        <TableRow
-                          key={lead.id}
-                          className="cursor-pointer hover:bg-gray-50"
-                        >
-                          <TableCell>
+                  {/* Horizontal scrollable table container */}
+                  <div className="overflow-x-auto overflow-y-visible">
+                    <Table className="min-w-full">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-12 sticky left-0 bg-white z-10">
                             <Checkbox
-                              checked={selectedLeads.includes(lead.id)}
-                              onCheckedChange={(checked) =>
-                                handleSelectLead(lead.id, checked as boolean)
+                              checked={
+                                selectedLeads.length === filteredLeads.length &&
+                                filteredLeads.length > 0
                               }
+                              onCheckedChange={handleSelectAll}
                             />
-                          </TableCell>
-                          <TableCell onClick={() => handleLeadClick(lead)}>
-                            {lead.firstName || "-"}
-                          </TableCell>
-                          <TableCell onClick={() => handleLeadClick(lead)}>
-                            {lead.lastName || "-"}
-                          </TableCell>
-                          <TableCell onClick={() => handleLeadClick(lead)}>
-                            {lead.company || "-"}
-                          </TableCell>
-                          <TableCell onClick={() => handleLeadClick(lead)}>
-                            {lead.title || "-"}
-                          </TableCell>
-                          <TableCell onClick={() => handleLeadClick(lead)}>
-                            {lead.email || "-"}
-                          </TableCell>
-                          <TableCell onClick={() => handleLeadClick(lead)}>
-                            <Badge
-                              variant={
-                                lead.verifiedStatus === "valid"
-                                  ? "default"
-                                  : lead.verifiedStatus === "risky"
-                                    ? "secondary"
-                                    : lead.verifiedStatus === "invalid"
-                                      ? "destructive"
-                                      : "outline"
-                              }
-                            >
-                              {lead.verifiedStatus}
-                            </Badge>
-                          </TableCell>
-                          <TableCell onClick={() => handleLeadClick(lead)}>
-                            {lead.customTextField || "-"}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-1">
-                              <Button size="sm" variant="ghost">
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                              <Button size="sm" variant="ghost">
-                                <Mail className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
+                          </TableHead>
+                          <TableHead className="min-w-[120px]">
+                            First Name
+                          </TableHead>
+                          <TableHead className="min-w-[120px]">
+                            Last Name
+                          </TableHead>
+                          <TableHead className="min-w-[150px]">
+                            Company
+                          </TableHead>
+                          <TableHead className="min-w-[150px]">Title</TableHead>
+                          <TableHead className="min-w-[200px]">Email</TableHead>
+                          <TableHead className="min-w-[100px]">
+                            Status
+                          </TableHead>
+                          {/* New columns between Status and Custom Field */}
+                          <TableHead className="min-w-[120px]">Phone</TableHead>
+                          <TableHead className="min-w-[150px]">
+                            Domain
+                          </TableHead>
+                          <TableHead className="min-w-[200px]">
+                            LinkedIn URL
+                          </TableHead>
+                          <TableHead className="min-w-[100px]">
+                            Country
+                          </TableHead>
+                          <TableHead className="min-w-[100px]">State</TableHead>
+                          <TableHead className="min-w-[100px]">City</TableHead>
+                          <TableHead className="min-w-[120px]">
+                            Source
+                          </TableHead>
+                          <TableHead className="min-w-[150px]">
+                            Custom Field
+                          </TableHead>
+                          <TableHead className="min-w-[100px]">
+                            Created At
+                          </TableHead>
+                          <TableHead className="min-w-[120px] sticky right-0 bg-white z-10">
+                            Actions
+                          </TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredLeads.map((lead) => (
+                          <TableRow
+                            key={lead.id}
+                            className="cursor-pointer hover:bg-gray-50"
+                          >
+                            <TableCell className="sticky left-0 bg-white z-10">
+                              <Checkbox
+                                checked={selectedLeads.includes(lead.id)}
+                                onCheckedChange={(checked) =>
+                                  handleSelectLead(lead.id, checked as boolean)
+                                }
+                              />
+                            </TableCell>
+                            <TableCell onClick={() => handleLeadClick(lead)}>
+                              {lead.firstName || "-"}
+                            </TableCell>
+                            <TableCell onClick={() => handleLeadClick(lead)}>
+                              {lead.lastName || "-"}
+                            </TableCell>
+                            <TableCell onClick={() => handleLeadClick(lead)}>
+                              {lead.company || "-"}
+                            </TableCell>
+                            <TableCell onClick={() => handleLeadClick(lead)}>
+                              {lead.title || "-"}
+                            </TableCell>
+                            <TableCell onClick={() => handleLeadClick(lead)}>
+                              {lead.email || "-"}
+                            </TableCell>
+                            <TableCell onClick={() => handleLeadClick(lead)}>
+                              <Badge
+                                variant={
+                                  lead.verifiedStatus === "valid"
+                                    ? "default"
+                                    : lead.verifiedStatus === "risky"
+                                      ? "secondary"
+                                      : lead.verifiedStatus === "invalid"
+                                        ? "destructive"
+                                        : "outline"
+                                }
+                              >
+                                {lead.verifiedStatus}
+                              </Badge>
+                            </TableCell>
+                            {/* New columns between Status and Custom Field */}
+                            <TableCell onClick={() => handleLeadClick(lead)}>
+                              {lead.phone || "-"}
+                            </TableCell>
+                            <TableCell onClick={() => handleLeadClick(lead)}>
+                              {lead.domain || "-"}
+                            </TableCell>
+                            <TableCell onClick={() => handleLeadClick(lead)}>
+                              {lead.linkedinUrl ? (
+                                <a
+                                  href={lead.linkedinUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline truncate block max-w-[180px]"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {lead.linkedinUrl}
+                                </a>
+                              ) : (
+                                "-"
+                              )}
+                            </TableCell>
+                            <TableCell onClick={() => handleLeadClick(lead)}>
+                              {lead.country || "-"}
+                            </TableCell>
+                            <TableCell onClick={() => handleLeadClick(lead)}>
+                              {lead.state || "-"}
+                            </TableCell>
+                            <TableCell onClick={() => handleLeadClick(lead)}>
+                              {lead.city || "-"}
+                            </TableCell>
+                            <TableCell onClick={() => handleLeadClick(lead)}>
+                              {lead.source || "-"}
+                            </TableCell>
+                            <TableCell onClick={() => handleLeadClick(lead)}>
+                              {lead.customTextField || "-"}
+                            </TableCell>
+                            <TableCell onClick={() => handleLeadClick(lead)}>
+                              {lead.createdAt
+                                ? new Date(lead.createdAt).toLocaleDateString()
+                                : "-"}
+                            </TableCell>
+                            <TableCell className="sticky right-0 bg-white z-10">
+                              <div className="flex gap-1">
+                                <Button size="sm" variant="ghost">
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                                <Button size="sm" variant="ghost">
+                                  <Mail className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
 
                   {/* Pagination Placeholder */}
                   <div className="flex justify-between items-center mt-4">
