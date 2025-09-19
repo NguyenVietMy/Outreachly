@@ -1,6 +1,7 @@
 package com.outreachly.outreachly.controller;
 
 import com.outreachly.outreachly.dto.LeadWithCampaignsDto;
+import com.outreachly.outreachly.entity.CampaignLead;
 import com.outreachly.outreachly.entity.EnrichmentJob;
 import com.outreachly.outreachly.entity.User;
 import com.outreachly.outreachly.repository.EnrichmentJobRepository;
@@ -177,14 +178,22 @@ public class LeadEnrichmentController {
             List<Lead> leads;
 
             if (campaignId != null) {
+                log.info("Fetching leads for campaign: {} for organization: {}", campaignId, orgId);
                 // Get leads through campaign-lead relationship
-                leads = campaignLeadService.getActiveLeadsForCampaign(campaignId)
-                        .stream()
+                List<Lead> campaignLeads = campaignLeadService.getActiveLeadsForCampaign(campaignId);
+                log.debug("Retrieved {} leads from campaign service for campaign {}", campaignLeads.size(), campaignId);
+
+                leads = campaignLeads.stream()
                         .filter(lead -> lead.getOrgId().equals(orgId))
                         .toList();
+
+                log.info("Filtered to {} leads belonging to organization {} for campaign {}",
+                        leads.size(), orgId, campaignId);
             } else {
+                log.info("Fetching all leads for organization: {}", orgId);
                 // Get all leads for the organization
                 leads = leadRepository.findByOrgId(orgId);
+                log.debug("Retrieved {} total leads for organization {}", leads.size(), orgId);
             }
 
             // Convert to DTO with campaign information
@@ -204,28 +213,45 @@ public class LeadEnrichmentController {
             @RequestBody BulkCampaignAssignmentRequest request,
             Authentication authentication) {
         User user = getUser(authentication);
-        if (user == null)
+        if (user == null) {
+            log.warn("Unauthorized attempt to assign leads to campaign - no user found");
             return ResponseEntity.status(401).build();
+        }
 
         UUID orgId = resolveOrgId(user);
+        log.info("Starting bulk campaign assignment - User: {}, Org: {}, Campaign: {}, Lead IDs: {}",
+                user.getId(), orgId, request.getCampaignId(), request.getLeadIds());
 
         try {
             List<Lead> leads = leadRepository.findAllById(request.getLeadIds());
+            log.debug("Found {} leads from database for IDs: {}", leads.size(), request.getLeadIds());
 
             // Filter leads that belong to the user's organization
             List<Lead> userLeads = leads.stream()
                     .filter(lead -> lead.getOrgId().equals(orgId))
                     .toList();
 
+            log.info("Filtered to {} leads belonging to organization {} out of {} total leads",
+                    userLeads.size(), orgId, leads.size());
+
             // Create campaign-lead relationships using service
             List<UUID> leadIds = userLeads.stream().map(Lead::getId).toList();
             int assignedCount = campaignLeadService.addLeadsToCampaign(request.getCampaignId(), leadIds, user.getId());
+
+            log.info("Successfully assigned {} leads to campaign {} for user {}",
+                    assignedCount, request.getCampaignId(), user.getId());
+
+            // Verify the assignments by checking the database
+            long actualCount = campaignLeadService.getActiveLeadCountForCampaign(request.getCampaignId());
+            log.info("Verification: Campaign {} now has {} active leads in database",
+                    request.getCampaignId(), actualCount);
 
             return ResponseEntity.ok(Map.of(
                     "message", "Leads assigned to campaign successfully",
                     "assignedCount", assignedCount));
         } catch (Exception e) {
-            log.error("Error assigning leads to campaign: {}", e.getMessage());
+            log.error("Error assigning leads to campaign - User: {}, Campaign: {}, Lead IDs: {}, Error: {}",
+                    user.getId(), request.getCampaignId(), request.getLeadIds(), e.getMessage(), e);
             return ResponseEntity.status(500).body(Map.of("error", "Failed to assign leads to campaign"));
         }
     }
@@ -236,22 +262,35 @@ public class LeadEnrichmentController {
             @RequestBody CampaignAssignmentRequest request,
             Authentication authentication) {
         User user = getUser(authentication);
-        if (user == null)
+        if (user == null) {
+            log.warn("Unauthorized attempt to assign lead to campaign - no user found for lead ID: {}", id);
             return ResponseEntity.status(401).build();
+        }
 
         UUID orgId = resolveOrgId(user);
+        log.info("Starting single lead campaign assignment - User: {}, Org: {}, Lead ID: {}, Campaign: {}",
+                user.getId(), orgId, id, request.getCampaignId());
 
         try {
             Lead lead = leadRepository.findById(id)
                     .filter(l -> l.getOrgId().equals(orgId))
-                    .orElseThrow(() -> new IllegalArgumentException("Lead not found"));
+                    .orElseThrow(() -> {
+                        log.warn("Lead not found or not accessible - Lead ID: {}, User Org: {}", id, orgId);
+                        return new IllegalArgumentException("Lead not found");
+                    });
+
+            log.debug("Found lead: {} (Email: {}) for campaign assignment", lead.getId(), lead.getEmail());
 
             // Create campaign-lead relationship using service
             campaignLeadService.addLeadToCampaign(request.getCampaignId(), lead.getId(), user.getId());
 
+            log.info("Successfully assigned lead {} to campaign {} for user {}",
+                    lead.getId(), request.getCampaignId(), user.getId());
+
             return ResponseEntity.ok(Map.of("message", "Lead assigned to campaign successfully"));
         } catch (Exception e) {
-            log.error("Error assigning lead to campaign: {}", e.getMessage());
+            log.error("Error assigning lead to campaign - User: {}, Lead ID: {}, Campaign: {}, Error: {}",
+                    user.getId(), id, request.getCampaignId(), e.getMessage(), e);
             return ResponseEntity.status(500).body(Map.of("error", "Failed to assign lead to campaign"));
         }
     }
@@ -384,6 +423,39 @@ public class LeadEnrichmentController {
         }
     }
 
+    @GetMapping("/debug/campaign/{campaignId}")
+    public ResponseEntity<?> debugCampaignLeads(
+            @PathVariable UUID campaignId,
+            Authentication authentication) {
+        try {
+            User user = getUser(authentication);
+            if (user == null)
+                return ResponseEntity.status(401).build();
+
+            UUID orgId = resolveOrgId(user);
+
+            // Get campaign-lead relationships directly
+            List<CampaignLead> campaignLeads = campaignLeadService.getActiveCampaignsForLead(campaignId);
+            long count = campaignLeadService.getActiveLeadCountForCampaign(campaignId);
+
+            // Get leads through the service
+            List<Lead> leads = campaignLeadService.getActiveLeadsForCampaign(campaignId);
+
+            Map<String, Object> debug = Map.of(
+                    "campaignId", campaignId,
+                    "orgId", orgId,
+                    "campaignLeadRelationships", campaignLeads.size(),
+                    "activeLeadCount", count,
+                    "leadsRetrieved", leads.size(),
+                    "leadIds", leads.stream().map(Lead::getId).toList());
+
+            return ResponseEntity.ok(debug);
+        } catch (Exception e) {
+            log.error("Error debugging campaign leads: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @PostMapping("/export")
     public ResponseEntity<?> exportLeads(@RequestBody ExportRequest request, Authentication authentication) {
         try {
@@ -408,22 +480,22 @@ public class LeadEnrichmentController {
             // Convert to CSV
             StringBuilder csv = new StringBuilder();
             csv.append(
-                    "ID,First Name,Last Name,Company,Title,Email,Phone,Domain,LinkedIn URL,Country,State,City,Source,Verified Status,Created At\n");
+                    "ID,First Name,Last Name,Position,Department,Email,Phone,Domain,LinkedIn URL,Twitter,Confidence Score,Email Type,Source,Verified Status,Created At\n");
 
             for (Lead lead : leads) {
                 csv.append(String.format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n",
                         lead.getId(),
                         escapeCsv(lead.getFirstName()),
                         escapeCsv(lead.getLastName()),
-                        escapeCsv(lead.getCompany()),
-                        escapeCsv(lead.getTitle()),
+                        escapeCsv(lead.getPosition()),
+                        escapeCsv(lead.getDepartment()),
                         escapeCsv(lead.getEmail()),
                         escapeCsv(lead.getPhone()),
                         escapeCsv(lead.getDomain()),
                         escapeCsv(lead.getLinkedinUrl()),
-                        escapeCsv(lead.getCountry()),
-                        escapeCsv(lead.getState()),
-                        escapeCsv(lead.getCity()),
+                        escapeCsv(lead.getTwitter()),
+                        lead.getConfidenceScore(),
+                        lead.getEmailType() != null ? lead.getEmailType().toString() : "",
                         escapeCsv(lead.getSource()),
                         lead.getVerifiedStatus(),
                         lead.getCreatedAt()));

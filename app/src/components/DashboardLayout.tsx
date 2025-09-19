@@ -12,6 +12,7 @@ import {
   X,
   Upload,
   FileText,
+  Search,
 } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
@@ -26,6 +27,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
+    { name: "Lead Discovery", href: "/lead-discovery", icon: Search },
     { name: "Campaigns", href: "/dashboard/campaigns", icon: Mail },
     { name: "Leads", href: "/leads", icon: Users },
     { name: "Import Leads", href: "/import", icon: Upload },

@@ -78,7 +78,7 @@ const mockActivities = [
 
 interface FilterState {
   verifiedStatus: string;
-  company: string;
+  position: string;
   source: string;
   dateRange: string;
   hasEmail: boolean;
@@ -128,7 +128,7 @@ export default function LeadsPage() {
     useState<string>("");
   const [filters, setFilters] = useState<FilterState>({
     verifiedStatus: "all",
-    company: "",
+    position: "",
     source: "",
     dateRange: "all",
     hasEmail: false,
@@ -148,8 +148,8 @@ export default function LeadsPage() {
           lead.firstName?.toLowerCase().includes(term) ||
           lead.lastName?.toLowerCase().includes(term) ||
           lead.email?.toLowerCase().includes(term) ||
-          lead.company?.toLowerCase().includes(term) ||
-          lead.title?.toLowerCase().includes(term)
+          lead.position?.toLowerCase().includes(term) ||
+          lead.department?.toLowerCase().includes(term)
       );
     }
 
@@ -160,11 +160,11 @@ export default function LeadsPage() {
       );
     }
 
-    // Apply company filter
-    if (filters.company) {
-      const companyTerm = filters.company.toLowerCase();
+    // Apply position filter
+    if (filters.position) {
+      const positionTerm = filters.position.toLowerCase();
       filtered = filtered.filter((lead) =>
-        lead.company?.toLowerCase().includes(companyTerm)
+        lead.position?.toLowerCase().includes(positionTerm)
       );
     }
 
@@ -260,7 +260,7 @@ export default function LeadsPage() {
   const resetFilters = () => {
     setFilters({
       verifiedStatus: "all",
-      company: "",
+      position: "",
       source: "",
       dateRange: "all",
       hasEmail: false,
@@ -273,7 +273,7 @@ export default function LeadsPage() {
   const getActiveFiltersCount = () => {
     let count = 0;
     if (filters.verifiedStatus !== "all") count++;
-    if (filters.company) count++;
+    if (filters.position) count++;
     if (filters.source) count++;
     if (filters.dateRange !== "all") count++;
     if (filters.hasEmail) count++;
@@ -504,16 +504,16 @@ export default function LeadsPage() {
                     </Select>
                   </div>
 
-                  {/* Company Filter */}
+                  {/* Position Filter */}
                   <div>
                     <label className="text-sm font-medium mb-2 block">
-                      Company
+                      Position
                     </label>
                     <Input
-                      placeholder="Filter by company..."
-                      value={filters.company}
+                      placeholder="Filter by position..."
+                      value={filters.position}
                       onChange={(e) =>
-                        handleFilterChange("company", e.target.value)
+                        handleFilterChange("position", e.target.value)
                       }
                     />
                   </div>
@@ -641,14 +641,14 @@ export default function LeadsPage() {
                         </button>
                       </Badge>
                     )}
-                    {filters.company && (
+                    {filters.position && (
                       <Badge
                         variant="secondary"
                         className="flex items-center gap-1"
                       >
-                        Company: {filters.company}
+                        Position: {filters.position}
                         <button
-                          onClick={() => handleFilterChange("company", "")}
+                          onClick={() => handleFilterChange("position", "")}
                           className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
                         >
                           ×
@@ -852,9 +852,11 @@ export default function LeadsPage() {
                             Last Name
                           </TableHead>
                           <TableHead className="min-w-[150px]">
-                            Company
+                            Position
                           </TableHead>
-                          <TableHead className="min-w-[150px]">Title</TableHead>
+                          <TableHead className="min-w-[150px]">
+                            Department
+                          </TableHead>
                           <TableHead className="min-w-[200px]">Email</TableHead>
                           <TableHead className="min-w-[100px]">
                             Status
@@ -867,11 +869,6 @@ export default function LeadsPage() {
                           <TableHead className="min-w-[200px]">
                             LinkedIn URL
                           </TableHead>
-                          <TableHead className="min-w-[100px]">
-                            Country
-                          </TableHead>
-                          <TableHead className="min-w-[100px]">State</TableHead>
-                          <TableHead className="min-w-[100px]">City</TableHead>
                           <TableHead className="min-w-[120px]">
                             Source
                           </TableHead>
@@ -907,10 +904,10 @@ export default function LeadsPage() {
                               {lead.lastName || "-"}
                             </TableCell>
                             <TableCell onClick={() => handleLeadClick(lead)}>
-                              {lead.company || "-"}
+                              {lead.position || "-"}
                             </TableCell>
                             <TableCell onClick={() => handleLeadClick(lead)}>
-                              {lead.title || "-"}
+                              {lead.department || "-"}
                             </TableCell>
                             <TableCell onClick={() => handleLeadClick(lead)}>
                               {lead.email || "-"}
@@ -951,15 +948,6 @@ export default function LeadsPage() {
                               ) : (
                                 "-"
                               )}
-                            </TableCell>
-                            <TableCell onClick={() => handleLeadClick(lead)}>
-                              {lead.country || "-"}
-                            </TableCell>
-                            <TableCell onClick={() => handleLeadClick(lead)}>
-                              {lead.state || "-"}
-                            </TableCell>
-                            <TableCell onClick={() => handleLeadClick(lead)}>
-                              {lead.city || "-"}
                             </TableCell>
                             <TableCell onClick={() => handleLeadClick(lead)}>
                               {lead.source || "-"}
@@ -1153,12 +1141,20 @@ export default function LeadsPage() {
                     <Input value={selectedLead?.lastName || ""} readOnly />
                   </div>
                   <div>
-                    <label className="text-sm font-medium">Company</label>
-                    <Input value={selectedLead?.company || ""} readOnly />
+                    <label className="text-sm font-medium">Position</label>
+                    <Input value={selectedLead?.position || ""} readOnly />
                   </div>
                   <div>
-                    <label className="text-sm font-medium">Title</label>
-                    <Input value={selectedLead?.title || ""} readOnly />
+                    <label className="text-sm font-medium">Position Raw</label>
+                    <Input value={selectedLead?.positionRaw || ""} readOnly />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Seniority</label>
+                    <Input value={selectedLead?.seniority || ""} readOnly />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Department</label>
+                    <Input value={selectedLead?.department || ""} readOnly />
                   </div>
                   <div>
                     <label className="text-sm font-medium">Email</label>
@@ -1177,16 +1173,21 @@ export default function LeadsPage() {
                     <Input value={selectedLead?.linkedinUrl || ""} readOnly />
                   </div>
                   <div>
-                    <label className="text-sm font-medium">Country</label>
-                    <Input value={selectedLead?.country || ""} readOnly />
+                    <label className="text-sm font-medium">Twitter</label>
+                    <Input value={selectedLead?.twitter || ""} readOnly />
                   </div>
                   <div>
-                    <label className="text-sm font-medium">State</label>
-                    <Input value={selectedLead?.state || ""} readOnly />
+                    <label className="text-sm font-medium">
+                      Confidence Score
+                    </label>
+                    <Input
+                      value={selectedLead?.confidenceScore?.toString() || ""}
+                      readOnly
+                    />
                   </div>
                   <div>
-                    <label className="text-sm font-medium">City</label>
-                    <Input value={selectedLead?.city || ""} readOnly />
+                    <label className="text-sm font-medium">Email Type</label>
+                    <Input value={selectedLead?.emailType || ""} readOnly />
                   </div>
                   <div>
                     <label className="text-sm font-medium">Source</label>

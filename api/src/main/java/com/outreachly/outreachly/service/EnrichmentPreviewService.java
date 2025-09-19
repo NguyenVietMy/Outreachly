@@ -45,14 +45,16 @@ public class EnrichmentPreviewService {
         currentData.put("firstName", lead.getFirstName());
         currentData.put("lastName", lead.getLastName());
         currentData.put("email", lead.getEmail());
-        currentData.put("company", lead.getCompany());
         currentData.put("domain", lead.getDomain());
-        currentData.put("title", lead.getTitle());
+        currentData.put("position", lead.getPosition());
+        currentData.put("positionRaw", lead.getPositionRaw());
+        currentData.put("seniority", lead.getSeniority());
+        currentData.put("department", lead.getDepartment());
         currentData.put("phone", lead.getPhone());
         currentData.put("linkedinUrl", lead.getLinkedinUrl());
-        currentData.put("country", lead.getCountry());
-        currentData.put("state", lead.getState());
-        currentData.put("city", lead.getCity());
+        currentData.put("twitter", lead.getTwitter());
+        currentData.put("confidenceScore", lead.getConfidenceScore());
+        currentData.put("emailType", lead.getEmailType() != null ? lead.getEmailType().toString() : null);
         preview.set("currentData", currentData);
 
         // Hunter enrichment data
@@ -154,24 +156,6 @@ public class EnrichmentPreviewService {
             }
         }
 
-        if (acceptedChanges.has("company") && !acceptedChanges.get("company").isNull()) {
-            String newCompany = acceptedChanges.get("company").asText();
-            if (newCompany != null && !newCompany.equals(lead.getCompany())) {
-                storePreviousData(lead, "company", lead.getCompany());
-                lead.setCompany(newCompany);
-                hasChanges = true;
-            }
-        }
-
-        if (acceptedChanges.has("title") && !acceptedChanges.get("title").isNull()) {
-            String newTitle = acceptedChanges.get("title").asText();
-            if (newTitle != null && !newTitle.equals(lead.getTitle())) {
-                storePreviousData(lead, "title", lead.getTitle());
-                lead.setTitle(newTitle);
-                hasChanges = true;
-            }
-        }
-
         if (acceptedChanges.has("phone") && !acceptedChanges.get("phone").isNull()) {
             String newPhone = acceptedChanges.get("phone").asText();
             if (newPhone != null && !newPhone.equals(lead.getPhone())) {
@@ -186,33 +170,6 @@ public class EnrichmentPreviewService {
             if (newLinkedinUrl != null && !newLinkedinUrl.equals(lead.getLinkedinUrl())) {
                 storePreviousData(lead, "linkedinUrl", lead.getLinkedinUrl());
                 lead.setLinkedinUrl(newLinkedinUrl);
-                hasChanges = true;
-            }
-        }
-
-        if (acceptedChanges.has("country") && !acceptedChanges.get("country").isNull()) {
-            String newCountry = acceptedChanges.get("country").asText();
-            if (newCountry != null && !newCountry.equals(lead.getCountry())) {
-                storePreviousData(lead, "country", lead.getCountry());
-                lead.setCountry(newCountry);
-                hasChanges = true;
-            }
-        }
-
-        if (acceptedChanges.has("state") && !acceptedChanges.get("state").isNull()) {
-            String newState = acceptedChanges.get("state").asText();
-            if (newState != null && !newState.equals(lead.getState())) {
-                storePreviousData(lead, "state", lead.getState());
-                lead.setState(newState);
-                hasChanges = true;
-            }
-        }
-
-        if (acceptedChanges.has("city") && !acceptedChanges.get("city").isNull()) {
-            String newCity = acceptedChanges.get("city").asText();
-            if (newCity != null && !newCity.equals(lead.getCity())) {
-                storePreviousData(lead, "city", lead.getCity());
-                lead.setCity(newCity);
                 hasChanges = true;
             }
         }
@@ -267,26 +224,11 @@ public class EnrichmentPreviewService {
         if (previousData.has("lastName")) {
             lead.setLastName(previousData.get("lastName").asText(null));
         }
-        if (previousData.has("company")) {
-            lead.setCompany(previousData.get("company").asText(null));
-        }
-        if (previousData.has("title")) {
-            lead.setTitle(previousData.get("title").asText(null));
-        }
         if (previousData.has("phone")) {
             lead.setPhone(previousData.get("phone").asText(null));
         }
         if (previousData.has("linkedinUrl")) {
             lead.setLinkedinUrl(previousData.get("linkedinUrl").asText(null));
-        }
-        if (previousData.has("country")) {
-            lead.setCountry(previousData.get("country").asText(null));
-        }
-        if (previousData.has("state")) {
-            lead.setState(previousData.get("state").asText(null));
-        }
-        if (previousData.has("city")) {
-            lead.setCity(previousData.get("city").asText(null));
         }
 
         leadRepository.save(lead);

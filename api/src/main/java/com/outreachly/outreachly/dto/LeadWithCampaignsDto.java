@@ -21,15 +21,17 @@ public class LeadWithCampaignsDto {
     private UUID listId;
     private String firstName;
     private String lastName;
-    private String company;
     private String domain;
-    private String title;
     private String email;
     private String phone;
+    private String position;
+    private String positionRaw;
+    private String seniority;
+    private String department;
     private String linkedinUrl;
-    private String country;
-    private String state;
-    private String city;
+    private String twitter;
+    private Integer confidenceScore;
+    private Lead.EmailType emailType;
     private String customTextField;
     private String source;
     private Lead.VerifiedStatus verifiedStatus;
@@ -58,15 +60,17 @@ public class LeadWithCampaignsDto {
                 .listId(lead.getListId())
                 .firstName(lead.getFirstName())
                 .lastName(lead.getLastName())
-                .company(lead.getCompany())
                 .domain(lead.getDomain())
-                .title(lead.getTitle())
                 .email(lead.getEmail())
                 .phone(lead.getPhone())
+                .position(lead.getPosition())
+                .positionRaw(lead.getPositionRaw())
+                .seniority(lead.getSeniority())
+                .department(lead.getDepartment())
                 .linkedinUrl(lead.getLinkedinUrl())
-                .country(lead.getCountry())
-                .state(lead.getState())
-                .city(lead.getCity())
+                .twitter(lead.getTwitter())
+                .confidenceScore(lead.getConfidenceScore())
+                .emailType(lead.getEmailType())
                 .customTextField(lead.getCustomTextField())
                 .source(lead.getSource())
                 .verifiedStatus(lead.getVerifiedStatus())

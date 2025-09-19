@@ -171,10 +171,22 @@ export function ColumnMappingModal({
     switch (category) {
       case "required":
         return "bg-red-100 text-red-800 border-red-200";
-      case "optional":
+      case "personal":
         return "bg-blue-100 text-blue-800 border-blue-200";
-      case "custom":
+      case "company":
+        return "bg-purple-100 text-purple-800 border-purple-200";
+      case "location":
         return "bg-green-100 text-green-800 border-green-200";
+      case "social":
+        return "bg-pink-100 text-pink-800 border-pink-200";
+      case "technical":
+        return "bg-orange-100 text-orange-800 border-orange-200";
+      case "verification":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case "meta":
+        return "bg-indigo-100 text-indigo-800 border-indigo-200";
+      case "custom":
+        return "bg-emerald-100 text-emerald-800 border-emerald-200";
       case "skip":
         return "bg-gray-100 text-gray-800 border-gray-200";
       default:
@@ -319,51 +331,88 @@ export function ColumnMappingModal({
                           <SelectValue placeholder="Select field..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {data.availableFields.map((field) => {
-                            const isSelected = Object.values(mapping).includes(
-                              field.value
-                            );
-                            const isCurrentlySelected =
-                              mapping[column.name] === field.value;
-                            const shouldShowCheckmark =
-                              isSelected && field.value !== "custom_field";
-                            const isDisabled =
-                              isSelected &&
-                              !isCurrentlySelected &&
-                              field.value !== "custom_field" &&
-                              field.value !== "skip";
+                          {data.availableFields
+                            .sort((a, b) => {
+                              // Sort by category first, then by label
+                              const categoryOrder = {
+                                required: 0,
+                                personal: 1,
+                                company: 2,
+                                location: 3,
+                                social: 4,
+                                technical: 5,
+                                verification: 6,
+                                meta: 7,
+                                custom: 8,
+                                skip: 9,
+                              };
+                              const categoryA =
+                                categoryOrder[
+                                  a.category as keyof typeof categoryOrder
+                                ] ?? 999;
+                              const categoryB =
+                                categoryOrder[
+                                  b.category as keyof typeof categoryOrder
+                                ] ?? 999;
 
-                            return (
-                              <SelectItem
-                                key={field.value}
-                                value={field.value}
-                                disabled={isDisabled}
-                              >
-                                <div className="flex items-center justify-between w-full">
-                                  <div className="flex items-center gap-2">
-                                    <span
-                                      className={
-                                        isDisabled ? "text-gray-400" : ""
-                                      }
-                                    >
-                                      {field.label}
-                                    </span>
-                                    {shouldShowCheckmark && (
-                                      <span className="text-green-600">✅</span>
+                              if (categoryA !== categoryB) {
+                                return categoryA - categoryB;
+                              }
+                              return a.label.localeCompare(b.label);
+                            })
+                            .map((field) => {
+                              const isSelected = Object.values(
+                                mapping
+                              ).includes(field.value);
+                              const isCurrentlySelected =
+                                mapping[column.name] === field.value;
+                              const shouldShowCheckmark =
+                                isSelected && field.value !== "custom_field";
+                              const isDisabled =
+                                isSelected &&
+                                !isCurrentlySelected &&
+                                field.value !== "custom_field" &&
+                                field.value !== "skip";
+
+                              return (
+                                <SelectItem
+                                  key={field.value}
+                                  value={field.value}
+                                  disabled={isDisabled}
+                                >
+                                  <div className="flex items-center justify-between w-full">
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className={
+                                          isDisabled ? "text-gray-400" : ""
+                                        }
+                                      >
+                                        {field.label}
+                                      </span>
+                                      <Badge
+                                        variant="outline"
+                                        className={`text-xs ${getCategoryColor(field.category)}`}
+                                      >
+                                        {field.category}
+                                      </Badge>
+                                      {shouldShowCheckmark && (
+                                        <span className="text-green-600">
+                                          ✅
+                                        </span>
+                                      )}
+                                    </div>
+                                    {field.isRequired && (
+                                      <Badge
+                                        variant="destructive"
+                                        className="text-xs ml-2"
+                                      >
+                                        Required
+                                      </Badge>
                                     )}
                                   </div>
-                                  {field.isRequired && (
-                                    <Badge
-                                      variant="destructive"
-                                      className="text-xs ml-2"
-                                    >
-                                      Required
-                                    </Badge>
-                                  )}
-                                </div>
-                              </SelectItem>
-                            );
-                          })}
+                                </SelectItem>
+                              );
+                            })}
                         </SelectContent>
                       </Select>
                     </div>

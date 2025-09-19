@@ -10,7 +10,6 @@ import com.outreachly.outreachly.entity.Organization;
 import com.outreachly.outreachly.repository.ImportJobRepository;
 import com.outreachly.outreachly.repository.LeadRepository;
 import com.outreachly.outreachly.repository.OrganizationRepository;
-import com.outreachly.outreachly.service.CampaignLeadService;
 // import com.outreachly.outreachly.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,8 +33,6 @@ public class CsvImportService {
     private final LeadRepository leadRepository;
     private final ImportJobRepository importJobRepository;
     private final OrganizationRepository organizationRepository;
-    private final CampaignLeadService campaignLeadService;
-    private final ObjectMapper objectMapper;
     // private final UserRepository userRepository; // Will be used when
     // implementing proper user lookup
     // private final EmailValidator emailValidator = EmailValidator.getInstance();
@@ -312,8 +309,9 @@ public class CsvImportService {
                     lead = leadRepository.save(lead);
 
                     // If campaignId is provided, create campaign-lead relationship
+                    // TODO: Implement campaign-lead relationship creation
                     if (campaignId != null) {
-                        campaignLeadService.addLeadToCampaign(campaignId, lead.getId(), null);
+                        log.warn("Campaign ID provided but campaign-lead relationship not implemented yet");
                     }
 
                     processedRows++;
@@ -371,15 +369,17 @@ public class CsvImportService {
                 .orgId(orgId)
                 .firstName(trimValue(getValueFromRow(row, getFirstNameColumnNames())))
                 .lastName(trimValue(getValueFromRow(row, getLastNameColumnNames())))
-                .company(trimValue(getValueFromRow(row, getCompanyColumnNames())))
                 .domain(domain)
-                .title(trimValue(getValueFromRow(row, getTitleColumnNames())))
+                .position(trimValue(getValueFromRow(row, getPositionColumnNames())))
+                .positionRaw(trimValue(getValueFromRow(row, getPositionRawColumnNames())))
+                .seniority(trimValue(getValueFromRow(row, getSeniorityColumnNames())))
+                .department(trimValue(getValueFromRow(row, getDepartmentColumnNames())))
                 .email(email)
                 .phone(trimValue(getValueFromRow(row, getPhoneColumnNames())))
                 .linkedinUrl(trimValue(getValueFromRow(row, getLinkedInColumnNames())))
-                .country(trimValue(getValueFromRow(row, getCountryColumnNames())))
-                .state(trimValue(getValueFromRow(row, getStateColumnNames())))
-                .city(trimValue(getValueFromRow(row, getCityColumnNames())))
+                .twitter(trimValue(getValueFromRow(row, getTwitterColumnNames())))
+                .confidenceScore(parseInteger(getValueFromRow(row, getConfidenceScoreColumnNames())))
+                .emailType(mapEmailType(getValueFromRow(row, getEmailTypeColumnNames())))
                 .customTextField(trimValue(getValueFromRow(row, getCustomTextFieldColumnNames())))
                 .source("csv_import")
                 .verifiedStatus(Lead.VerifiedStatus.unknown)
@@ -396,6 +396,29 @@ public class CsvImportService {
 
     private String trimValue(String value) {
         return value != null ? value.trim() : null;
+    }
+
+    private Lead.EmailType mapEmailType(String emailType) {
+        if (emailType == null)
+            return Lead.EmailType.unknown;
+
+        try {
+            return Lead.EmailType.valueOf(emailType.toLowerCase());
+        } catch (IllegalArgumentException e) {
+            return Lead.EmailType.unknown;
+        }
+    }
+
+    private Integer parseInteger(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            log.warn("Could not parse integer value: {}", value);
+            return null;
+        }
     }
 
     private boolean isValidEmail(String email) {
@@ -471,26 +494,67 @@ public class CsvImportService {
         };
     }
 
-    private String[] getCompanyColumnNames() {
+    private String[] getPositionColumnNames() {
         return new String[] {
-                "company", "?company",
-                "company name", "?company name",
-                "organization", "?organization",
-                "org", "?org",
-                "company_name", "?company_name",
-                "organization_name", "?organization_name"
+                "position", "?position",
+                "job position", "?job position",
+                "role", "?role",
+                "job_position", "?job_position",
+                "job_role", "?job_role"
         };
     }
 
-    private String[] getTitleColumnNames() {
+    private String[] getPositionRawColumnNames() {
         return new String[] {
-                "title", "?title",
-                "job title", "?job title",
-                "position", "?position",
-                "role", "?role",
-                "job_title", "?job_title",
-                "job_position", "?job_position",
-                "job_role", "?job_role"
+                "position_raw", "?position_raw",
+                "position raw", "?position raw",
+                "raw_position", "?raw_position",
+                "raw position", "?raw position"
+        };
+    }
+
+    private String[] getSeniorityColumnNames() {
+        return new String[] {
+                "seniority", "?seniority",
+                "level", "?level",
+                "senior", "?senior",
+                "junior", "?junior",
+                "seniority_level", "?seniority_level"
+        };
+    }
+
+    private String[] getDepartmentColumnNames() {
+        return new String[] {
+                "department", "?department",
+                "dept", "?dept",
+                "team", "?team",
+                "division", "?division"
+        };
+    }
+
+    private String[] getTwitterColumnNames() {
+        return new String[] {
+                "twitter", "?twitter",
+                "x.com", "?x.com",
+                "twitter_handle", "?twitter_handle",
+                "twitter handle", "?twitter handle"
+        };
+    }
+
+    private String[] getConfidenceScoreColumnNames() {
+        return new String[] {
+                "confidence_score", "?confidence_score",
+                "confidence", "?confidence",
+                "score", "?score",
+                "confidence score", "?confidence score"
+        };
+    }
+
+    private String[] getEmailTypeColumnNames() {
+        return new String[] {
+                "email_type", "?email_type",
+                "email type", "?email type",
+                "type", "?type"
         };
     }
 
@@ -513,34 +577,6 @@ public class CsvImportService {
                 "linkedin profile", "?linkedin profile",
                 "linkedin_profile", "?linkedin_profile",
                 "linkedinurl", "?linkedinurl"
-        };
-    }
-
-    private String[] getCountryColumnNames() {
-        return new String[] {
-                "country", "?country",
-                "nation", "?nation",
-                "country_name", "?country_name",
-                "countryname", "?countryname"
-        };
-    }
-
-    private String[] getStateColumnNames() {
-        return new String[] {
-                "state", "?state",
-                "province", "?province",
-                "region", "?region",
-                "state_name", "?state_name",
-                "province_name", "?province_name"
-        };
-    }
-
-    private String[] getCityColumnNames() {
-        return new String[] {
-                "city", "?city",
-                "town", "?town",
-                "city_name", "?city_name",
-                "town_name", "?town_name"
         };
     }
 
@@ -567,35 +603,76 @@ public class CsvImportService {
 
     // Helper methods for column mapping
     private String autoDetectFieldType(String normalizedHeader) {
-        // Email detection
-        if (normalizedHeader.contains("email") || normalizedHeader.contains("mail")) {
+        // EMAIL DETECTION
+        if (normalizedHeader.contains("email") || normalizedHeader.contains("mail") ||
+                normalizedHeader.contains("e_mail") || normalizedHeader.contains("emailaddress")) {
             return "email";
         }
-        // First name detection
+
+        // PERSONAL INFO DETECTION
         if (normalizedHeader.contains("first") || normalizedHeader.contains("given") ||
                 normalizedHeader.equals("name") || normalizedHeader.contains("fname")) {
             return "first_name";
         }
-        // Last name detection
         if (normalizedHeader.contains("last") || normalizedHeader.contains("surname") ||
                 normalizedHeader.contains("family") || normalizedHeader.contains("lname")) {
             return "last_name";
         }
-        // Company detection
-        if (normalizedHeader.contains("company") || normalizedHeader.contains("organization") ||
-                normalizedHeader.contains("org") || normalizedHeader.contains("employer")) {
-            return "company";
-        }
-        // Title detection
-        if (normalizedHeader.contains("title") || normalizedHeader.contains("position") ||
-                normalizedHeader.contains("role") || normalizedHeader.contains("job")) {
-            return "title";
-        }
-        // Phone detection
         if (normalizedHeader.contains("phone") || normalizedHeader.contains("mobile") ||
-                normalizedHeader.contains("telephone") || normalizedHeader.contains("tel")) {
+                normalizedHeader.contains("telephone") || normalizedHeader.contains("tel") ||
+                normalizedHeader.contains("contact_number")) {
             return "phone";
         }
+        if (normalizedHeader.contains("position") || normalizedHeader.contains("job_position")) {
+            return "position";
+        }
+        if (normalizedHeader.contains("position_raw") || normalizedHeader.contains("positionraw") ||
+                normalizedHeader.contains("raw_position")) {
+            return "position_raw";
+        }
+        if (normalizedHeader.contains("seniority") || normalizedHeader.contains("level") ||
+                normalizedHeader.contains("senior") || normalizedHeader.contains("junior")) {
+            return "seniority";
+        }
+        if (normalizedHeader.contains("department") || normalizedHeader.contains("dept") ||
+                normalizedHeader.contains("team") || normalizedHeader.contains("division")) {
+            return "department";
+        }
+
+        // COMPANY INFO DETECTION
+        if (normalizedHeader.contains("domain") || normalizedHeader.contains("website") ||
+                normalizedHeader.contains("company_domain") || normalizedHeader.contains("domain_name")) {
+            return "domain";
+        }
+
+        // SOCIAL & PROFESSIONAL DETECTION
+        if (normalizedHeader.contains("linkedin") || normalizedHeader.contains("linkedin_url") ||
+                normalizedHeader.contains("linkedin_profile")) {
+            return "linkedin_url";
+        }
+        if (normalizedHeader.contains("twitter") || normalizedHeader.contains("x.com")) {
+            return "twitter";
+        }
+
+        // VERIFICATION DETECTION
+        if (normalizedHeader.contains("confidence") || normalizedHeader.contains("score") ||
+                normalizedHeader.contains("confidence_score")) {
+            return "confidence_score";
+        }
+        if (normalizedHeader.contains("email_type") || normalizedHeader.contains("emailtype") ||
+                normalizedHeader.contains("type")) {
+            return "email_type";
+        }
+
+        // META DATA DETECTION
+        if (normalizedHeader.contains("source") || normalizedHeader.contains("origin")) {
+            return "source";
+        }
+        if (normalizedHeader.contains("custom") || normalizedHeader.contains("custom_field") ||
+                normalizedHeader.contains("custom_text")) {
+            return "custom_text_field";
+        }
+
         // No match found - only detect fields that are available in the dropdown
         return null;
     }
@@ -651,82 +728,9 @@ public class CsvImportService {
         return mappedData;
     }
 
-    private Lead buildLeadFromMappedRow(Map<String, String> mappedRow, UUID orgId, Map<String, String> columnMapping) {
-        // Get standard fields
-        String email = mappedRow.get("email");
-        String domain = extractDomainFromEmail(email);
-
-        // Use provided domain if available
-        String providedDomain = mappedRow.get("domain");
-        if (providedDomain != null && !providedDomain.trim().isEmpty()) {
-            domain = providedDomain.trim().toLowerCase();
-        }
-
-        // Build custom fields JSON for extra columns
-        Map<String, Object> customFields = new HashMap<>();
-        for (Map.Entry<String, String> entry : mappedRow.entrySet()) {
-            String fieldName = entry.getKey();
-            String value = entry.getValue();
-
-            // Skip standard fields - they go to their own columns
-            if (isStandardField(fieldName)) {
-                continue;
-            }
-
-            // Add to custom fields
-            customFields.put(fieldName, value);
-        }
-
-        // Create enriched JSON with custom fields
-        String enrichedJson = "{}";
-        if (!customFields.isEmpty()) {
-            try {
-                Map<String, Object> enrichedData = new HashMap<>();
-                enrichedData.put("custom_csv_fields", customFields);
-                enrichedJson = objectMapper.writeValueAsString(enrichedData);
-            } catch (Exception e) {
-                log.warn("Error creating enriched JSON for custom fields", e);
-            }
-        }
-
-        return Lead.builder()
-                .orgId(orgId)
-                .firstName(trimValue(mappedRow.get("first_name")))
-                .lastName(trimValue(mappedRow.get("last_name")))
-                .company(trimValue(mappedRow.get("company")))
-                .domain(domain)
-                .title(trimValue(mappedRow.get("title")))
-                .email(email)
-                .phone(trimValue(mappedRow.get("phone")))
-                .linkedinUrl(trimValue(mappedRow.get("linkedin_url")))
-                .country(trimValue(mappedRow.get("country")))
-                .state(trimValue(mappedRow.get("state")))
-                .city(trimValue(mappedRow.get("city")))
-                .customTextField(trimValue(mappedRow.get("custom_text_field")))
-                .source("csv_import")
-                .verifiedStatus(Lead.VerifiedStatus.unknown)
-                .enrichedJson(enrichedJson)
-                .build();
-    }
-
-    private boolean isStandardField(String fieldName) {
-        return fieldName.equals("email") ||
-                fieldName.equals("first_name") ||
-                fieldName.equals("last_name") ||
-                fieldName.equals("company") ||
-                fieldName.equals("domain") ||
-                fieldName.equals("title") ||
-                fieldName.equals("phone") ||
-                fieldName.equals("linkedin_url") ||
-                fieldName.equals("country") ||
-                fieldName.equals("state") ||
-                fieldName.equals("city") ||
-                fieldName.equals("custom_text_field");
-    }
-
     private List<CsvColumnMappingDto.FieldOption> getAvailableFieldOptions() {
         return List.of(
-                // Required fields
+                // REQUIRED FIELDS
                 CsvColumnMappingDto.FieldOption.builder()
                         .value("email")
                         .label("Email")
@@ -742,37 +746,108 @@ public class CsvImportService {
                         .category("required")
                         .build(),
 
-                // Essential optional fields
+                // PERSONAL INFO
                 CsvColumnMappingDto.FieldOption.builder()
                         .value("last_name")
                         .label("Last Name")
                         .description("Last name")
                         .isRequired(false)
-                        .category("optional")
-                        .build(),
-                CsvColumnMappingDto.FieldOption.builder()
-                        .value("company")
-                        .label("Company")
-                        .description("Company name")
-                        .isRequired(false)
-                        .category("optional")
-                        .build(),
-                CsvColumnMappingDto.FieldOption.builder()
-                        .value("title")
-                        .label("Job Title")
-                        .description("Job title")
-                        .isRequired(false)
-                        .category("optional")
+                        .category("personal")
                         .build(),
                 CsvColumnMappingDto.FieldOption.builder()
                         .value("phone")
                         .label("Phone")
                         .description("Phone number")
                         .isRequired(false)
-                        .category("optional")
+                        .category("personal")
+                        .build(),
+                CsvColumnMappingDto.FieldOption.builder()
+                        .value("position")
+                        .label("Position")
+                        .description("Job position")
+                        .isRequired(false)
+                        .category("personal")
+                        .build(),
+                CsvColumnMappingDto.FieldOption.builder()
+                        .value("position_raw")
+                        .label("Position Raw")
+                        .description("Raw position title")
+                        .isRequired(false)
+                        .category("personal")
+                        .build(),
+                CsvColumnMappingDto.FieldOption.builder()
+                        .value("seniority")
+                        .label("Seniority")
+                        .description("Seniority level")
+                        .isRequired(false)
+                        .category("personal")
+                        .build(),
+                CsvColumnMappingDto.FieldOption.builder()
+                        .value("department")
+                        .label("Department")
+                        .description("Department")
+                        .isRequired(false)
+                        .category("personal")
                         .build(),
 
-                // Special options
+                // COMPANY INFO
+                CsvColumnMappingDto.FieldOption.builder()
+                        .value("domain")
+                        .label("Domain")
+                        .description("Company domain")
+                        .isRequired(false)
+                        .category("company")
+                        .build(),
+
+                // SOCIAL & PROFESSIONAL
+                CsvColumnMappingDto.FieldOption.builder()
+                        .value("linkedin_url")
+                        .label("LinkedIn URL")
+                        .description("LinkedIn profile URL")
+                        .isRequired(false)
+                        .category("social")
+                        .build(),
+                CsvColumnMappingDto.FieldOption.builder()
+                        .value("twitter")
+                        .label("Twitter")
+                        .description("Twitter handle/URL")
+                        .isRequired(false)
+                        .category("social")
+                        .build(),
+
+                // VERIFICATION
+                CsvColumnMappingDto.FieldOption.builder()
+                        .value("confidence_score")
+                        .label("Confidence Score")
+                        .description("Confidence score (0-100)")
+                        .isRequired(false)
+                        .category("verification")
+                        .build(),
+                CsvColumnMappingDto.FieldOption.builder()
+                        .value("email_type")
+                        .label("Email Type")
+                        .description("Email type (personal, generic, role, etc.)")
+                        .isRequired(false)
+                        .category("verification")
+                        .build(),
+
+                // META DATA
+                CsvColumnMappingDto.FieldOption.builder()
+                        .value("source")
+                        .label("Source")
+                        .description("Lead source")
+                        .isRequired(false)
+                        .category("meta")
+                        .build(),
+                CsvColumnMappingDto.FieldOption.builder()
+                        .value("custom_text_field")
+                        .label("Custom Text Field")
+                        .description("Custom text field")
+                        .isRequired(false)
+                        .category("meta")
+                        .build(),
+
+                // SPECIAL OPTIONS
                 CsvColumnMappingDto.FieldOption.builder()
                         .value("custom_field")
                         .label("Custom Field")

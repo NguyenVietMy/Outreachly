@@ -39,19 +39,31 @@ public class Lead {
     @Column(name = "last_name")
     private String lastName;
 
-    private String company;
     private String domain;
-    private String title;
     private String email;
     private String phone;
+
+    // NEW PERSONAL INFO FIELDS
+    private String position;
+    @Column(name = "position_raw")
+    private String positionRaw;
+    private String seniority;
+    private String department;
 
     @Column(name = "linkedin_url")
     private String linkedinUrl;
 
-    private String country;
-    private String state;
-    private String city;
+    // NEW SOCIAL & PROFESSIONAL FIELDS
+    private String twitter;
+    @Column(name = "confidence_score")
+    private Integer confidenceScore;
 
+    // HUNTER API FIELDS
+    @Enumerated(EnumType.STRING)
+    @Column(name = "email_type")
+    private EmailType emailType;
+
+    // EXISTING META DATA FIELDS
     @Column(name = "custom_text_field")
     private String customTextField;
 
@@ -95,5 +107,9 @@ public class Lead {
 
     public enum VerifiedStatus {
         unknown, valid, risky, invalid
+    }
+
+    public enum EmailType {
+        personal, generic, role, catch_all, unknown
     }
 }
