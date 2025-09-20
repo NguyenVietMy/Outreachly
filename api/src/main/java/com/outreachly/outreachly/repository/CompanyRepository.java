@@ -14,13 +14,34 @@ import java.util.UUID;
 @Repository
 public interface CompanyRepository extends JpaRepository<Company, UUID> {
 
-    Optional<Company> findByDomain(String domain);
+        Optional<Company> findByDomain(String domain);
 
-    @Query("SELECT c FROM Company c WHERE " +
-            "(:search IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%')))")
-    Page<Company> findWithFilters(@Param("search") String search, Pageable pageable);
+        @Query(value = "SELECT * FROM companies c WHERE " +
+                        "(:search IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+                        "(:companyType IS NULL OR c.company_type = :companyType) AND " +
+                        "(:size IS NULL OR c.size = :size) AND " +
+                        "(:headquartersCountry IS NULL OR c.headquarters_country = :headquartersCountry)", countQuery = "SELECT COUNT(*) FROM companies c WHERE "
+                                        +
+                                        "(:search IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))) AND "
+                                        +
+                                        "(:companyType IS NULL OR c.company_type = :companyType) AND " +
+                                        "(:size IS NULL OR c.size = :size) AND " +
+                                        "(:headquartersCountry IS NULL OR c.headquarters_country = :headquartersCountry)", nativeQuery = true)
+        Page<Company> findWithFilters(
+                        @Param("search") String search,
+                        @Param("companyType") String companyType,
+                        @Param("size") String size,
+                        @Param("headquartersCountry") String headquartersCountry,
+                        Pageable pageable);
 
-    @Query("SELECT COUNT(c) FROM Company c WHERE " +
-            "(:search IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%')))")
-    Long countWithFilters(@Param("search") String search);
+        @Query(value = "SELECT COUNT(*) FROM companies c WHERE " +
+                        "(:search IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+                        "(:companyType IS NULL OR c.company_type = :companyType) AND " +
+                        "(:size IS NULL OR c.size = :size) AND " +
+                        "(:headquartersCountry IS NULL OR c.headquarters_country = :headquartersCountry)", nativeQuery = true)
+        Long countWithFilters(
+                        @Param("search") String search,
+                        @Param("companyType") String companyType,
+                        @Param("size") String size,
+                        @Param("headquartersCountry") String headquartersCountry);
 }

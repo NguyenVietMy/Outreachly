@@ -29,6 +29,18 @@ public class Company {
     @Column(unique = true)
     private String domain;
 
+    @Column(name = "headquarters_country")
+    private String headquartersCountry;
+
+    @Column(name = "size")
+    private String size;
+
+    @Column(name = "industry")
+    private String industry;
+
+    @Column(name = "company_type")
+    private String companyType;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

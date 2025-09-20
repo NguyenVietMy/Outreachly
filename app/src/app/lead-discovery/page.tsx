@@ -13,12 +13,14 @@ interface Company {
   id: string;
   name: string;
   domain: string;
-  createdAt: string;
   updatedAt: string;
 }
 
 interface CompanyFilters {
   search: string;
+  companyType: string;
+  size: string;
+  headquartersCountry: string;
 }
 
 export default function LeadDiscoveryPage() {
@@ -26,6 +28,9 @@ export default function LeadDiscoveryPage() {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<CompanyFilters>({
     search: "",
+    companyType: "all",
+    size: "all",
+    headquartersCountry: "all",
   });
   const [pagination, setPagination] = useState({
     currentPage: 0,
@@ -34,16 +39,33 @@ export default function LeadDiscoveryPage() {
     size: 20,
   });
 
-  const fetchCompanies = async (page = 0, search = "") => {
+  const fetchCompanies = async (page = 0, currentFilters = filters) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
         page: page.toString(),
-        size: pagination.size.toString(),
+        pageSize: pagination.size.toString(),
       });
 
-      if (search) {
-        params.append("search", search);
+      // Add all filter parameters (skip "all" values)
+      if (currentFilters.search) {
+        params.append("search", currentFilters.search);
+      }
+      // Industry filter removed - now shown in table
+      if (currentFilters.companyType && currentFilters.companyType !== "all") {
+        params.append("companyType", currentFilters.companyType);
+      }
+      if (currentFilters.size && currentFilters.size !== "all") {
+        params.append("size", currentFilters.size);
+      }
+      if (
+        currentFilters.headquartersCountry &&
+        currentFilters.headquartersCountry !== "all"
+      ) {
+        params.append(
+          "headquartersCountry",
+          currentFilters.headquartersCountry
+        );
       }
 
       const response = await fetch(`${API_BASE_URL}/api/companies?${params}`);
@@ -68,15 +90,15 @@ export default function LeadDiscoveryPage() {
   };
 
   useEffect(() => {
-    fetchCompanies(0, filters.search);
+    fetchCompanies(0, filters);
   }, []);
 
   const handleSearch = () => {
-    fetchCompanies(0, filters.search);
+    fetchCompanies(0, filters);
   };
 
   const handlePageChange = (page: number) => {
-    fetchCompanies(page, filters.search);
+    fetchCompanies(page, filters);
   };
 
   const handleFilterChange = (newFilters: Partial<CompanyFilters>) => {

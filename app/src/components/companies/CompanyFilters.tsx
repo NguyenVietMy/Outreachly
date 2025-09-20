@@ -5,10 +5,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Search, Filter } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Search, Filter, X } from "lucide-react";
 
 interface CompanyFilters {
   search: string;
+  companyType: string;
+  size: string;
+  headquartersCountry: string;
 }
 
 interface CompanyFiltersProps {
@@ -16,6 +27,32 @@ interface CompanyFiltersProps {
   onFilterChange: (filters: Partial<CompanyFilters>) => void;
   onSearch: () => void;
 }
+
+// Removed INDUSTRIES - now showing in table instead of filter
+
+const COMPANY_TYPES = [
+  "Privately Held",
+  "Public Company",
+  "Educational Institution",
+  "Government Agency",
+  "Non Profit Partnership",
+  "Self Employed",
+  "Self Owned",
+  "Self Proprietorship",
+];
+
+const COMPANY_SIZES = [
+  "1-10",
+  "11-50",
+  "51-200",
+  "201-500",
+  "501-1000",
+  "1001-5000",
+  "5001-10000",
+  "10001+",
+];
+
+const COUNTRIES = ["United States"];
 
 export function CompanyFilters({
   filters,
@@ -27,6 +64,12 @@ export function CompanyFilters({
   const handleSearchChange = (value: string) => {
     setLocalSearch(value);
     onFilterChange({ search: value });
+  };
+
+  const handleFilterChange = (key: keyof CompanyFilters, value: string) => {
+    // Treat "all" as empty string for filtering
+    const filterValue = value === "all" ? "" : value;
+    onFilterChange({ [key]: filterValue });
   };
 
   const handleSearch = () => {
@@ -41,9 +84,19 @@ export function CompanyFilters({
 
   const clearFilters = () => {
     setLocalSearch("");
-    onFilterChange({ search: "" });
+    onFilterChange({
+      search: "",
+      companyType: "all",
+      size: "all",
+      headquartersCountry: "all",
+    });
     onSearch();
   };
+
+  const hasActiveFilters =
+    (filters.companyType && filters.companyType !== "all") ||
+    (filters.size && filters.size !== "all") ||
+    (filters.headquartersCountry && filters.headquartersCountry !== "all");
 
   return (
     <Card>
@@ -51,6 +104,11 @@ export function CompanyFilters({
         <CardTitle className="flex items-center gap-2">
           <Filter className="w-5 h-5" />
           Filters
+          {hasActiveFilters && (
+            <Badge variant="secondary" className="ml-auto">
+              Active
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -71,15 +129,71 @@ export function CompanyFilters({
           </div>
         </div>
 
-        {/* Future filters can be added here */}
-        <div className="text-sm text-muted-foreground">
-          <p>More filters coming soon:</p>
-          <ul className="list-disc list-inside mt-2 space-y-1">
-            <li>Industry</li>
-            <li>Company Size</li>
-            <li>Location</li>
-            <li>Technologies</li>
-          </ul>
+        {/* Industry removed - now shown in table */}
+
+        {/* Company Type Filter */}
+        <div className="space-y-2">
+          <Label>Company Type</Label>
+          <Select
+            value={filters.companyType}
+            onValueChange={(value) => handleFilterChange("companyType", value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              {COMPANY_TYPES.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {type}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Company Size Filter */}
+        <div className="space-y-2">
+          <Label>Company Size</Label>
+          <Select
+            value={filters.size}
+            onValueChange={(value) => handleFilterChange("size", value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select size" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Sizes</SelectItem>
+              {COMPANY_SIZES.map((size) => (
+                <SelectItem key={size} value={size}>
+                  {size} employees
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Headquarters Country Filter */}
+        <div className="space-y-2">
+          <Label>Headquarters</Label>
+          <Select
+            value={filters.headquartersCountry}
+            onValueChange={(value) =>
+              handleFilterChange("headquartersCountry", value)
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select country" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Countries</SelectItem>
+              {COUNTRIES.map((country) => (
+                <SelectItem key={country} value={country}>
+                  {country}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Clear Filters */}
@@ -89,7 +203,8 @@ export function CompanyFilters({
           onClick={clearFilters}
           className="w-full"
         >
-          Clear Filters
+          <X className="w-4 h-4 mr-2" />
+          Clear All Filters
         </Button>
       </CardContent>
     </Card>

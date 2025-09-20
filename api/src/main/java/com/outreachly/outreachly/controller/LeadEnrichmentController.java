@@ -6,7 +6,9 @@ import com.outreachly.outreachly.entity.EnrichmentJob;
 import com.outreachly.outreachly.entity.User;
 import com.outreachly.outreachly.repository.EnrichmentJobRepository;
 import com.outreachly.outreachly.repository.LeadRepository;
+import com.outreachly.outreachly.repository.CampaignRepository;
 import com.outreachly.outreachly.entity.Lead;
+import com.outreachly.outreachly.entity.Campaign;
 import com.outreachly.outreachly.service.CampaignLeadService;
 import com.outreachly.outreachly.service.CsvImportService;
 import com.outreachly.outreachly.service.EnrichmentService;
@@ -33,6 +35,7 @@ public class LeadEnrichmentController {
     private final CsvImportService csvImportService;
     private final LeadRepository leadRepository;
     private final CampaignLeadService campaignLeadService;
+    private final CampaignRepository campaignRepository;
 
     @PostMapping("/{id}/enrich")
     public ResponseEntity<?> enrichLead(@PathVariable UUID id, Authentication authentication) {
@@ -326,6 +329,98 @@ public class LeadEnrichmentController {
         }
     }
 
+    @PostMapping("/bulk-create")
+    public ResponseEntity<?> bulkCreateLeads(
+            @RequestBody BulkCreateLeadsRequest request,
+            Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null) {
+            log.warn("Unauthorized attempt to create leads - no user found");
+            return ResponseEntity.status(401).build();
+        }
+
+        UUID orgId = resolveOrgId(user);
+        log.info("Starting bulk lead creation - User: {}, Org: {}, Lead count: {}",
+                user.getId(), orgId, request.getLeads().size());
+
+        try {
+            List<Lead> leadsToCreate = new ArrayList<>();
+            List<String> createdLeadIds = new ArrayList<>();
+
+            log.info("Processing {} leads for bulk creation", request.getLeads().size());
+            log.info("Campaign ID: {}", request.getCampaignId());
+
+            for (LeadData leadData : request.getLeads()) {
+                log.debug("Creating lead: firstName={}, lastName={}, email={}, domain={}",
+                        leadData.getFirstName(), leadData.getLastName(), leadData.getEmail(), leadData.getDomain());
+
+                Lead lead = Lead.builder()
+                        .orgId(orgId)
+                        .firstName(leadData.getFirstName())
+                        .lastName(leadData.getLastName())
+                        .email(leadData.getEmail())
+                        .domain(leadData.getDomain())
+                        .position(leadData.getPosition())
+                        .positionRaw(leadData.getPositionRaw())
+                        .seniority(leadData.getSeniority())
+                        .department(leadData.getDepartment())
+                        .linkedinUrl(leadData.getLinkedinUrl())
+                        .confidenceScore(leadData.getConfidenceScore())
+                        .emailType(leadData.getEmailType())
+                        .verifiedStatus(leadData.getVerifiedStatus())
+                        .source("hunter_api")
+                        .build();
+
+                leadsToCreate.add(lead);
+            }
+
+            // Save all leads
+            List<Lead> savedLeads = leadRepository.saveAll(leadsToCreate);
+
+            // Extract IDs for response
+            for (Lead savedLead : savedLeads) {
+                createdLeadIds.add(savedLead.getId().toString());
+            }
+
+            log.info("Successfully created {} leads for user {} in organization {}",
+                    savedLeads.size(), user.getId(), orgId);
+
+            // If campaign ID is provided, add leads to campaign
+            if (request.getCampaignId() != null) {
+                List<UUID> leadIds = savedLeads.stream().map(Lead::getId).toList();
+                log.info("Adding {} leads to campaign {} for user {}",
+                        leadIds.size(), request.getCampaignId(), user.getId());
+
+                try {
+                    // Validate campaign exists and belongs to user's organization
+                    Campaign campaign = campaignRepository.findByIdAndOrgId(request.getCampaignId(), orgId)
+                            .orElseThrow(() -> new IllegalArgumentException("Campaign not found or access denied"));
+
+                    log.info("Campaign validation successful: {} (ID: {})", campaign.getName(), campaign.getId());
+
+                    int assignedCount = campaignLeadService.addLeadsToCampaign(request.getCampaignId(), leadIds,
+                            user.getId());
+                    log.info("Successfully assigned {} leads to campaign {} for user {}",
+                            assignedCount, request.getCampaignId(), user.getId());
+                } catch (Exception e) {
+                    log.error("Error adding leads to campaign {}: {}", request.getCampaignId(), e.getMessage(), e);
+                    // Don't fail the entire operation if campaign assignment fails
+                }
+            } else {
+                log.info("No campaign ID provided, leads created without campaign assignment");
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Leads created successfully",
+                    "leadIds", createdLeadIds,
+                    "count", savedLeads.size()));
+        } catch (Exception e) {
+            log.error("Error creating leads: {}", e.getMessage(), e);
+            e.printStackTrace(); // Add stack trace for debugging
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to create leads: " + e.getMessage()));
+        }
+    }
+
     private User getUser(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated())
             return null;
@@ -518,5 +613,139 @@ public class LeadEnrichmentController {
             return "\"" + value.replace("\"", "\"\"") + "\"";
         }
         return value;
+    }
+
+    // Request DTOs
+    public static class BulkCreateLeadsRequest {
+        private List<LeadData> leads;
+        private UUID campaignId;
+
+        public List<LeadData> getLeads() {
+            return leads;
+        }
+
+        public void setLeads(List<LeadData> leads) {
+            this.leads = leads;
+        }
+
+        public UUID getCampaignId() {
+            return campaignId;
+        }
+
+        public void setCampaignId(UUID campaignId) {
+            this.campaignId = campaignId;
+        }
+    }
+
+    public static class LeadData {
+        private String firstName;
+        private String lastName;
+        private String email;
+        private String domain;
+        private String position;
+        private String positionRaw;
+        private String seniority;
+        private String department;
+        private String linkedinUrl;
+        private Integer confidenceScore;
+        private Lead.EmailType emailType;
+        private Lead.VerifiedStatus verifiedStatus;
+
+        // Getters and setters
+        public String getFirstName() {
+            return firstName;
+        }
+
+        public void setFirstName(String firstName) {
+            this.firstName = firstName;
+        }
+
+        public String getLastName() {
+            return lastName;
+        }
+
+        public void setLastName(String lastName) {
+            this.lastName = lastName;
+        }
+
+        public String getEmail() {
+            return email;
+        }
+
+        public void setEmail(String email) {
+            this.email = email;
+        }
+
+        public String getDomain() {
+            return domain;
+        }
+
+        public void setDomain(String domain) {
+            this.domain = domain;
+        }
+
+        public String getPosition() {
+            return position;
+        }
+
+        public void setPosition(String position) {
+            this.position = position;
+        }
+
+        public String getPositionRaw() {
+            return positionRaw;
+        }
+
+        public void setPositionRaw(String positionRaw) {
+            this.positionRaw = positionRaw;
+        }
+
+        public String getSeniority() {
+            return seniority;
+        }
+
+        public void setSeniority(String seniority) {
+            this.seniority = seniority;
+        }
+
+        public String getDepartment() {
+            return department;
+        }
+
+        public void setDepartment(String department) {
+            this.department = department;
+        }
+
+        public String getLinkedinUrl() {
+            return linkedinUrl;
+        }
+
+        public void setLinkedinUrl(String linkedinUrl) {
+            this.linkedinUrl = linkedinUrl;
+        }
+
+        public Integer getConfidenceScore() {
+            return confidenceScore;
+        }
+
+        public void setConfidenceScore(Integer confidenceScore) {
+            this.confidenceScore = confidenceScore;
+        }
+
+        public Lead.EmailType getEmailType() {
+            return emailType;
+        }
+
+        public void setEmailType(Lead.EmailType emailType) {
+            this.emailType = emailType;
+        }
+
+        public Lead.VerifiedStatus getVerifiedStatus() {
+            return verifiedStatus;
+        }
+
+        public void setVerifiedStatus(Lead.VerifiedStatus verifiedStatus) {
+            this.verifiedStatus = verifiedStatus;
+        }
     }
 }

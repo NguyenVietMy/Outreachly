@@ -19,21 +19,50 @@ public class CompanyService {
 
     private final CompanyRepository companyRepository;
 
-    public Page<Company> getCompanies(String search, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size);
+    public Page<Company> getCompanies(String search, String companyType,
+            String size, String headquartersCountry, int page, int pageSize) {
+        Pageable pageable = PageRequest.of(page, pageSize);
 
-        if (search != null && !search.trim().isEmpty()) {
-            log.info("Searching companies with query: '{}', page: {}, size: {}", search, page, size);
-            return companyRepository.findWithFilters(search.trim(), pageable);
+        boolean hasFilters = (search != null && !search.trim().isEmpty()) ||
+                (companyType != null && !companyType.trim().isEmpty()) ||
+                (size != null && !size.trim().isEmpty()) ||
+                (headquartersCountry != null && !headquartersCountry.trim().isEmpty());
+
+        if (hasFilters) {
+            log.info(
+                    "Searching companies with filters: search='{}', type='{}', size='{}', country='{}', page: {}, size: {}",
+                    search, companyType, size, headquartersCountry, page, pageSize);
+            Page<Company> filteredCompanies = companyRepository.findWithFilters(
+                    search != null ? search.trim() : null,
+                    companyType != null && !companyType.trim().isEmpty() ? companyType.trim() : null,
+                    size != null && !size.trim().isEmpty() ? size.trim() : null,
+                    headquartersCountry != null && !headquartersCountry.trim().isEmpty() ? headquartersCountry.trim()
+                            : null,
+                    pageable);
+            log.info("Found {} companies with filters", filteredCompanies.getTotalElements());
+            return filteredCompanies;
         } else {
-            log.info("Fetching all companies, page: {}, size: {}", page, size);
-            return companyRepository.findAll(pageable);
+            log.info("Fetching all companies, page: {}, size: {}", page, pageSize);
+            Page<Company> allCompanies = companyRepository.findAll(pageable);
+            log.info("Found {} companies in database", allCompanies.getTotalElements());
+            return allCompanies;
         }
     }
 
-    public long getCompanyCount(String search) {
-        if (search != null && !search.trim().isEmpty()) {
-            return companyRepository.countWithFilters(search.trim());
+    public long getCompanyCount(String search, String companyType,
+            String size, String headquartersCountry) {
+        boolean hasFilters = (search != null && !search.trim().isEmpty()) ||
+                (companyType != null && !companyType.trim().isEmpty()) ||
+                (size != null && !size.trim().isEmpty()) ||
+                (headquartersCountry != null && !headquartersCountry.trim().isEmpty());
+
+        if (hasFilters) {
+            return companyRepository.countWithFilters(
+                    search != null ? search.trim() : null,
+                    companyType != null && !companyType.trim().isEmpty() ? companyType.trim() : null,
+                    size != null && !size.trim().isEmpty() ? size.trim() : null,
+                    headquartersCountry != null && !headquartersCountry.trim().isEmpty() ? headquartersCountry.trim()
+                            : null);
         } else {
             return companyRepository.count();
         }
@@ -73,5 +102,11 @@ public class CompanyService {
     public void deleteCompany(UUID id) {
         log.info("Deleting company: id='{}'", id);
         companyRepository.deleteById(id);
+    }
+
+    public Company saveCompany(Company company) {
+        log.info("Saving company: id='{}', name='{}', domain='{}'", company.getId(), company.getName(),
+                company.getDomain());
+        return companyRepository.save(company);
     }
 }
