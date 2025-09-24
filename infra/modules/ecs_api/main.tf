@@ -111,6 +111,38 @@ resource "aws_iam_role_policy_attachment" "task_exec_attach" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+# SES permissions for the ECS task
+resource "aws_iam_role_policy" "ses_policy" {
+  name = "${local.name}-ses-policy"
+  role = aws_iam_role.task_exec.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ses:SendEmail",
+          "ses:SendRawEmail",
+          "ses:SendBulkTemplatedEmail",
+          "ses:SendTemplatedEmail",
+          "ses:VerifyEmailIdentity",
+          "ses:GetIdentityVerificationAttributes",
+          "ses:GetSendQuota",
+          "ses:GetSendStatistics",
+          "ses:ListIdentities",
+          "ses:GetIdentityDkimAttributes",
+          "ses:GetIdentityMailFromDomainAttributes",
+          "ses:GetIdentityNotificationAttributes",
+          "ses:GetIdentityPolicies",
+          "ses:GetIdentityVerificationAttributes"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 
 # ---------- Cluster, Task, Service ----------
 resource "aws_ecs_cluster" "this" {

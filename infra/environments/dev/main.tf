@@ -37,6 +37,14 @@ module "ecs_api" {
   domain_name       = "api.outreach-ly.com"
 }
 
+module "ses" {
+  source = "../../modules/ses"
+
+  domain_name = "outreach-ly.com"
+  route53_zone_id = "Z02495573ISDF5X4NF9YA"
+  region = "us-east-1"
+}
+
 resource "aws_route53_record" "api_alias" {
   zone_id = "Z02495573ISDF5X4NF9YA"
   name    = "api.outreach-ly.com"

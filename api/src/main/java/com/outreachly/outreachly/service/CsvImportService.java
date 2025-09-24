@@ -1,6 +1,5 @@
 package com.outreachly.outreachly.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvException;
 import com.outreachly.outreachly.dto.CsvColumnMappingDto;
