@@ -2,8 +2,8 @@ package com.outreachly.outreachly.service;
 
 import com.outreachly.outreachly.dto.EmailRequest;
 import com.outreachly.outreachly.dto.EmailResponse;
-import com.outreachly.outreachly.entity.EmailEvent;
-import lombok.RequiredArgsConstructor;
+import com.outreachly.outreachly.service.email.AbstractEmailProvider;
+import com.outreachly.outreachly.service.email.EmailProviderType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -15,12 +15,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
-public class SesEmailService {
+public class SesEmailService extends AbstractEmailProvider {
 
     private final SesClient sesClient;
     private final EmailEventService emailEventService;
+
+    public SesEmailService(SesClient sesClient, EmailEventService emailEventService) {
+        super(emailEventService);
+        this.sesClient = sesClient;
+        this.emailEventService = emailEventService;
+    }
 
     @Value("${aws.ses.from-email}")
     private String fromEmail;
@@ -28,35 +33,14 @@ public class SesEmailService {
     @Value("${aws.ses.from-name}")
     private String fromName;
 
-    public EmailResponse sendEmail(EmailRequest emailRequest) {
+    @Override
+    public EmailProviderType getProviderType() {
+        return EmailProviderType.AWS_SES;
+    }
+
+    @Override
+    protected EmailResponse doSendEmail(EmailRequest emailRequest) {
         try {
-            // Check for suppressed emails
-            List<String> suppressedEmails = new ArrayList<>();
-            List<String> validRecipients = new ArrayList<>();
-
-            for (String recipient : emailRequest.getRecipients()) {
-                if (emailEventService.isEmailSuppressed(recipient)) {
-                    suppressedEmails.add(recipient);
-                    log.warn("Email suppressed due to previous bounces/complaints: {}", recipient);
-                } else {
-                    validRecipients.add(recipient);
-                }
-            }
-
-            if (validRecipients.isEmpty()) {
-                return EmailResponse.builder()
-                        .success(false)
-                        .message("All recipients are suppressed")
-                        .timestamp(LocalDateTime.now())
-                        .totalRecipients(emailRequest.getRecipients().size())
-                        .successfulRecipients(0)
-                        .failedRecipients(suppressedEmails)
-                        .build();
-            }
-
-            // Update email request to only include valid recipients
-            emailRequest.setRecipients(validRecipients);
-
             // Build the email message
             Message message = Message.builder()
                     .subject(Content.builder()
@@ -93,21 +77,18 @@ public class SesEmailService {
             // Send the email
             SendEmailResponse response = sesClient.sendEmail(sendEmailRequest);
 
-            log.info("Email sent successfully. MessageId: {}, Recipients: {}",
-                    response.messageId(), emailRequest.getRecipients().size());
-
             return EmailResponse.builder()
                     .messageId(response.messageId())
                     .success(true)
                     .message("Email sent successfully")
                     .timestamp(LocalDateTime.now())
-                    .totalRecipients(emailRequest.getRecipients().size() + suppressedEmails.size())
+                    .totalRecipients(emailRequest.getRecipients().size())
                     .successfulRecipients(emailRequest.getRecipients().size())
-                    .failedRecipients(suppressedEmails)
+                    .failedRecipients(new ArrayList<>())
                     .build();
 
         } catch (SesException e) {
-            log.error("Failed to send email: {}", e.getMessage(), e);
+            log.error("SES failed to send email: {}", e.getMessage(), e);
 
             return EmailResponse.builder()
                     .success(false)
@@ -120,32 +101,7 @@ public class SesEmailService {
         }
     }
 
-    public EmailResponse sendBulkEmail(List<EmailRequest> emailRequests) {
-        List<String> allRecipients = new ArrayList<>();
-        List<String> failedRecipients = new ArrayList<>();
-        int successfulCount = 0;
-
-        for (EmailRequest emailRequest : emailRequests) {
-            EmailResponse response = sendEmail(emailRequest);
-            allRecipients.addAll(emailRequest.getRecipients());
-
-            if (response.isSuccess()) {
-                successfulCount += response.getSuccessfulRecipients();
-            } else {
-                failedRecipients.addAll(response.getFailedRecipients());
-            }
-        }
-
-        return EmailResponse.builder()
-                .success(failedRecipients.isEmpty())
-                .message(failedRecipients.isEmpty() ? "All emails sent successfully" : "Some emails failed to send")
-                .timestamp(LocalDateTime.now())
-                .totalRecipients(allRecipients.size())
-                .successfulRecipients(successfulCount)
-                .failedRecipients(failedRecipients)
-                .build();
-    }
-
+    @Override
     public boolean verifyEmailAddress(String emailAddress) {
         try {
             VerifyEmailIdentityRequest request = VerifyEmailIdentityRequest.builder()
@@ -161,6 +117,7 @@ public class SesEmailService {
         }
     }
 
+    @Override
     public List<String> getVerifiedEmailAddresses() {
         try {
             GetIdentityVerificationAttributesRequest request = GetIdentityVerificationAttributesRequest.builder()
@@ -177,13 +134,5 @@ public class SesEmailService {
             log.error("Failed to get verified email addresses: {}", e.getMessage());
             return new ArrayList<>();
         }
-    }
-
-    public boolean isEmailSuppressed(String emailAddress) {
-        return emailEventService.isEmailSuppressed(emailAddress);
-    }
-
-    public List<EmailEvent> getEmailHistory(String emailAddress) {
-        return emailEventService.getEmailHistory(emailAddress);
     }
 }

@@ -3,7 +3,8 @@ package com.outreachly.outreachly.controller;
 import com.outreachly.outreachly.dto.EmailRequest;
 import com.outreachly.outreachly.dto.EmailResponse;
 import com.outreachly.outreachly.entity.EmailEvent;
-import com.outreachly.outreachly.service.SesEmailService;
+import com.outreachly.outreachly.service.UnifiedEmailService;
+import com.outreachly.outreachly.service.email.EmailProviderType;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +22,7 @@ import java.util.Map;
 @Slf4j
 public class EmailController {
 
-    private final SesEmailService emailService;
+    private final UnifiedEmailService emailService;
 
     @PostMapping("/send")
     public ResponseEntity<EmailResponse> sendEmail(
@@ -141,5 +142,40 @@ public class EmailController {
     @GetMapping("/health")
     public ResponseEntity<String> healthCheck() {
         return ResponseEntity.ok("Email service is healthy");
+    }
+
+    @GetMapping("/providers")
+    public ResponseEntity<Map<String, Object>> getProviders(Authentication authentication) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("currentProvider", emailService.getCurrentProvider().getProviderType().getDisplayName());
+        response.put("availableProviders", emailService.getProvidersInfo());
+        response.put("healthStatus", emailService.getProvidersHealthStatus());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/send/{provider}")
+    public ResponseEntity<EmailResponse> sendEmailWithProvider(
+            @PathVariable String provider,
+            @Valid @RequestBody EmailRequest emailRequest,
+            Authentication authentication) {
+
+        try {
+            EmailProviderType providerType = EmailProviderType.valueOf(provider.toUpperCase().replace("-", "_"));
+            log.info("Sending email via {} to {} recipients for user: {}",
+                    providerType.getDisplayName(),
+                    emailRequest.getRecipients().size(),
+                    authentication.getName());
+
+            EmailResponse response = emailService.sendEmail(emailRequest, providerType);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Invalid provider: " + provider);
+            errorResponse.put("availableProviders", emailService.getAllProviders().keySet());
+            return ResponseEntity.badRequest().body(EmailResponse.builder()
+                    .success(false)
+                    .message("Invalid provider: " + provider)
+                    .build());
+        }
     }
 }

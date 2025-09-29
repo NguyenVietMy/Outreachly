@@ -440,33 +440,33 @@ export default function TemplatesPage() {
                   >
                     <RefreshCw className="h-3 w-3 md:h-4 md:w-4" />
                     <span className="hidden sm:inline">Refresh</span>
-                  </Button>
-                  <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-                    <DialogTrigger asChild>
+              </Button>
+              <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                <DialogTrigger asChild>
                       <Button className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
                         <FilePlus2 className="h-3 w-3 md:h-4 md:w-4" />
                         <span className="hidden sm:inline">New Template</span>
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[600px]">
-                      <DialogHeader>
-                        <DialogTitle>Create Template</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-3">
-                        <Select
-                          value={platform}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[600px]">
+                  <DialogHeader>
+                    <DialogTitle>Create Template</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-3">
+                    <Select
+                      value={platform}
                           onValueChange={(v) =>
                             setPlatform(v as TemplatePlatform)
                           }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Platform" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="EMAIL">Email</SelectItem>
-                            <SelectItem value="LINKEDIN">LinkedIn</SelectItem>
-                          </SelectContent>
-                        </Select>
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Platform" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="EMAIL">Email</SelectItem>
+                        <SelectItem value="LINKEDIN">LinkedIn</SelectItem>
+                      </SelectContent>
+                    </Select>
                         <div className="space-y-3">
                           <Input
                             placeholder="Template Name"
@@ -977,31 +977,31 @@ export default function TemplatesPage() {
               </TabsContent>
             </Tabs>
 
-            {/* Edit Template Modal */}
-            <Dialog open={editOpen} onOpenChange={setEditOpen}>
-              <DialogContent className="sm:max-w-[600px]">
-                <DialogHeader>
-                  <DialogTitle>Edit Template</DialogTitle>
-                </DialogHeader>
-                {editValue && (
-                  <div className="space-y-3">
-                    <Select
-                      value={editValue.platform}
-                      onValueChange={(v) =>
-                        setEditValue({
-                          ...editValue,
-                          platform: v as TemplatePlatform,
-                        })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Platform" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="EMAIL">Email</SelectItem>
-                        <SelectItem value="LINKEDIN">LinkedIn</SelectItem>
-                      </SelectContent>
-                    </Select>
+              {/* Edit Template Modal */}
+              <Dialog open={editOpen} onOpenChange={setEditOpen}>
+                <DialogContent className="sm:max-w-[600px]">
+                  <DialogHeader>
+                    <DialogTitle>Edit Template</DialogTitle>
+                  </DialogHeader>
+                  {editValue && (
+                    <div className="space-y-3">
+                      <Select
+                        value={editValue.platform}
+                        onValueChange={(v) =>
+                          setEditValue({
+                            ...editValue,
+                            platform: v as TemplatePlatform,
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Platform" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="EMAIL">Email</SelectItem>
+                          <SelectItem value="LINKEDIN">LinkedIn</SelectItem>
+                        </SelectContent>
+                      </Select>
                     <div className="space-y-3">
                       <Input
                         placeholder="Template Name"
@@ -1048,27 +1048,27 @@ export default function TemplatesPage() {
                       <div className="flex gap-2">
                         <Button
                           onClick={async () => {
-                            if (!editingId) return;
-                            try {
-                              setEditSaving(true);
-                              await updateTemplate(editingId, {
+                          if (!editingId) return;
+                          try {
+                            setEditSaving(true);
+                            await updateTemplate(editingId, {
                                 name: editValue.name,
                                 category: editValue.category || undefined,
                                 platform: editValue.platform,
-                                content:
+                              content:
                                   editValue.platform === "EMAIL"
-                                    ? {
+                                  ? {
                                         subject: editValue.subject || "",
                                         body: editValue.body,
-                                      }
+                                    }
                                     : { body: editValue.body },
-                              });
-                              setEditOpen(false);
-                              await load();
-                            } finally {
-                              setEditSaving(false);
-                            }
-                          }}
+                            });
+                            setEditOpen(false);
+                            await load();
+                          } finally {
+                            setEditSaving(false);
+                          }
+                        }}
                           disabled={
                             !editValue.name ||
                             !editValue.body ||
@@ -1087,7 +1087,7 @@ export default function TemplatesPage() {
                         </Button>
                       </div>
                     </div>
-                  </div>
+                      </div>
                 )}
               </DialogContent>
             </Dialog>
@@ -1104,7 +1104,7 @@ export default function TemplatesPage() {
                     Unsaved Changes
                   </DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4">
+            <div className="space-y-4">
                   <p className="text-sm text-gray-600">
                     You have an unsaved AI-generated template. What would you
                     like to do?
@@ -1130,7 +1130,7 @@ export default function TemplatesPage() {
                   >
                     Cancel
                   </Button>
-                </div>
+            </div>
               </DialogContent>
             </Dialog>
           </div>

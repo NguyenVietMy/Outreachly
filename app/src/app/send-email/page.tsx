@@ -859,13 +859,13 @@ export default function SendEmailPage() {
                             <div className="flex justify-between">
                               <span>Failed:</span>
                               <span className="font-medium">
-                                {lastResponse.failedRecipients.length}
+                                {lastResponse.failedRecipients?.length || 0}
                               </span>
                             </div>
                             <div className="flex justify-between">
                               <span>Total:</span>
                               <span className="font-medium">
-                                {lastResponse.totalRecipients}
+                                {lastResponse.totalRecipients || 0}
                               </span>
                             </div>
                             {lastResponse.messageId && (
