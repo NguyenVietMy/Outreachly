@@ -33,7 +33,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { name: "Leads", href: "/leads", icon: Users },
     { name: "Import Leads", href: "/import", icon: Upload },
     { name: "Templates", href: "/templates", icon: FileText },
-    { name: "Settings", href: "/dashboard/settings", icon: Settings },
+    { name: "Settings", href: "/settings", icon: Settings },
   ];
 
   return (
