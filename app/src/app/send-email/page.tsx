@@ -63,6 +63,7 @@ import { RecipientManager } from "@/components/email/RecipientManager";
 import { RichTextEditor } from "@/components/email/RichTextEditor";
 import DashboardLayout from "@/components/DashboardLayout";
 import AuthGuard from "@/components/AuthGuard";
+import { useLeads, Lead } from "@/hooks/useLeads";
 
 interface EmailFormData {
   recipients: string[];
@@ -88,10 +89,12 @@ interface EmailResponse {
 interface EmailTemplate {
   id: string;
   name: string;
-  subject: string;
-  content: string;
-  category: string;
-  isHtml: boolean;
+  subject?: string;
+  content?: string;
+  category?: string;
+  isHtml?: boolean;
+  platform: string;
+  contentJson: string;
 }
 
 interface EmailStats {
@@ -134,6 +137,10 @@ export default function SendEmailPage() {
   });
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [emailHistory, setEmailHistory] = useState<EmailResponse[]>([]);
+  const [selectedLeads, setSelectedLeads] = useState<Lead[]>([]);
+  const [showLeadSelection, setShowLeadSelection] = useState(false);
+
+  const { leads, loading: leadsLoading } = useLeads();
 
   const [formData, setFormData] = useState<EmailFormData>({
     recipients: [],
@@ -185,13 +192,20 @@ export default function SendEmailPage() {
         }
 
         // Load templates
-        const templatesResponse = await fetch(`${API_URL}/api/templates`, {
-          credentials: "include",
-        });
+        const templatesResponse = await fetch(
+          `${API_URL}/api/templates?platform=EMAIL`,
+          {
+            credentials: "include",
+          }
+        );
         if (templatesResponse.ok) {
           const templatesData = await templatesResponse.json();
-          setTemplates(
-            templatesData.filter((t: any) => t.platform === "EMAIL")
+          setTemplates(templatesData);
+        } else {
+          console.error(
+            "Failed to load templates:",
+            templatesResponse.status,
+            templatesResponse.statusText
           );
         }
 
@@ -289,18 +303,34 @@ export default function SendEmailPage() {
   };
 
   const loadTemplate = (template: EmailTemplate) => {
-    setFormData((prev) => ({
-      ...prev,
-      subject: template.subject || "",
-      content: template.content || "",
-      isHtml: template.isHtml || false,
-      templateId: template.id,
-    }));
-    setShowTemplates(false);
-    toast({
-      title: "Template Loaded",
-      description: `Loaded template: ${template.name}`,
-    });
+    try {
+      // Parse the JSON content to extract subject and body
+      const contentData = JSON.parse(template.contentJson || "{}");
+      const subject = contentData.subject || "";
+      const content = contentData.body || "";
+      const isHtml = contentData.isHtml || false;
+
+      setFormData((prev) => ({
+        ...prev,
+        subject: subject,
+        content: content,
+        isHtml: isHtml,
+        templateId: template.id,
+      }));
+      setShowTemplates(false);
+
+      toast({
+        title: "Template Loaded",
+        description: `Loaded template: ${template.name}`,
+      });
+    } catch (error) {
+      console.error("Error parsing template content:", error);
+      toast({
+        title: "Template Error",
+        description: "Failed to load template content",
+        variant: "destructive",
+      });
+    }
   };
 
   const clearTemplate = () => {
@@ -308,6 +338,93 @@ export default function SendEmailPage() {
       ...prev,
       templateId: undefined,
     }));
+  };
+
+  // Lead selection functions
+  const addLeadToRecipients = (lead: Lead) => {
+    if (!formData.recipients.includes(lead.email)) {
+      setFormData((prev) => ({
+        ...prev,
+        recipients: [...prev.recipients, lead.email],
+      }));
+      setSelectedLeads((prev) => [...prev, lead]);
+    }
+  };
+
+  const removeLeadFromRecipients = (lead: Lead) => {
+    setFormData((prev) => ({
+      ...prev,
+      recipients: prev.recipients.filter((email) => email !== lead.email),
+    }));
+    setSelectedLeads((prev) => prev.filter((l) => l.id !== lead.id));
+  };
+
+  const addAllLeadsToRecipients = () => {
+    const newRecipients = leads
+      .filter((lead) => !formData.recipients.includes(lead.email))
+      .map((lead) => lead.email);
+
+    const newSelectedLeads = leads.filter(
+      (lead) => !formData.recipients.includes(lead.email)
+    );
+
+    setFormData((prev) => ({
+      ...prev,
+      recipients: [...prev.recipients, ...newRecipients],
+    }));
+    setSelectedLeads((prev) => [...prev, ...newSelectedLeads]);
+  };
+
+  const clearAllLeads = () => {
+    setFormData((prev) => ({
+      ...prev,
+      recipients: [],
+    }));
+    setSelectedLeads([]);
+  };
+
+  // Template variable substitution
+  const substituteTemplateVariables = (text: string, lead: Lead): string => {
+    if (!text || !lead) return text;
+
+    let result = text
+      .replace(/\{\{\s*first_name\s*\}\}/gi, lead.firstName || "")
+      .replace(/\{\{\s*last_name\s*\}\}/gi, lead.lastName || "")
+      .replace(/\{\{\s*email\s*\}\}/gi, lead.email || "")
+      .replace(/\{\{\s*company\s*\}\}/gi, lead.domain || "")
+      .replace(/\{\{\s*title\s*\}\}/gi, lead.position || "")
+      .replace(/\{\{\s*position\s*\}\}/gi, lead.position || "")
+      .replace(/\{\{\s*department\s*\}\}/gi, lead.department || "")
+      .replace(/\{\{\s*seniority\s*\}\}/gi, lead.seniority || "")
+      .replace(/\{\{\s*phone\s*\}\}/gi, lead.phone || "")
+      .replace(/\{\{\s*linkedin\s*\}\}/gi, lead.linkedinUrl || "")
+      .replace(/\{\{\s*twitter\s*\}\}/gi, lead.twitter || "");
+
+    // Also handle any remaining variables that might not have been replaced
+    result = result.replace(/\{\{\s*[^}]+\s*\}\}/g, ""); // Remove any remaining {{variable}} patterns
+
+    return result;
+  };
+
+  const getPersonalizedContent = (template: EmailTemplate, lead: Lead) => {
+    try {
+      const contentData = JSON.parse(template.contentJson || "{}");
+      const subject = contentData.subject || "";
+      const content = contentData.body || "";
+
+      return {
+        subject: substituteTemplateVariables(subject, lead),
+        content: substituteTemplateVariables(content, lead),
+        isHtml: contentData.isHtml || false,
+      };
+    } catch (error) {
+      console.error("Error parsing template for personalization:", error);
+      return {
+        subject: "",
+        content: "",
+        isHtml: false,
+      };
+    }
   };
 
   const addRecipientsFromCSV = () => {
@@ -338,6 +455,58 @@ export default function SendEmailPage() {
         (email) => email.trim() !== ""
       );
 
+      // If we have selected leads and a template, send personalized emails
+      if (selectedLeads.length > 0 && formData.templateId) {
+        const template = templates.find((t) => t.id === formData.templateId);
+        if (template) {
+          // Send personalized emails to each lead
+          const personalizedEmails = selectedLeads.map((lead) => {
+            const personalized = getPersonalizedContent(template, lead);
+            return {
+              recipients: [lead.email],
+              subject: personalized.subject,
+              content: personalized.content,
+              replyTo: null,
+              isHtml: personalized.isHtml,
+              campaignId: null,
+            };
+          });
+
+          // Send each personalized email
+          const emailPromises = personalizedEmails.map(async (emailRequest) => {
+            const response = await fetch(`${API_URL}/api/email/send`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              credentials: "include",
+              body: JSON.stringify(emailRequest),
+            });
+            return response.json();
+          });
+
+          const results = await Promise.all(emailPromises);
+          const successfulCount = results.filter((r) => r.success).length;
+          const failedCount = results.length - successfulCount;
+
+          toast({
+            title: "Personalized Emails Sent",
+            description: `Sent ${successfulCount} personalized emails, ${failedCount} failed`,
+          });
+
+          // Reset form
+          setFormData((prev) => ({
+            ...prev,
+            subject: "",
+            content: "",
+            recipients: [],
+          }));
+          setSelectedLeads([]);
+          return;
+        }
+      }
+
+      // Fallback to regular email sending
       const emailRequest = {
         recipients: validRecipients,
         subject: (formData.subject || "").trim(),
@@ -372,6 +541,7 @@ export default function SendEmailPage() {
           content: "",
           recipients: [],
         }));
+        setSelectedLeads([]);
       } else {
         // Check if it's a SES verification error
         if (data.message && data.message.includes("not verified")) {
@@ -636,6 +806,156 @@ export default function SendEmailPage() {
                             </div>
                           )}
 
+                          {/* Lead Selection */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Label>Import Leads</Label>
+                              <div className="flex gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    setShowLeadSelection(!showLeadSelection)
+                                  }
+                                  className="flex items-center gap-1"
+                                >
+                                  <Users className="h-4 w-4" />
+                                  {showLeadSelection ? "Hide" : "Show"} Leads
+                                </Button>
+                                {leads.length > 0 && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={addAllLeadsToRecipients}
+                                    disabled={leadsLoading}
+                                  >
+                                    Add All ({leads.length})
+                                  </Button>
+                                )}
+                                {selectedLeads.length > 0 && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={clearAllLeads}
+                                  >
+                                    Clear All
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+
+                            {showLeadSelection && (
+                              <div className="border rounded-lg p-4 bg-gray-50 max-h-60 overflow-y-auto">
+                                {leadsLoading ? (
+                                  <div className="flex items-center justify-center py-4">
+                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                    Loading leads...
+                                  </div>
+                                ) : leads.length > 0 ? (
+                                  <div className="space-y-2">
+                                    {leads.map((lead) => {
+                                      const isSelected = selectedLeads.some(
+                                        (l) => l.id === lead.id
+                                      );
+                                      return (
+                                        <div
+                                          key={lead.id}
+                                          className={`flex items-center justify-between p-2 rounded border ${
+                                            isSelected
+                                              ? "bg-blue-50 border-blue-200"
+                                              : "bg-white border-gray-200"
+                                          }`}
+                                        >
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                              <span className="font-medium text-sm truncate">
+                                                {lead.firstName} {lead.lastName}
+                                              </span>
+                                              {lead.position && (
+                                                <Badge
+                                                  variant="secondary"
+                                                  className="text-xs"
+                                                >
+                                                  {lead.position}
+                                                </Badge>
+                                              )}
+                                            </div>
+                                            <div className="text-xs text-gray-500 truncate">
+                                              {lead.email}
+                                            </div>
+                                            {lead.domain && (
+                                              <div className="text-xs text-gray-400 truncate">
+                                                {lead.domain}
+                                              </div>
+                                            )}
+                                          </div>
+                                          <Button
+                                            type="button"
+                                            variant={
+                                              isSelected
+                                                ? "destructive"
+                                                : "default"
+                                            }
+                                            size="sm"
+                                            onClick={() =>
+                                              isSelected
+                                                ? removeLeadFromRecipients(lead)
+                                                : addLeadToRecipients(lead)
+                                            }
+                                            className="ml-2 h-8"
+                                          >
+                                            {isSelected ? "Remove" : "Add"}
+                                          </Button>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <div className="text-center py-4 text-gray-500">
+                                    <Users className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                                    <p>No leads available</p>
+                                    <p className="text-sm">
+                                      Import leads from the Leads page first
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {selectedLeads.length > 0 && (
+                              <div className="mt-2">
+                                <div className="text-sm text-gray-600 mb-2">
+                                  Selected leads ({selectedLeads.length}):
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                  {selectedLeads.map((lead) => (
+                                    <Badge
+                                      key={lead.id}
+                                      variant="secondary"
+                                      className="flex items-center gap-1"
+                                    >
+                                      {lead.firstName} {lead.lastName}
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-4 w-4 p-0 hover:bg-transparent"
+                                        onClick={() =>
+                                          removeLeadFromRecipients(lead)
+                                        }
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
                           {/* Recipients */}
                           <RecipientManager
                             recipients={formData.recipients}
@@ -696,6 +1016,63 @@ export default function SendEmailPage() {
                             maxLength={10000}
                             error={errors.content}
                           />
+
+                          {/* Template Preview with Lead Data */}
+                          {selectedLeads.length > 0 && formData.templateId && (
+                            <div className="space-y-2">
+                              <Label>Preview with Lead Data</Label>
+                              <div className="border rounded-lg p-4 bg-blue-50">
+                                <div className="text-sm text-blue-600 mb-2">
+                                  Preview with: {selectedLeads[0].firstName}{" "}
+                                  {selectedLeads[0].lastName}
+                                </div>
+                                <div className="space-y-2">
+                                  <div>
+                                    <span className="font-medium text-sm">
+                                      Subject:{" "}
+                                    </span>
+                                    <span className="text-sm">
+                                      {(() => {
+                                        const template = templates.find(
+                                          (t) => t.id === formData.templateId
+                                        );
+                                        if (template) {
+                                          const personalized =
+                                            getPersonalizedContent(
+                                              template,
+                                              selectedLeads[0]
+                                            );
+                                          return personalized.subject;
+                                        }
+                                        return formData.subject;
+                                      })()}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium text-sm">
+                                      Content:{" "}
+                                    </span>
+                                    <div className="text-sm mt-1 p-2 bg-white rounded border max-h-32 overflow-y-auto">
+                                      {(() => {
+                                        const template = templates.find(
+                                          (t) => t.id === formData.templateId
+                                        );
+                                        if (template) {
+                                          const personalized =
+                                            getPersonalizedContent(
+                                              template,
+                                              selectedLeads[0]
+                                            );
+                                          return personalized.content;
+                                        }
+                                        return formData.content;
+                                      })()}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
 
                           {/* Advanced Options */}
                           <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
@@ -763,9 +1140,13 @@ export default function SendEmailPage() {
                             ) : (
                               <>
                                 <Send className="mr-2 h-5 w-5" />
-                                {formData.scheduledAt
-                                  ? "Schedule Email"
-                                  : "Send Email"}
+                                {selectedLeads.length > 0 && formData.templateId
+                                  ? formData.scheduledAt
+                                    ? `Schedule ${selectedLeads.length} Personalized Emails`
+                                    : `Send ${selectedLeads.length} Personalized Emails`
+                                  : formData.scheduledAt
+                                    ? "Schedule Email"
+                                    : "Send Email"}
                               </>
                             )}
                           </Button>
@@ -1003,7 +1384,16 @@ export default function SendEmailPage() {
                             </CardHeader>
                             <CardContent className="pt-0">
                               <p className="text-sm text-gray-600 line-clamp-2">
-                                {template.subject}
+                                {(() => {
+                                  try {
+                                    const contentData = JSON.parse(
+                                      template.contentJson || "{}"
+                                    );
+                                    return contentData.subject || "No subject";
+                                  } catch {
+                                    return "No subject";
+                                  }
+                                })()}
                               </p>
                             </CardContent>
                           </Card>
