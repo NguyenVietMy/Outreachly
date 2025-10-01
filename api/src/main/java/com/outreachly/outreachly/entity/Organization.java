@@ -28,6 +28,12 @@ public class Organization {
     @Column(columnDefinition = "TEXT DEFAULT 'free'")
     private String plan;
 
+    @Column(name = "description")
+    private String description;
+
+    @Column(name = "billing_email")
+    private String billingEmail;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

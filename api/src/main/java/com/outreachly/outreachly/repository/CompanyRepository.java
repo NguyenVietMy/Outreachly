@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,30 +17,37 @@ public interface CompanyRepository extends JpaRepository<Company, UUID> {
 
         Optional<Company> findByDomain(String domain);
 
-        @Query(value = "SELECT * FROM companies c WHERE " +
+        // RLS-compatible queries with org filtering
+        List<Company> findByOrgId(UUID orgId);
+
+        Page<Company> findByOrgId(UUID orgId, Pageable pageable);
+
+        @Query(value = "SELECT * FROM companies c WHERE c.org_id = :orgId AND " +
                         "(:search IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
                         "(:companyType IS NULL OR c.company_type = :companyType) AND " +
                         "(:size IS NULL OR c.size = :size) AND " +
-                        "(:headquartersCountry IS NULL OR c.headquarters_country = :headquartersCountry)", countQuery = "SELECT COUNT(*) FROM companies c WHERE "
+                        "(:headquartersCountry IS NULL OR c.headquarters_country = :headquartersCountry)", countQuery = "SELECT COUNT(*) FROM companies c WHERE c.org_id = :orgId AND "
                                         +
                                         "(:search IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))) AND "
                                         +
                                         "(:companyType IS NULL OR c.company_type = :companyType) AND " +
                                         "(:size IS NULL OR c.size = :size) AND " +
                                         "(:headquartersCountry IS NULL OR c.headquarters_country = :headquartersCountry)", nativeQuery = true)
-        Page<Company> findWithFilters(
+        Page<Company> findWithFiltersByOrgId(
+                        @Param("orgId") UUID orgId,
                         @Param("search") String search,
                         @Param("companyType") String companyType,
                         @Param("size") String size,
                         @Param("headquartersCountry") String headquartersCountry,
                         Pageable pageable);
 
-        @Query(value = "SELECT COUNT(*) FROM companies c WHERE " +
+        @Query(value = "SELECT COUNT(*) FROM companies c WHERE c.org_id = :orgId AND " +
                         "(:search IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
                         "(:companyType IS NULL OR c.company_type = :companyType) AND " +
                         "(:size IS NULL OR c.size = :size) AND " +
                         "(:headquartersCountry IS NULL OR c.headquarters_country = :headquartersCountry)", nativeQuery = true)
-        Long countWithFilters(
+        Long countWithFiltersByOrgId(
+                        @Param("orgId") UUID orgId,
                         @Param("search") String search,
                         @Param("companyType") String companyType,
                         @Param("size") String size,

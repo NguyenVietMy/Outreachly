@@ -91,30 +91,8 @@ export default function SettingsPage() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Email providers state
-  const [emailProviders, setEmailProviders] = useState<EmailProvider[]>([
-    {
-      id: "ses",
-      name: "Amazon SES",
-      type: "api",
-      isActive: true,
-      config: {
-        apiKey: "••••••••••••••••",
-        fromEmail: "noreply@yourdomain.com",
-        fromName: "Your Company",
-      },
-    },
-    {
-      id: "resend",
-      name: "Resend",
-      type: "api",
-      isActive: false,
-      config: {
-        apiKey: "",
-        fromEmail: "",
-        fromName: "",
-      },
-    },
-  ]);
+  const [emailProviders, setEmailProviders] = useState<EmailProvider[]>([]);
+  const [loadingProviders, setLoadingProviders] = useState(true);
 
   // User settings state
   const [settings, setSettings] = useState<UserSettings>({
@@ -134,27 +112,140 @@ export default function SettingsPage() {
     }
   }, [user, authLoading, router]);
 
+  // Load settings and email providers on component mount
+  useEffect(() => {
+    if (user && !authLoading) {
+      loadSettings();
+      loadEmailProviders();
+    }
+  }, [user, authLoading]);
+
+  const loadSettings = async () => {
+    try {
+      const response = await fetch("http://localhost:8080/api/settings", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        // Update settings based on API response
+        if (data.notificationSettings) {
+          setSettings((prev) => ({
+            ...prev,
+            emailNotifications:
+              data.notificationSettings.emailNotifications ??
+              prev.emailNotifications,
+            marketingEmails:
+              data.notificationSettings.marketingEmails ?? prev.marketingEmails,
+          }));
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load settings:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load settings. Using defaults.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const loadEmailProviders = async () => {
+    try {
+      setLoadingProviders(true);
+      console.log("Loading email providers...");
+
+      const response = await fetch(
+        "http://localhost:8080/api/settings/email-providers",
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+        }
+      );
+
+      console.log("Response status:", response.status);
+
+      if (response.ok) {
+        const providers = await response.json();
+        console.log("Loaded providers:", providers);
+
+        // Ensure each provider has a config object with default values
+        const providersWithDefaults = providers.map((provider: any) => ({
+          ...provider,
+          config: provider.config || {
+            apiKey: "",
+            fromEmail: "",
+            fromName: "",
+          },
+        }));
+
+        setEmailProviders(providersWithDefaults);
+      } else {
+        const errorText = await response.text();
+        console.error("API Error:", response.status, errorText);
+
+        if (response.status === 404) {
+          throw new Error(
+            "Backend API not found. Please make sure the backend is running and restarted."
+          );
+        }
+
+        throw new Error(
+          `Failed to load email providers: ${response.status} - ${errorText}`
+        );
+      }
+    } catch (error) {
+      console.error("Failed to load email providers:", error);
+      toast({
+        title: "Error",
+        description: `Failed to load email providers: ${error instanceof Error ? error.message : "Unknown error"}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingProviders(false);
+    }
+  };
+
   const handleSaveSettings = async () => {
     setIsSaving(true);
     try {
-      // Save all settings at once
-      const allSettings = {
-        userSettings: settings,
-        emailProviders: emailProviders,
+      // Save notification settings
+      const notificationSettings = {
+        emailNotifications: settings.emailNotifications,
+        marketingEmails: settings.marketingEmails,
       };
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const response = await fetch("http://localhost:8080/api/settings", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          notificationSettings: notificationSettings,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save settings");
+      }
 
       setHasUnsavedChanges(false);
       toast({
         title: "Settings Saved",
-        description: "All your settings have been updated successfully.",
+        description: "Your settings have been saved successfully.",
       });
     } catch (error) {
+      console.error("Failed to save settings:", error);
       toast({
         title: "Error",
-        description: "Failed to save settings. Please try again.",
+        description: `Failed to save settings: ${error instanceof Error ? error.message : "Unknown error"}`,
         variant: "destructive",
       });
     } finally {
@@ -164,6 +255,93 @@ export default function SettingsPage() {
 
   const markAsChanged = () => {
     setHasUnsavedChanges(true);
+  };
+
+  const switchEmailProvider = async (
+    providerId: string,
+    config: EmailProvider["config"]
+  ) => {
+    try {
+      console.log(`Switching to provider: ${providerId}`, config);
+      setIsSaving(true);
+      const response = await fetch(
+        `http://localhost:8080/api/settings/email-providers/${providerId}/switch`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify(config),
+        }
+      );
+
+      console.log("Switch response status:", response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Switch error:", errorText);
+        throw new Error("Failed to switch email provider");
+      }
+
+      // Reload providers to get updated status
+      await loadEmailProviders();
+
+      toast({
+        title: "Email Provider Switched",
+        description: `Successfully switched to ${providerId}.`,
+      });
+    } catch (error) {
+      console.error("Failed to switch email provider:", error);
+      toast({
+        title: "Error",
+        description: "Failed to switch email provider. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const testEmailProvider = async (
+    providerId: string,
+    config: EmailProvider["config"]
+  ) => {
+    try {
+      const response = await fetch(
+        `http://localhost:8080/api/settings/email-providers/${providerId}/test`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify(config),
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.isValid) {
+        toast({
+          title: "Configuration Valid",
+          description: "Email provider configuration is working correctly.",
+        });
+      } else {
+        toast({
+          title: "Configuration Invalid",
+          description: result.message || "Please check your configuration.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Failed to test email provider:", error);
+      toast({
+        title: "Test Failed",
+        description: "Failed to test email provider configuration.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDeactivateAccount = async () => {
@@ -196,7 +374,15 @@ export default function SettingsPage() {
   ) => {
     setEmailProviders((prev) =>
       prev.map((provider) =>
-        provider.id === providerId ? { ...provider, ...updates } : provider
+        provider.id === providerId
+          ? {
+              ...provider,
+              ...updates,
+              config: updates.config
+                ? { ...provider.config, ...updates.config }
+                : provider.config,
+            }
+          : provider
       )
     );
   };
@@ -295,111 +481,165 @@ export default function SettingsPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    {emailProviders.map((provider) => (
-                      <div key={provider.id} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`w-3 h-3 rounded-full ${
-                                provider.isActive
-                                  ? "bg-green-500"
-                                  : "bg-gray-300"
-                              }`}
-                            />
-                            <h3 className="font-medium">{provider.name}</h3>
-                            {provider.isActive && (
-                              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                                Active
-                              </span>
-                            )}
-                          </div>
-                          <Switch
-                            checked={provider.isActive}
-                            onCheckedChange={(checked) => {
-                              updateEmailProvider(provider.id, {
-                                isActive: checked,
-                              });
-                              markAsChanged();
-                            }}
-                          />
-                        </div>
-
-                        {provider.isActive && (
-                          <div className="space-y-4">
-                            {provider.type === "api" && (
-                              <>
-                                <div className="space-y-2">
-                                  <Label>API Key</Label>
-                                  <div className="flex gap-2">
-                                    <Input
-                                      type={showApiKey ? "text" : "password"}
-                                      value={provider.config.apiKey || ""}
-                                      onChange={(e) => {
-                                        updateEmailProvider(provider.id, {
-                                          config: {
-                                            ...provider.config,
-                                            apiKey: e.target.value,
-                                          },
-                                        });
-                                        markAsChanged();
-                                      }}
-                                      placeholder="Enter your API key"
-                                    />
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => setShowApiKey(!showApiKey)}
-                                    >
-                                      {showApiKey ? (
-                                        <EyeOff className="h-4 w-4" />
-                                      ) : (
-                                        <Eye className="h-4 w-4" />
-                                      )}
-                                    </Button>
-                                  </div>
-                                </div>
-                              </>
-                            )}
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <Label>From Email</Label>
-                                <Input
-                                  value={provider.config.fromEmail || ""}
-                                  onChange={(e) => {
+                    {loadingProviders ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                        <span>Loading email providers...</span>
+                      </div>
+                    ) : (
+                      emailProviders.map((provider) => (
+                        <div
+                          key={provider.id}
+                          className="border rounded-lg p-4"
+                        >
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              <div
+                                className={`w-3 h-3 rounded-full ${
+                                  provider.isActive
+                                    ? "bg-green-500"
+                                    : "bg-gray-300"
+                                }`}
+                              />
+                              <h3 className="font-medium">{provider.name}</h3>
+                              {provider.isActive && (
+                                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                                  Active
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  testEmailProvider(
+                                    provider.id,
+                                    provider.config
+                                  )
+                                }
+                                disabled={
+                                  !provider.config?.apiKey ||
+                                  !provider.config?.fromEmail
+                                }
+                              >
+                                Test
+                              </Button>
+                              <Switch
+                                checked={provider.isActive}
+                                onCheckedChange={(checked) => {
+                                  console.log(
+                                    `Switching ${provider.id} to ${checked}`
+                                  );
+                                  if (checked) {
+                                    // Enable this provider and disable all others
+                                    setEmailProviders((prev) => {
+                                      const updated = prev.map((p) => ({
+                                        ...p,
+                                        isActive: p.id === provider.id,
+                                      }));
+                                      console.log(
+                                        "Updated providers:",
+                                        updated
+                                      );
+                                      return updated;
+                                    });
+                                    // Call the backend to switch
+                                    switchEmailProvider(
+                                      provider.id,
+                                      provider.config
+                                    );
+                                  } else {
+                                    // Just disable this provider locally
                                     updateEmailProvider(provider.id, {
-                                      config: {
-                                        ...provider.config,
-                                        fromEmail: e.target.value,
-                                      },
+                                      isActive: false,
                                     });
                                     markAsChanged();
-                                  }}
-                                  placeholder="noreply@yourdomain.com"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label>From Name</Label>
-                                <Input
-                                  value={provider.config.fromName || ""}
-                                  onChange={(e) => {
-                                    updateEmailProvider(provider.id, {
-                                      config: {
-                                        ...provider.config,
-                                        fromName: e.target.value,
-                                      },
-                                    });
-                                    markAsChanged();
-                                  }}
-                                  placeholder="Your Company"
-                                />
-                              </div>
+                                  }
+                                }}
+                              />
                             </div>
                           </div>
-                        )}
-                      </div>
-                    ))}
+
+                          {provider.isActive && (
+                            <div className="space-y-4">
+                              {provider.type === "api" && (
+                                <>
+                                  <div className="space-y-2">
+                                    <Label>API Key</Label>
+                                    <div className="flex gap-2">
+                                      <Input
+                                        type={showApiKey ? "text" : "password"}
+                                        value={provider.config?.apiKey || ""}
+                                        onChange={(e) => {
+                                          updateEmailProvider(provider.id, {
+                                            config: {
+                                              ...provider.config,
+                                              apiKey: e.target.value,
+                                            },
+                                          });
+                                          markAsChanged();
+                                        }}
+                                        placeholder="Enter your API key"
+                                      />
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                          setShowApiKey(!showApiKey)
+                                        }
+                                      >
+                                        {showApiKey ? (
+                                          <EyeOff className="h-4 w-4" />
+                                        ) : (
+                                          <Eye className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </>
+                              )}
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label>From Email</Label>
+                                  <Input
+                                    value={provider.config?.fromEmail || ""}
+                                    onChange={(e) => {
+                                      updateEmailProvider(provider.id, {
+                                        config: {
+                                          ...provider.config,
+                                          fromEmail: e.target.value,
+                                        },
+                                      });
+                                      markAsChanged();
+                                    }}
+                                    placeholder="noreply@yourdomain.com"
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>From Name</Label>
+                                  <Input
+                                    value={provider.config?.fromName || ""}
+                                    onChange={(e) => {
+                                      updateEmailProvider(provider.id, {
+                                        config: {
+                                          ...provider.config,
+                                          fromName: e.target.value,
+                                        },
+                                      });
+                                      markAsChanged();
+                                    }}
+                                    placeholder="Your Company"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>

@@ -30,13 +30,15 @@ public class AuthController {
 
             if (user != null) {
                 response.put("authenticated", true);
-                response.put("user", Map.of(
-                        "id", user.getId(),
-                        "email", user.getEmail(),
-                        "firstName", user.getFirstName(),
-                        "lastName", user.getLastName(),
-                        "profilePictureUrl", user.getProfilePictureUrl(),
-                        "role", user.getRole().name()));
+                Map<String, Object> userMap = new HashMap<>();
+                userMap.put("id", user.getId());
+                userMap.put("email", user.getEmail());
+                userMap.put("firstName", user.getFirstName());
+                userMap.put("lastName", user.getLastName());
+                userMap.put("profilePictureUrl", user.getProfilePictureUrl());
+                userMap.put("role", user.getRole() != null ? user.getRole().name() : null);
+                userMap.put("orgId", user.getOrgId());
+                response.put("user", userMap);
             } else {
                 response.put("authenticated", false);
                 response.put("message", "User not found");

@@ -42,7 +42,7 @@ public class LeadEnrichmentController {
         User user = getUser(authentication);
         if (user == null)
             return ResponseEntity.status(401).build();
-        UUID orgId = resolveOrgId(user);
+        UUID orgId = getOrgIdOrForbidden(user);
 
         EnrichmentJob job = enrichmentService.createJob(orgId, id);
         // Let the scheduled processor handle the job to avoid race conditions
@@ -54,7 +54,7 @@ public class LeadEnrichmentController {
         User user = getUser(authentication);
         if (user == null)
             return ResponseEntity.status(401).build();
-        UUID orgId = resolveOrgId(user);
+        UUID orgId = getOrgIdOrForbidden(user);
 
         // Create one job per lead in the list
         var leads = leadRepository.findByOrgIdAndListId(orgId, listId);
@@ -76,7 +76,7 @@ public class LeadEnrichmentController {
         User user = getUser(authentication);
         if (user == null)
             return ResponseEntity.status(401).build();
-        UUID orgId = resolveOrgId(user);
+        UUID orgId = getOrgIdOrForbidden(user);
         List<EnrichmentJob> jobs = jobRepository.findByOrgIdAndLeadIdOrderByCreatedAtDesc(orgId, id);
         return ResponseEntity.ok(jobs);
     }
@@ -177,7 +177,7 @@ public class LeadEnrichmentController {
             if (user == null)
                 return ResponseEntity.status(401).build();
 
-            UUID orgId = resolveOrgId(user);
+            UUID orgId = getOrgIdOrForbidden(user);
             List<Lead> leads;
 
             if (campaignId != null) {
@@ -221,7 +221,7 @@ public class LeadEnrichmentController {
             return ResponseEntity.status(401).build();
         }
 
-        UUID orgId = resolveOrgId(user);
+        UUID orgId = getOrgIdOrForbidden(user);
         log.info("Starting bulk campaign assignment - User: {}, Org: {}, Campaign: {}, Lead IDs: {}",
                 user.getId(), orgId, request.getCampaignId(), request.getLeadIds());
 
@@ -270,7 +270,7 @@ public class LeadEnrichmentController {
             return ResponseEntity.status(401).build();
         }
 
-        UUID orgId = resolveOrgId(user);
+        UUID orgId = getOrgIdOrForbidden(user);
         log.info("Starting single lead campaign assignment - User: {}, Org: {}, Lead ID: {}, Campaign: {}",
                 user.getId(), orgId, id, request.getCampaignId());
 
@@ -306,7 +306,7 @@ public class LeadEnrichmentController {
         if (user == null)
             return ResponseEntity.status(401).build();
 
-        UUID orgId = resolveOrgId(user);
+        UUID orgId = getOrgIdOrForbidden(user);
 
         try {
             List<Lead> leads = leadRepository.findAllById(request.getLeadIds());
@@ -339,7 +339,7 @@ public class LeadEnrichmentController {
             return ResponseEntity.status(401).build();
         }
 
-        UUID orgId = resolveOrgId(user);
+        UUID orgId = getOrgIdOrForbidden(user);
         log.info("Starting bulk lead creation - User: {}, Org: {}, Lead count: {}",
                 user.getId(), orgId, request.getLeads().size());
 
@@ -427,8 +427,10 @@ public class LeadEnrichmentController {
         return userService.findByEmail(authentication.getName());
     }
 
-    private UUID resolveOrgId(User user) {
-        return user.getOrgId() != null ? user.getOrgId() : csvImportService.getOrCreateDefaultOrganization();
+    private UUID getOrgIdOrForbidden(User user) {
+        return java.util.Optional.ofNullable(user.getOrgId())
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.FORBIDDEN, "Organization required"));
     }
 
     // Request DTOs
@@ -505,7 +507,7 @@ public class LeadEnrichmentController {
             if (user == null)
                 return ResponseEntity.status(401).build();
 
-            UUID orgId = resolveOrgId(user);
+            UUID orgId = getOrgIdOrForbidden(user);
             leadRepository.findById(id)
                     .filter(l -> l.getOrgId().equals(orgId))
                     .orElseThrow(() -> new IllegalArgumentException("Lead not found"));
@@ -527,7 +529,7 @@ public class LeadEnrichmentController {
             if (user == null)
                 return ResponseEntity.status(401).build();
 
-            UUID orgId = resolveOrgId(user);
+            UUID orgId = getOrgIdOrForbidden(user);
 
             // Get campaign-lead relationships directly
             List<CampaignLead> campaignLeads = campaignLeadService.getActiveCampaignsForLead(campaignId);
@@ -558,7 +560,7 @@ public class LeadEnrichmentController {
             if (user == null)
                 return ResponseEntity.status(401).build();
 
-            UUID orgId = resolveOrgId(user);
+            UUID orgId = getOrgIdOrForbidden(user);
             List<Lead> leads;
 
             if (request.getLeadIds() != null && !request.getLeadIds().isEmpty()) {

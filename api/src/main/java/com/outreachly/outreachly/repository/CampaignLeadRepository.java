@@ -22,6 +22,17 @@ public interface CampaignLeadRepository extends JpaRepository<CampaignLead, UUID
     // Find specific campaign-lead relationship
     Optional<CampaignLead> findByCampaignIdAndLeadId(UUID campaignId, UUID leadId);
 
+    // RLS-compatible methods with org verification
+    @Query("SELECT cl FROM CampaignLead cl JOIN cl.campaign c WHERE cl.campaignId = :campaignId AND c.orgId = :orgId")
+    List<CampaignLead> findByCampaignIdAndOrgId(@Param("campaignId") UUID campaignId, @Param("orgId") UUID orgId);
+
+    @Query("SELECT cl FROM CampaignLead cl JOIN cl.lead l WHERE cl.leadId = :leadId AND l.orgId = :orgId")
+    List<CampaignLead> findByLeadIdAndOrgId(@Param("leadId") UUID leadId, @Param("orgId") UUID orgId);
+
+    @Query("SELECT cl FROM CampaignLead cl JOIN cl.campaign c JOIN cl.lead l WHERE cl.campaignId = :campaignId AND cl.leadId = :leadId AND c.orgId = :orgId AND l.orgId = :orgId")
+    Optional<CampaignLead> findByCampaignIdAndLeadIdAndOrgId(@Param("campaignId") UUID campaignId,
+            @Param("leadId") UUID leadId, @Param("orgId") UUID orgId);
+
     // Find active campaign-lead relationships for a campaign
     @Query("SELECT cl FROM CampaignLead cl LEFT JOIN FETCH cl.lead WHERE cl.campaignId = :campaignId AND cl.status = 'active'")
     List<CampaignLead> findActiveByCampaignId(@Param("campaignId") UUID campaignId);
@@ -29,6 +40,13 @@ public interface CampaignLeadRepository extends JpaRepository<CampaignLead, UUID
     // Find active campaign-lead relationships for a lead
     @Query("SELECT cl FROM CampaignLead cl LEFT JOIN FETCH cl.campaign WHERE cl.leadId = :leadId AND cl.status = 'active'")
     List<CampaignLead> findActiveByLeadId(@Param("leadId") UUID leadId);
+
+    // RLS-compatible active methods with org verification
+    @Query("SELECT cl FROM CampaignLead cl LEFT JOIN FETCH cl.lead JOIN cl.campaign c WHERE cl.campaignId = :campaignId AND cl.status = 'active' AND c.orgId = :orgId")
+    List<CampaignLead> findActiveByCampaignIdAndOrgId(@Param("campaignId") UUID campaignId, @Param("orgId") UUID orgId);
+
+    @Query("SELECT cl FROM CampaignLead cl LEFT JOIN FETCH cl.campaign JOIN cl.lead l WHERE cl.leadId = :leadId AND cl.status = 'active' AND l.orgId = :orgId")
+    List<CampaignLead> findActiveByLeadIdAndOrgId(@Param("leadId") UUID leadId, @Param("orgId") UUID orgId);
 
     // Check if a lead is already in a campaign
     boolean existsByCampaignIdAndLeadId(UUID campaignId, UUID leadId);
@@ -40,4 +58,11 @@ public interface CampaignLeadRepository extends JpaRepository<CampaignLead, UUID
     // Count active campaigns for a lead
     @Query("SELECT COUNT(cl) FROM CampaignLead cl WHERE cl.leadId = :leadId AND cl.status = 'active'")
     long countActiveCampaignsByLeadId(@Param("leadId") UUID leadId);
+
+    // RLS-compatible count methods with org verification
+    @Query("SELECT COUNT(cl) FROM CampaignLead cl JOIN cl.campaign c WHERE cl.campaignId = :campaignId AND cl.status = 'active' AND c.orgId = :orgId")
+    long countActiveLeadsByCampaignIdAndOrgId(@Param("campaignId") UUID campaignId, @Param("orgId") UUID orgId);
+
+    @Query("SELECT COUNT(cl) FROM CampaignLead cl JOIN cl.lead l WHERE cl.leadId = :leadId AND cl.status = 'active' AND l.orgId = :orgId")
+    long countActiveCampaignsByLeadIdAndOrgId(@Param("leadId") UUID leadId, @Param("orgId") UUID orgId);
 }

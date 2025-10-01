@@ -2,12 +2,15 @@ package com.outreachly.outreachly.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.outreachly.outreachly.entity.Company;
+import com.outreachly.outreachly.entity.User;
 import com.outreachly.outreachly.service.CompanyService;
 import com.outreachly.outreachly.service.HunterClient;
+import com.outreachly.outreachly.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -22,6 +25,7 @@ public class CompanyController {
 
     private final CompanyService companyService;
     private final HunterClient hunterClient;
+    private final UserService userService;
 
     @GetMapping
     public ResponseEntity<?> getCompanies(
@@ -30,16 +34,26 @@ public class CompanyController {
             @RequestParam(required = false) String size,
             @RequestParam(required = false) String headquartersCountry,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int pageSize) {
+            @RequestParam(defaultValue = "20") int pageSize,
+            Authentication authentication) {
 
         try {
+            User user = getUser(authentication);
+            if (user == null) {
+                return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+            }
+
+            UUID orgId = user.getOrgId();
+            if (orgId == null) {
+                return ResponseEntity.status(403).body(Map.of("error", "Organization required"));
+            }
+
             log.info(
-                    "Fetching companies with filters: search='{}', type='{}', size='{}', country='{}', page: {}, size: {}",
-                    search, companyType, size, headquartersCountry, page, pageSize);
+                    "Fetching companies with filters: search='{}', type='{}', size='{}', country='{}', page: {}, size: {}, orgId: {}",
+                    search, companyType, size, headquartersCountry, page, pageSize, orgId);
 
             Page<Company> companies = companyService.getCompanies(search, companyType, size,
-                    headquartersCountry, page, pageSize);
-            long totalCount = companyService.getCompanyCount(search, companyType, size, headquartersCountry);
+                    headquartersCountry, page, pageSize, orgId);
 
             return ResponseEntity.ok(Map.of(
                     "companies", companies.getContent(),
@@ -84,11 +98,22 @@ public class CompanyController {
     }
 
     @PostMapping
-    public ResponseEntity<?> createCompany(@RequestBody CreateCompanyRequest request) {
+    public ResponseEntity<?> createCompany(@RequestBody CreateCompanyRequest request, Authentication authentication) {
         try {
-            log.info("Creating company: name='{}', domain='{}'", request.getName(), request.getDomain());
+            User user = getUser(authentication);
+            if (user == null) {
+                return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+            }
 
-            Company company = companyService.createCompany(request.getName(), request.getDomain());
+            UUID orgId = user.getOrgId();
+            if (orgId == null) {
+                return ResponseEntity.status(403).body(Map.of("error", "Organization required"));
+            }
+
+            log.info("Creating company: name='{}', domain='{}', orgId='{}'", request.getName(), request.getDomain(),
+                    orgId);
+
+            Company company = companyService.createCompany(request.getName(), request.getDomain(), orgId);
             return ResponseEntity.ok(company);
         } catch (Exception e) {
             log.error("Error creating company: {}", e.getMessage(), e);
@@ -319,5 +344,12 @@ public class CompanyController {
 
         // For now, return null for unmapped sizes to avoid constraint violations
         return null;
+    }
+
+    private User getUser(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return null;
+        }
+        return userService.findByEmail(authentication.getName());
     }
 }

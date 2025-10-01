@@ -32,7 +32,7 @@ public class CampaignController {
             if (user == null)
                 return ResponseEntity.status(401).build();
 
-            UUID orgId = resolveOrgId(user);
+            UUID orgId = getOrgIdOrForbidden(user);
             List<Campaign> campaigns = campaignRepository.findByOrgIdOrderByCreatedAtDescSimple(orgId);
 
             return ResponseEntity.ok(campaigns);
@@ -48,7 +48,7 @@ public class CampaignController {
         if (user == null)
             return ResponseEntity.status(401).build();
 
-        UUID orgId = resolveOrgId(user);
+        UUID orgId = getOrgIdOrForbidden(user);
 
         try {
             Campaign campaign = Campaign.builder()
@@ -72,7 +72,7 @@ public class CampaignController {
         if (user == null)
             return ResponseEntity.status(401).build();
 
-        UUID orgId = resolveOrgId(user);
+        UUID orgId = getOrgIdOrForbidden(user);
         return campaignRepository.findByIdAndOrgId(id, orgId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
@@ -85,7 +85,7 @@ public class CampaignController {
         if (user == null)
             return ResponseEntity.status(401).build();
 
-        UUID orgId = resolveOrgId(user);
+        UUID orgId = getOrgIdOrForbidden(user);
 
         return campaignRepository.findByIdAndOrgId(id, orgId)
                 .map(campaign -> {
@@ -108,7 +108,7 @@ public class CampaignController {
         if (user == null)
             return ResponseEntity.status(401).build();
 
-        UUID orgId = resolveOrgId(user);
+        UUID orgId = getOrgIdOrForbidden(user);
 
         return campaignRepository.findByIdAndOrgId(id, orgId)
                 .map(campaign -> {
@@ -124,8 +124,12 @@ public class CampaignController {
         return userService.findByEmail(authentication.getName());
     }
 
-    private UUID resolveOrgId(User user) {
-        return user.getOrgId() != null ? user.getOrgId() : csvImportService.getOrCreateDefaultOrganization();
+    private UUID getOrgIdOrForbidden(User user) {
+        if (user.getOrgId() == null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Organization required");
+        }
+        return user.getOrgId();
     }
 
     // Request DTOs

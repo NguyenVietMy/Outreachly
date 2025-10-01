@@ -29,6 +29,9 @@ public class Company {
     @Column(unique = true)
     private String domain;
 
+    @Column(name = "org_id", nullable = false)
+    private UUID orgId;
+
     @Column(name = "headquarters_country")
     private String headquartersCountry;
 

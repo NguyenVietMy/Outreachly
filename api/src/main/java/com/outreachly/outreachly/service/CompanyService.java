@@ -20,7 +20,7 @@ public class CompanyService {
     private final CompanyRepository companyRepository;
 
     public Page<Company> getCompanies(String search, String companyType,
-            String size, String headquartersCountry, int page, int pageSize) {
+            String size, String headquartersCountry, int page, int pageSize, UUID orgId) {
         Pageable pageable = PageRequest.of(page, pageSize);
 
         boolean hasFilters = (search != null && !search.trim().isEmpty()) ||
@@ -30,41 +30,43 @@ public class CompanyService {
 
         if (hasFilters) {
             log.info(
-                    "Searching companies with filters: search='{}', type='{}', size='{}', country='{}', page: {}, size: {}",
-                    search, companyType, size, headquartersCountry, page, pageSize);
-            Page<Company> filteredCompanies = companyRepository.findWithFilters(
+                    "Searching companies with filters: search='{}', type='{}', size='{}', country='{}', page: {}, size: {}, orgId: {}",
+                    search, companyType, size, headquartersCountry, page, pageSize, orgId);
+            Page<Company> filteredCompanies = companyRepository.findWithFiltersByOrgId(
+                    orgId,
                     search != null ? search.trim() : null,
                     companyType != null && !companyType.trim().isEmpty() ? companyType.trim() : null,
                     size != null && !size.trim().isEmpty() ? size.trim() : null,
                     headquartersCountry != null && !headquartersCountry.trim().isEmpty() ? headquartersCountry.trim()
                             : null,
                     pageable);
-            log.info("Found {} companies with filters", filteredCompanies.getTotalElements());
+            log.info("Found {} companies with filters for org {}", filteredCompanies.getTotalElements(), orgId);
             return filteredCompanies;
         } else {
-            log.info("Fetching all companies, page: {}, size: {}", page, pageSize);
-            Page<Company> allCompanies = companyRepository.findAll(pageable);
-            log.info("Found {} companies in database", allCompanies.getTotalElements());
+            log.info("Fetching all companies for org {}, page: {}, size: {}", orgId, page, pageSize);
+            Page<Company> allCompanies = companyRepository.findByOrgId(orgId, pageable);
+            log.info("Found {} companies in database for org {}", allCompanies.getTotalElements(), orgId);
             return allCompanies;
         }
     }
 
     public long getCompanyCount(String search, String companyType,
-            String size, String headquartersCountry) {
+            String size, String headquartersCountry, UUID orgId) {
         boolean hasFilters = (search != null && !search.trim().isEmpty()) ||
                 (companyType != null && !companyType.trim().isEmpty()) ||
                 (size != null && !size.trim().isEmpty()) ||
                 (headquartersCountry != null && !headquartersCountry.trim().isEmpty());
 
         if (hasFilters) {
-            return companyRepository.countWithFilters(
+            return companyRepository.countWithFiltersByOrgId(
+                    orgId,
                     search != null ? search.trim() : null,
                     companyType != null && !companyType.trim().isEmpty() ? companyType.trim() : null,
                     size != null && !size.trim().isEmpty() ? size.trim() : null,
                     headquartersCountry != null && !headquartersCountry.trim().isEmpty() ? headquartersCountry.trim()
                             : null);
         } else {
-            return companyRepository.count();
+            return companyRepository.findByOrgId(orgId).size();
         }
     }
 
@@ -76,12 +78,13 @@ public class CompanyService {
         return companyRepository.findByDomain(domain);
     }
 
-    public Company createCompany(String name, String domain) {
-        log.info("Creating company: name='{}', domain='{}'", name, domain);
+    public Company createCompany(String name, String domain, UUID orgId) {
+        log.info("Creating company: name='{}', domain='{}', orgId='{}'", name, domain, orgId);
 
         Company company = Company.builder()
                 .name(name)
                 .domain(domain)
+                .orgId(orgId)
                 .build();
 
         return companyRepository.save(company);

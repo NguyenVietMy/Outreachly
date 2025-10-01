@@ -13,6 +13,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -46,32 +47,38 @@ public class HunterClient {
     }
 
     public JsonNode emailFinder(String domain, String firstName, String lastName) throws Exception {
-        ResponseEntity<String> res = getWithRotation("/email-finder", Map.of(
-                "domain", domain,
-                "first_name", firstName,
-                "last_name", lastName));
+        Map<String, String> params = new HashMap<>();
+        params.put("domain", domain);
+        params.put("first_name", firstName);
+        params.put("last_name", lastName);
+        ResponseEntity<String> res = getWithRotation("/email-finder", params);
         return objectMapper.readTree(res.getBody());
     }
 
     public JsonNode emailVerifier(String email) throws Exception {
-        ResponseEntity<String> res = getWithRotation("/email-verifier", Map.of("email", email));
+        Map<String, String> params = new HashMap<>();
+        params.put("email", email);
+        ResponseEntity<String> res = getWithRotation("/email-verifier", params);
         return objectMapper.readTree(res.getBody());
     }
 
     public JsonNode domainSearch(String domain, int limit) throws Exception {
-        ResponseEntity<String> res = getWithRotation("/domain-search", Map.of(
-                "domain", domain,
-                "limit", String.valueOf(limit)));
+        Map<String, String> params = new HashMap<>();
+        params.put("domain", domain);
+        params.put("limit", String.valueOf(limit));
+        ResponseEntity<String> res = getWithRotation("/domain-search", params);
         return objectMapper.readTree(res.getBody());
     }
 
     public JsonNode companySearch(String domain) throws Exception {
-        ResponseEntity<String> res = getWithRotation("/companies/find", Map.of("domain", domain));
+        Map<String, String> params = new HashMap<>();
+        params.put("domain", domain);
+        ResponseEntity<String> res = getWithRotation("/companies/find", params);
         return objectMapper.readTree(res.getBody());
     }
 
     public JsonNode accountInfo() throws Exception {
-        ResponseEntity<String> res = getWithRotation("/account", Map.of());
+        ResponseEntity<String> res = getWithRotation("/account", new HashMap<>());
         return objectMapper.readTree(res.getBody());
     }
 

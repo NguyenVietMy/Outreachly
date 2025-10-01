@@ -17,8 +17,15 @@ export default function AuthGuard({
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push(redirectTo);
+    if (!loading) {
+      if (!user) {
+        router.push(redirectTo);
+        return;
+      }
+      if (!user.orgId) {
+        router.push("/onboarding/organization");
+        return;
+      }
     }
   }, [user, loading, router, redirectTo]);
 
@@ -34,8 +41,8 @@ export default function AuthGuard({
     );
   }
 
-  // Don't render anything if not authenticated (will redirect)
-  if (!user) {
+  // Don't render anything if not authenticated or no org (will redirect)
+  if (!user || !user.orgId) {
     return null;
   }
 

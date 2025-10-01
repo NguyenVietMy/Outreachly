@@ -3,7 +3,10 @@ package com.outreachly.outreachly.controller;
 import com.outreachly.outreachly.dto.EmailRequest;
 import com.outreachly.outreachly.dto.EmailResponse;
 import com.outreachly.outreachly.entity.EmailEvent;
-import com.outreachly.outreachly.service.UnifiedEmailService;
+import com.outreachly.outreachly.entity.User;
+import com.outreachly.outreachly.service.CsvImportService;
+import com.outreachly.outreachly.service.OrganizationEmailService;
+import com.outreachly.outreachly.service.UserService;
 import com.outreachly.outreachly.service.email.EmailProviderType;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/email")
@@ -22,18 +26,22 @@ import java.util.Map;
 @Slf4j
 public class EmailController {
 
-    private final UnifiedEmailService emailService;
+    private final OrganizationEmailService emailService;
+    private final UserService userService;
+    private final CsvImportService csvImportService;
 
     @PostMapping("/send")
     public ResponseEntity<EmailResponse> sendEmail(
             @Valid @RequestBody EmailRequest emailRequest,
             Authentication authentication) {
 
-        log.info("Sending email to {} recipients for user: {}",
+        UUID orgId = getOrgIdFromAuthentication(authentication);
+        log.info("Sending email to {} recipients for user: {} in org: {}",
                 emailRequest.getRecipients().size(),
-                authentication.getName());
+                authentication.getName(),
+                orgId);
 
-        EmailResponse response = emailService.sendEmail(emailRequest);
+        EmailResponse response = emailService.sendEmail(orgId, emailRequest);
 
         return ResponseEntity.ok(response);
     }
@@ -43,11 +51,13 @@ public class EmailController {
             @Valid @RequestBody List<EmailRequest> emailRequests,
             Authentication authentication) {
 
-        log.info("Sending bulk email with {} requests for user: {}",
+        UUID orgId = getOrgIdFromAuthentication(authentication);
+        log.info("Sending bulk email with {} requests for user: {} in org: {}",
                 emailRequests.size(),
-                authentication.getName());
+                authentication.getName(),
+                orgId);
 
-        EmailResponse response = emailService.sendBulkEmail(emailRequests);
+        EmailResponse response = emailService.sendBulkEmail(orgId, emailRequests);
 
         return ResponseEntity.ok(response);
     }
@@ -107,10 +117,10 @@ public class EmailController {
 
     @GetMapping("/verified")
     public ResponseEntity<List<String>> getVerifiedEmailAddresses(Authentication authentication) {
+        UUID orgId = getOrgIdFromAuthentication(authentication);
+        log.info("Getting verified email addresses for user: {} in org: {}", authentication.getName(), orgId);
 
-        log.info("Getting verified email addresses for user: {}", authentication.getName());
-
-        List<String> verifiedEmails = emailService.getVerifiedEmailAddresses();
+        List<String> verifiedEmails = emailService.getVerifiedEmailAddresses(orgId);
 
         return ResponseEntity.ok(verifiedEmails);
     }
@@ -119,10 +129,10 @@ public class EmailController {
     public ResponseEntity<Boolean> isEmailSuppressed(
             @PathVariable String email,
             Authentication authentication) {
+        UUID orgId = getOrgIdFromAuthentication(authentication);
+        log.info("Checking if email is suppressed: {} for user: {} in org: {}", email, authentication.getName(), orgId);
 
-        log.info("Checking if email is suppressed: {} for user: {}", email, authentication.getName());
-
-        boolean suppressed = emailService.isEmailSuppressed(email);
+        boolean suppressed = emailService.isEmailSuppressed(orgId, email);
 
         return ResponseEntity.ok(suppressed);
     }
@@ -131,10 +141,10 @@ public class EmailController {
     public ResponseEntity<List<EmailEvent>> getEmailHistory(
             @PathVariable String email,
             Authentication authentication) {
+        UUID orgId = getOrgIdFromAuthentication(authentication);
+        log.info("Getting email history for: {} for user: {} in org: {}", email, authentication.getName(), orgId);
 
-        log.info("Getting email history for: {} for user: {}", email, authentication.getName());
-
-        List<EmailEvent> history = emailService.getEmailHistory(email);
+        List<EmailEvent> history = emailService.getEmailHistory(orgId, email);
 
         return ResponseEntity.ok(history);
     }
@@ -146,8 +156,9 @@ public class EmailController {
 
     @GetMapping("/providers")
     public ResponseEntity<Map<String, Object>> getProviders(Authentication authentication) {
+        UUID orgId = getOrgIdFromAuthentication(authentication);
         Map<String, Object> response = new HashMap<>();
-        response.put("currentProvider", emailService.getCurrentProvider().getProviderType().getDisplayName());
+        response.put("currentProvider", emailService.getOrganizationProviderType(orgId).getDisplayName());
         response.put("availableProviders", emailService.getProvidersInfo());
         response.put("healthStatus", emailService.getProvidersHealthStatus());
         return ResponseEntity.ok(response);
@@ -159,14 +170,16 @@ public class EmailController {
             @Valid @RequestBody EmailRequest emailRequest,
             Authentication authentication) {
 
+        UUID orgId = getOrgIdFromAuthentication(authentication);
         try {
             EmailProviderType providerType = EmailProviderType.valueOf(provider.toUpperCase().replace("-", "_"));
-            log.info("Sending email via {} to {} recipients for user: {}",
+            log.info("Sending email via {} to {} recipients for user: {} in org: {}",
                     providerType.getDisplayName(),
                     emailRequest.getRecipients().size(),
-                    authentication.getName());
+                    authentication.getName(),
+                    orgId);
 
-            EmailResponse response = emailService.sendEmail(emailRequest, providerType);
+            EmailResponse response = emailService.sendEmail(orgId, emailRequest, providerType);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             Map<String, Object> errorResponse = new HashMap<>();
@@ -177,5 +190,28 @@ public class EmailController {
                     .message("Invalid provider: " + provider)
                     .build());
         }
+    }
+
+    // Helper method to extract org ID from authentication
+    private UUID getOrgIdFromAuthentication(Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null) {
+            log.error("User not found for authentication: {}",
+                    authentication != null ? authentication.getName() : null);
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNAUTHORIZED, "User not authenticated");
+        }
+        if (user.getOrgId() == null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Organization required");
+        }
+        return user.getOrgId();
+    }
+
+    private User getUser(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return null;
+        }
+        return userService.findByEmail(authentication.getName());
     }
 }

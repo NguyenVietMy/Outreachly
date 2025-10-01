@@ -10,6 +10,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -26,7 +27,8 @@ public class AiController {
             Authentication authentication) {
 
         if (authentication == null || !authentication.isAuthenticated()) {
-            Map<String, Object> errorResponse = Map.of("error", "Unauthorized");
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Unauthorized");
             return Mono.just(ResponseEntity.status(401).body(errorResponse));
         }
 
@@ -38,21 +40,24 @@ public class AiController {
                 .map(response -> {
                     try {
                         // Parse the JSON response from OpenAI
-                        Map<String, Object> result = Map.of(
-                                "success", true,
-                                "data", response);
+                        Map<String, Object> result = new HashMap<>();
+                        result.put("success", true);
+                        result.put("data", response);
                         return ResponseEntity.ok(result);
                     } catch (Exception e) {
                         log.error("Error parsing OpenAI response: ", e);
-                        Map<String, Object> errorResult = Map.of(
-                                "success", false,
-                                "error", "Failed to parse AI response");
+                        Map<String, Object> errorResult = new HashMap<>();
+                        errorResult.put("success", false);
+                        errorResult.put("error", "Failed to parse AI response");
                         return ResponseEntity.status(500).body(errorResult);
                     }
                 })
-                .onErrorReturn(ResponseEntity.status(500).body(Map.of(
-                        "success", false,
-                        "error", "Failed to generate template")));
+                .onErrorReturn(ResponseEntity.status(500).body(new HashMap<String, Object>() {
+                    {
+                        put("success", false);
+                        put("error", "Failed to generate template");
+                    }
+                }));
     }
 
     @PostMapping("/improve-template")
@@ -61,7 +66,8 @@ public class AiController {
             Authentication authentication) {
 
         if (authentication == null || !authentication.isAuthenticated()) {
-            Map<String, Object> errorResponse = Map.of("error", "Unauthorized");
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Unauthorized");
             return Mono.just(ResponseEntity.status(401).body(errorResponse));
         }
 
@@ -71,20 +77,23 @@ public class AiController {
                 request.getImprovementType())
                 .map(response -> {
                     try {
-                        Map<String, Object> result = Map.of(
-                                "success", true,
-                                "data", response);
+                        Map<String, Object> result = new HashMap<>();
+                        result.put("success", true);
+                        result.put("data", response);
                         return ResponseEntity.ok(result);
                     } catch (Exception e) {
                         log.error("Error parsing OpenAI response: ", e);
-                        Map<String, Object> errorResult = Map.of(
-                                "success", false,
-                                "error", "Failed to parse AI response");
+                        Map<String, Object> errorResult = new HashMap<>();
+                        errorResult.put("success", false);
+                        errorResult.put("error", "Failed to parse AI response");
                         return ResponseEntity.status(500).body(errorResult);
                     }
                 })
-                .onErrorReturn(ResponseEntity.status(500).body(Map.of(
-                        "success", false,
-                        "error", "Failed to improve template")));
+                .onErrorReturn(ResponseEntity.status(500).body(new HashMap<String, Object>() {
+                    {
+                        put("success", false);
+                        put("error", "Failed to improve template");
+                    }
+                }));
     }
 }

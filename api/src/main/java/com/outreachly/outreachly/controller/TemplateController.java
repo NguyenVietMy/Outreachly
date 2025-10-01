@@ -47,7 +47,7 @@ public class TemplateController {
                 return ResponseEntity.badRequest().build();
             }
         }
-        return ResponseEntity.ok(templateService.listTemplates(resolveOrgId(user), pf));
+        return ResponseEntity.ok(templateService.listTemplates(getOrgIdOrForbidden(user), pf));
     }
 
     @GetMapping("/{id}")
@@ -55,7 +55,7 @@ public class TemplateController {
         User user = getUser(authentication);
         if (user == null)
             return ResponseEntity.status(401).build();
-        Template t = templateService.getTemplate(resolveOrgId(user), id);
+        Template t = templateService.getTemplate(getOrgIdOrForbidden(user), id);
         return t != null ? ResponseEntity.ok(t) : ResponseEntity.notFound().build();
     }
 
@@ -87,7 +87,8 @@ public class TemplateController {
                         "missing", missing));
             }
 
-            Template created = templateService.createTemplate(resolveOrgId(user), name, pf, category, contentJson);
+            Template created = templateService.createTemplate(getOrgIdOrForbidden(user), name, pf, category,
+                    contentJson);
             return ResponseEntity.ok(created);
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid platform"));
@@ -113,7 +114,7 @@ public class TemplateController {
             if (contentObj != null) {
                 contentJson = objectMapper.writeValueAsString(contentObj);
 
-                Template existing = templateService.getTemplate(resolveOrgId(user), id);
+                Template existing = templateService.getTemplate(getOrgIdOrForbidden(user), id);
                 if (existing == null)
                     return ResponseEntity.notFound().build();
 
@@ -135,7 +136,8 @@ public class TemplateController {
                 }
             }
 
-            Template updated = templateService.updateTemplate(resolveOrgId(user), id, name, category, contentJson, pf);
+            Template updated = templateService.updateTemplate(getOrgIdOrForbidden(user), id, name, category,
+                    contentJson, pf);
             if (updated == null)
                 return ResponseEntity.notFound().build();
             return ResponseEntity.ok(updated);
@@ -150,7 +152,7 @@ public class TemplateController {
         User user = getUser(authentication);
         if (user == null)
             return ResponseEntity.status(401).build();
-        boolean ok = templateService.deleteTemplate(resolveOrgId(user), id);
+        boolean ok = templateService.deleteTemplate(getOrgIdOrForbidden(user), id);
         return ok ? ResponseEntity.ok(Map.of("deleted", true)) : ResponseEntity.notFound().build();
     }
 
@@ -161,11 +163,12 @@ public class TemplateController {
         return userService.findByEmail(authentication.getName());
     }
 
-    private UUID resolveOrgId(User user) {
-        if (user.getOrgId() != null) {
-            return user.getOrgId();
+    private java.util.UUID getOrgIdOrForbidden(User user) {
+        if (user.getOrgId() == null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Organization required");
         }
-        return csvImportService.getOrCreateDefaultOrganization();
+        return user.getOrgId();
     }
 
     private List<String> validateRequiredVariables(Template.Platform platform, String contentJson) {

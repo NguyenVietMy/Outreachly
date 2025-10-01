@@ -57,11 +57,16 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
                         // Ensure the authentication is properly set in the security context
                         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                        // Redirect to frontend with success
-                        String targetUrl = UriComponentsBuilder.fromUriString("http://localhost:3000/auth/callback")
-                                        .queryParam("success", "true")
-                                        .queryParam("email", email)
-                                        .build().toUriString();
+                        // Decide redirect based on org membership
+                        String targetUrl;
+                        if (user.getOrgId() == null) {
+                                targetUrl = "http://localhost:3000/onboarding/organization";
+                        } else {
+                                targetUrl = UriComponentsBuilder.fromUriString("http://localhost:3000/auth/callback")
+                                                .queryParam("success", "true")
+                                                .queryParam("email", email)
+                                                .build().toUriString();
+                        }
 
                         log.info("Redirecting to: {}", targetUrl);
                         getRedirectStrategy().sendRedirect(request, response, targetUrl);

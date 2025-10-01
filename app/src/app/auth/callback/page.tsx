@@ -7,7 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 export default function AuthCallback() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { checkAuth } = useAuth();
+  const { checkAuth, user } = useAuth();
   const [status, setStatus] = useState<"loading" | "success" | "error">(
     "loading"
   );
@@ -23,10 +23,13 @@ export default function AuthCallback() {
       setMessage("Authentication successful! Redirecting...");
       // Check auth status and redirect
       checkAuth().then(() => {
-        // Wait a bit longer to ensure session is established
         setTimeout(() => {
-          router.push("/dashboard");
-        }, 2000);
+          if (!user?.orgId) {
+            router.push("/onboarding/organization");
+          } else {
+            router.push("/dashboard");
+          }
+        }, 1000);
       });
     } else if (error) {
       setStatus("error");
@@ -35,7 +38,7 @@ export default function AuthCallback() {
       setStatus("error");
       setMessage("Invalid callback parameters");
     }
-  }, [searchParams, router, checkAuth]);
+  }, [searchParams, router, checkAuth, user]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">

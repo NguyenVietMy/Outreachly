@@ -101,6 +101,11 @@ public class ImportController {
                         .body(Map.of("error", "User not found"));
             }
 
+            if (user.getOrgId() == null) {
+                return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Organization required"));
+            }
+
             // Parse column mapping JSON
             Map<String, String> columnMapping;
             try {
@@ -116,8 +121,7 @@ public class ImportController {
             if (campaignId != null && !campaignId.trim().isEmpty() && !campaignId.equals("default")) {
                 try {
                     campaignUuid = UUID.fromString(campaignId);
-                    UUID orgId = user.getOrgId() != null ? user.getOrgId()
-                            : csvImportService.getOrCreateDefaultOrganization();
+                    UUID orgId = user.getOrgId();
 
                     // Validate campaign exists and belongs to user's organization
                     Campaign campaign = campaignRepository.findByIdAndOrgId(campaignUuid, orgId)
@@ -135,7 +139,7 @@ public class ImportController {
             List<Map<String, String>> mappedData = csvImportService.parseCsvWithMapping(file, columnMapping);
 
             // Create import job
-            UUID orgId = user.getOrgId() != null ? user.getOrgId() : csvImportService.getOrCreateDefaultOrganization();
+            UUID orgId = user.getOrgId();
             ImportJob importJob = csvImportService.createImportJob(
                     user.getId(),
                     orgId,
@@ -175,6 +179,11 @@ public class ImportController {
                         .body(Map.of("error", "User not found"));
             }
 
+            if (user.getOrgId() == null) {
+                return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Organization required"));
+            }
+
             // Validate file first
             CsvImportService.CsvValidationResult validationResult = csvImportService.validateCsvFile(file);
 
@@ -188,8 +197,7 @@ public class ImportController {
             if (campaignId != null && !campaignId.trim().isEmpty() && !campaignId.equals("default")) {
                 try {
                     campaignUuid = UUID.fromString(campaignId);
-                    UUID orgId = user.getOrgId() != null ? user.getOrgId()
-                            : csvImportService.getOrCreateDefaultOrganization();
+                    UUID orgId = user.getOrgId();
 
                     // Validate campaign exists and belongs to user's organization
                     Campaign campaign = campaignRepository.findByIdAndOrgId(campaignUuid, orgId)
@@ -203,7 +211,7 @@ public class ImportController {
             }
 
             // Create import job with actual user ID and org ID
-            UUID orgId = user.getOrgId() != null ? user.getOrgId() : csvImportService.getOrCreateDefaultOrganization();
+            UUID orgId = user.getOrgId();
             ImportJob importJob = csvImportService.createImportJob(
                     user.getId(),
                     orgId,

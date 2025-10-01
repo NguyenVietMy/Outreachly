@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -36,13 +37,13 @@ public class WebhookService {
         }
 
         try {
-            Map<String, Object> payload = Map.of(
-                    "event", "enrichment.completed",
-                    "leadId", leadId.toString(),
-                    "userId", userId.toString(),
-                    "action", action,
-                    "timestamp", System.currentTimeMillis(),
-                    "data", data);
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("event", "enrichment.completed");
+            payload.put("leadId", leadId != null ? leadId.toString() : null);
+            payload.put("userId", userId != null ? userId.toString() : null);
+            payload.put("action", action);
+            payload.put("timestamp", System.currentTimeMillis());
+            payload.put("data", data);
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -69,12 +70,12 @@ public class WebhookService {
         }
 
         try {
-            Map<String, Object> payload = Map.of(
-                    "event", "enrichment.failed",
-                    "leadId", leadId.toString(),
-                    "userId", userId.toString(),
-                    "error", error,
-                    "timestamp", System.currentTimeMillis());
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("event", "enrichment.failed");
+            payload.put("leadId", leadId != null ? leadId.toString() : null);
+            payload.put("userId", userId != null ? userId.toString() : null);
+            payload.put("error", error);
+            payload.put("timestamp", System.currentTimeMillis());
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);

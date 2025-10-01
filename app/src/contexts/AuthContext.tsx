@@ -15,6 +15,7 @@ interface User {
   lastName: string;
   profilePictureUrl: string;
   role: string;
+  orgId?: string;
 }
 
 interface AuthContextType {
