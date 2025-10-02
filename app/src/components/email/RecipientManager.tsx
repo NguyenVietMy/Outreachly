@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -16,16 +15,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
   Plus,
   X,
-  Upload,
   Download,
   Users,
   CheckCircle,
@@ -60,8 +51,6 @@ export function RecipientManager({
 }: RecipientManagerProps) {
   const [recipientList, setRecipientList] = useState<Recipient[]>([]);
   const [newEmail, setNewEmail] = useState("");
-  const [showBulkImport, setShowBulkImport] = useState(false);
-  const [bulkEmails, setBulkEmails] = useState("");
   const [filter, setFilter] = useState<"all" | "valid" | "invalid">("all");
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
@@ -123,53 +112,6 @@ export function RecipientManager({
     onRecipientsChange(updatedList.map((r) => r.email));
   };
 
-  const handleBulkImport = () => {
-    const emails = bulkEmails
-      .split(/[,\n;]/)
-      .map((email) => email.trim())
-      .filter((email) => email.length > 0);
-
-    if (emails.length === 0) {
-      toast({
-        title: "No Emails Found",
-        description: "Please enter valid email addresses",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const newRecipients: Recipient[] = emails.map((email) => ({
-      email,
-      isValid: validateEmail(email),
-      isVerified: false,
-    }));
-
-    const validEmails = newRecipients.filter((r) => r.isValid);
-    const invalidEmails = newRecipients.filter((r) => !r.isValid);
-
-    if (validEmails.length > 0) {
-      const updatedList = [...recipientList, ...validEmails];
-      setRecipientList(updatedList);
-      onRecipientsChange(updatedList.map((r) => r.email));
-
-      toast({
-        title: "Emails Imported",
-        description: `Added ${validEmails.length} valid emails${invalidEmails.length > 0 ? `, ${invalidEmails.length} invalid emails skipped` : ""}`,
-      });
-    }
-
-    if (invalidEmails.length > 0) {
-      toast({
-        title: "Invalid Emails",
-        description: `${invalidEmails.length} emails were invalid and skipped`,
-        variant: "destructive",
-      });
-    }
-
-    setBulkEmails("");
-    setShowBulkImport(false);
-  };
-
   const exportRecipients = () => {
     const csvContent = recipientList
       .map(
@@ -214,49 +156,6 @@ export function RecipientManager({
           Recipients ({recipientList.length}/{maxRecipients})
         </Label>
         <div className="flex gap-2">
-          <Dialog open={showBulkImport} onOpenChange={setShowBulkImport}>
-            <DialogTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-1"
-              >
-                <Upload className="h-4 w-4" />
-                Import
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Bulk Import Recipients</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="bulk-emails">Email Addresses</Label>
-                  <Textarea
-                    id="bulk-emails"
-                    placeholder="Enter emails separated by commas, semicolons, or new lines"
-                    value={bulkEmails}
-                    onChange={(e) => setBulkEmails(e.target.value)}
-                    className="min-h-[120px] mt-2"
-                  />
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowBulkImport(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="button" onClick={handleBulkImport}>
-                    Import Emails
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-
           {recipientList.length > 0 && (
             <Button
               type="button"

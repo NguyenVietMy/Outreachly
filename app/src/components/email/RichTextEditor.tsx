@@ -8,6 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
   Bold,
   Italic,
   Underline,
@@ -27,6 +34,7 @@ import {
   Undo,
   Redo,
   Save,
+  BookOpen,
 } from "lucide-react";
 
 interface RichTextEditorProps {
@@ -37,6 +45,7 @@ interface RichTextEditorProps {
   onHtmlChange?: (isHtml: boolean) => void;
   maxLength?: number;
   error?: string;
+  onBrowseTemplates?: () => void;
 }
 
 export function RichTextEditor({
@@ -47,8 +56,8 @@ export function RichTextEditor({
   onHtmlChange,
   maxLength = 10000,
   error,
+  onBrowseTemplates,
 }: RichTextEditorProps) {
-  const [showPreview, setShowPreview] = useState(false);
   const [history, setHistory] = useState<string[]>([value]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -181,36 +190,51 @@ export function RichTextEditor({
           )}
         </Label>
         <div className="flex items-center gap-2">
-          {onHtmlChange && (
+          {onBrowseTemplates && (
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => onHtmlChange(!isHtml)}
+              onClick={onBrowseTemplates}
               className="flex items-center gap-1"
             >
-              <Type className="h-4 w-4" />
-              {isHtml ? "Plain Text" : "HTML"}
+              <BookOpen className="h-4 w-4" />
+              Browse Templates
             </Button>
           )}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setShowPreview(!showPreview)}
-            className="flex items-center gap-1"
-          >
-            {showPreview ? (
-              <EyeOff className="h-4 w-4" />
-            ) : (
-              <Eye className="h-4 w-4" />
-            )}
-            {showPreview ? "Hide" : "Show"} Preview
-          </Button>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1"
+              >
+                <Eye className="h-4 w-4" />
+                Show Preview
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Email Preview</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="prose prose-sm max-w-none">
+                  <div
+                    dangerouslySetInnerHTML={{
+                      __html:
+                        renderPreview() ||
+                        "<p class='text-gray-400'>No content to preview</p>",
+                    }}
+                  />
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="space-y-4">
         <div className="space-y-3">
           {/* Toolbar */}
           <Card>
@@ -364,25 +388,6 @@ export function RichTextEditor({
             </span>
           </div>
         </div>
-
-        {/* Preview */}
-        {showPreview && (
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Preview</Label>
-            <Card>
-              <CardContent className="p-4">
-                <div
-                  className="prose prose-sm max-w-none"
-                  dangerouslySetInnerHTML={{
-                    __html:
-                      renderPreview() ||
-                      "<p class='text-gray-400'>No content to preview</p>",
-                  }}
-                />
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </div>
     </div>
   );

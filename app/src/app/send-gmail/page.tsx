@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -14,12 +13,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Switch } from "@/components/ui/switch";
-import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -29,34 +31,15 @@ import {
 } from "@/components/ui/select";
 import {
   Mail,
-  Send,
-  Shield,
-  Clock,
   CheckCircle,
   AlertCircle,
   Loader2,
-  Eye,
-  EyeOff,
-  Lock,
   Users,
   FileText,
-  Calendar,
-  BarChart3,
   Plus,
   X,
-  Search,
-  Filter,
-  Download,
-  Upload,
-  Settings,
   Zap,
-  Target,
-  TrendingUp,
-  MessageSquare,
-  History,
-  Star,
   BookOpen,
-  Sparkles,
   MailCheck,
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
@@ -75,7 +58,6 @@ interface GmailFormData {
   campaignId?: string;
   scheduledAt?: string;
   priority: "low" | "normal" | "high";
-  fromEmail?: string;
 }
 
 interface GmailResponse {
@@ -108,13 +90,8 @@ export default function SendGmailPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [showSecurityInfo, setShowSecurityInfo] = useState(false);
-  const [activeTab, setActiveTab] = useState("compose");
-  const [showPreview, setShowPreview] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
   const [gmailStatus, setGmailStatus] = useState<GmailStatus | null>(null);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [selectedLeads, setSelectedLeads] = useState<Lead[]>([]);
@@ -128,7 +105,6 @@ export default function SendGmailPage() {
     content: "",
     isHtml: true,
     priority: "normal",
-    fromEmail: "",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -212,13 +188,6 @@ export default function SendGmailPage() {
       newErrors.content = "Content is required";
     } else if (formData.content.length > 10000) {
       newErrors.content = "Content must be less than 10,000 characters";
-    }
-
-    // Validate from email (optional but if provided, must be valid)
-    if (formData.fromEmail && formData.fromEmail.trim() !== "") {
-      if (!validateEmail(formData.fromEmail)) {
-        newErrors.fromEmail = "Invalid from email address";
-      }
     }
 
     setErrors(newErrors);
@@ -341,7 +310,7 @@ export default function SendGmailPage() {
           subject: (formData.subject || "").trim(),
           body: (formData.content || "").trim(),
           html: formData.isHtml,
-          from: formData.fromEmail?.trim() || undefined,
+          from: undefined,
         };
 
         const response = await fetch(`${API_URL}/api/gmail/send`, {
@@ -457,48 +426,7 @@ export default function SendGmailPage() {
                     authentication
                   </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 md:gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={testGmailConnection}
-                    className="flex items-center gap-1 md:gap-2 text-xs md:text-sm"
-                  >
-                    <MailCheck className="h-3 w-3 md:h-4 md:w-4" />
-                    <span className="hidden sm:inline">Test Gmail</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      window.location.href = `${API_URL}/oauth2/authorization/google?prompt=consent&scope=openid%20profile%20email%20https://www.googleapis.com/auth/gmail.send`;
-                    }}
-                    className="flex items-center gap-1 md:gap-2 text-xs md:text-sm border-orange-300 text-orange-700 hover:bg-orange-100"
-                  >
-                    <AlertCircle className="h-3 w-3 md:h-4 md:w-4" />
-                    <span className="hidden sm:inline">Grant Gmail Access</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowTemplates(!showTemplates)}
-                    className="flex items-center gap-1 md:gap-2 text-xs md:text-sm"
-                  >
-                    <BookOpen className="h-3 w-3 md:h-4 md:w-4" />
-                    <span className="hidden sm:inline">Templates</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowSecurityInfo(!showSecurityInfo)}
-                    className="flex items-center gap-1 md:gap-2 text-xs md:text-sm"
-                  >
-                    <Shield className="h-3 w-3 md:h-4 md:w-4" />
-                    <span className="hidden sm:inline">
-                      {showSecurityInfo ? "Hide" : "Show"} Security
-                    </span>
-                  </Button>
-                </div>
+                <div className="flex flex-wrap items-center gap-2 md:gap-3"></div>
               </div>
             </div>
 
@@ -514,46 +442,6 @@ export default function SendGmailPage() {
                   </p>
                 </AlertDescription>
               </Alert>
-            )}
-
-            {/* Security Info Panel */}
-            {showSecurityInfo && (
-              <Card className="mb-6 border-blue-200 bg-blue-50">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-blue-900 flex items-center gap-2">
-                    <Lock className="h-4 w-4" />
-                    Gmail API Security Features
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <span>OAuth2 Authentication</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <span>Gmail API Integration</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <span>User's Own Gmail Account</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <span>HTTPS Only</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <span>Token-based Access</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <span>Google Security Standards</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             )}
 
             {/* Main Content */}
@@ -585,83 +473,6 @@ export default function SendGmailPage() {
                   </CardHeader>
                   <CardContent className="p-6">
                     <form onSubmit={handleSubmit} className="space-y-6">
-                      {/* Template Selection */}
-                      {templates.length > 0 && (
-                        <div className="space-y-2">
-                          <Label>Email Template</Label>
-                          <div className="flex gap-2">
-                            <Select
-                              value={formData.templateId || ""}
-                              onValueChange={(value) => {
-                                if (value) {
-                                  const template = templates.find(
-                                    (t) => t.id === value
-                                  );
-                                  if (template) loadTemplate(template);
-                                } else {
-                                  clearTemplate();
-                                }
-                              }}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select a template (optional)" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {templates.map((template) => (
-                                  <SelectItem
-                                    key={template.id}
-                                    value={template.id}
-                                  >
-                                    {template.name}{" "}
-                                    {template.category &&
-                                      `(${template.category})`}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            {formData.templateId && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={clearTemplate}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* From Email */}
-                      <div className="space-y-2">
-                        <Label
-                          htmlFor="fromEmail"
-                          className="text-base font-medium"
-                        >
-                          From Email (Optional)
-                        </Label>
-                        <Input
-                          id="fromEmail"
-                          type="email"
-                          value={formData.fromEmail || ""}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              fromEmail: e.target.value,
-                            }))
-                          }
-                          placeholder="your-email@gmail.com"
-                          className={`h-11 ${errors.fromEmail ? "border-red-500" : ""}`}
-                        />
-                        <div className="flex justify-between text-xs text-gray-500">
-                          <span>
-                            {errors.fromEmail ||
-                              "Leave empty to use your Gmail account"}
-                          </span>
-                        </div>
-                      </div>
-
                       {/* Lead Selection */}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -869,12 +680,15 @@ export default function SendGmailPage() {
                         }
                         maxLength={10000}
                         error={errors.content}
+                        onBrowseTemplates={() =>
+                          setShowTemplates(!showTemplates)
+                        }
                       />
 
                       {/* Advanced Options */}
                       <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
                         <h4 className="font-medium text-sm text-gray-700">
-                          Advanced Options
+                          Advanced Options (Coming soon)
                         </h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-2">
@@ -889,6 +703,7 @@ export default function SendGmailPage() {
                                   priority: value,
                                 }))
                               }
+                              disabled={true}
                             >
                               <SelectTrigger>
                                 <SelectValue />
@@ -914,6 +729,7 @@ export default function SendGmailPage() {
                                   scheduledAt: e.target.value,
                                 }))
                               }
+                              disabled={true}
                             />
                           </div>
                         </div>
@@ -953,16 +769,6 @@ export default function SendGmailPage() {
                                 Gmail API access required. Click to grant
                                 permissions.
                               </span>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  window.location.href = `${API_URL}/oauth2/authorization/google?prompt=consent&scope=openid%20profile%20email%20https://www.googleapis.com/auth/gmail.send`;
-                                }}
-                                className="ml-2 border-orange-300 text-orange-700 hover:bg-orange-100"
-                              >
-                                Grant Access
-                              </Button>
                             </div>
                           </AlertDescription>
                         </Alert>
@@ -1022,16 +828,6 @@ export default function SendGmailPage() {
                             Click below to grant Gmail permissions. This will
                             open Google's consent screen.
                           </p>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              window.location.href = `${API_URL}/oauth2/authorization/google?prompt=consent&scope=openid%20profile%20email%20https://www.googleapis.com/auth/gmail.send`;
-                            }}
-                            className="w-full border-orange-300 text-orange-700 hover:bg-orange-100"
-                          >
-                            Grant Gmail Access
-                          </Button>
                         </div>
                       )}
                     </div>
@@ -1115,20 +911,10 @@ export default function SendGmailPage() {
                         variant="outline"
                         size="sm"
                         className="w-full justify-start"
-                        onClick={() => setShowTemplates(!showTemplates)}
-                      >
-                        <BookOpen className="h-4 w-4 mr-2" />
-                        Browse Templates
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="w-full justify-start"
                         onClick={() => router.push("/send-email")}
                       >
                         <Mail className="h-4 w-4 mr-2" />
-                        Use SES Email
+                        Use AWS SES email service (Coming soon)
                       </Button>
                     </div>
                   </CardContent>
@@ -1138,7 +924,7 @@ export default function SendGmailPage() {
                 <Card className="shadow-lg border-0">
                   <CardHeader className="pb-3 bg-gradient-to-r from-orange-50 to-yellow-50">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      <Shield className="h-4 w-4 text-orange-600" />
+                      <Mail className="h-4 w-4 text-orange-600" />
                       Gmail API Tips
                     </CardTitle>
                   </CardHeader>
@@ -1171,6 +957,92 @@ export default function SendGmailPage() {
             </div>
           </div>
         </div>
+
+        {/* Template Modal */}
+        <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
+          <DialogContent className="w-1/4 max-w-md h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Email Templates</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              {templates.length > 0 ? (
+                <div className="space-y-3">
+                  {templates.map((template) => (
+                    <Card
+                      key={template.id}
+                      className={`hover:shadow-md transition-all cursor-pointer ${
+                        formData.templateId === template.id
+                          ? "ring-2 ring-blue-500 bg-blue-50"
+                          : "hover:bg-gray-50"
+                      }`}
+                      onClick={() => {
+                        if (formData.templateId === template.id) {
+                          // If already selected, use it
+                          loadTemplate(template);
+                        } else {
+                          // If not selected, select it
+                          setFormData((prev) => ({
+                            ...prev,
+                            templateId: template.id,
+                          }));
+                        }
+                      }}
+                    >
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          {template.name}
+                        </CardTitle>
+                        <Badge variant="secondary" className="w-fit text-xs">
+                          {template.category || "No tag"}
+                        </Badge>
+                      </CardHeader>
+                      <CardContent className="pt-0 pb-4">
+                        <div className="text-xs text-gray-600 space-y-2">
+                          {template.subject && (
+                            <div>
+                              <strong>Subject:</strong> {template.subject}
+                            </div>
+                          )}
+                          {template.contentJson && (
+                            <div className="text-xs text-gray-500 line-clamp-3">
+                              {(() => {
+                                try {
+                                  const contentData = JSON.parse(
+                                    template.contentJson || "{}"
+                                  );
+                                  const content =
+                                    contentData.body ||
+                                    contentData.content ||
+                                    "";
+                                  return content.length > 100
+                                    ? content.substring(0, 100) + "..."
+                                    : content;
+                                } catch {
+                                  return "Template content preview unavailable";
+                                }
+                              })()}
+                            </div>
+                          )}
+                          <div className="text-xs text-gray-500">
+                            Platform: {template.platform}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <p className="text-lg font-medium">No templates available</p>
+                  <p className="text-sm">
+                    Create templates in the Templates page first
+                  </p>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </DashboardLayout>
     </AuthGuard>
   );
