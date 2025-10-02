@@ -7,6 +7,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfigurationSource;
 
@@ -43,5 +45,12 @@ public class OAuth2Config {
                                                 .deleteCookies("JSESSIONID"));
 
                 return http.build();
+        }
+
+        @Bean
+        public OAuth2AuthorizedClientService authorizedClientService(
+                        ClientRegistrationRepository clientRegistrationRepository) {
+                return new org.springframework.security.oauth2.client.InMemoryOAuth2AuthorizedClientService(
+                                clientRegistrationRepository);
         }
 }
