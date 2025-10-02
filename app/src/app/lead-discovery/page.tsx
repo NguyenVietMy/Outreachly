@@ -68,8 +68,16 @@ export default function LeadDiscoveryPage() {
         );
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/companies?${params}`);
+      const response = await fetch(`${API_BASE_URL}/api/companies?${params}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+      console.log("API Response:", response.status, response.statusText);
       const data = await response.json();
+      console.log("API Data:", data);
 
       if (response.ok) {
         setCompanies(data.companies);

@@ -43,10 +43,8 @@ public class CompanyController {
                 return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
             }
 
-            UUID orgId = user.getOrgId();
-            if (orgId == null) {
-                return ResponseEntity.status(403).body(Map.of("error", "Organization required"));
-            }
+            // Companies are global (NULL org id) - show ALL companies
+            UUID orgId = null;
 
             log.info(
                     "Fetching companies with filters: search='{}', type='{}', size='{}', country='{}', page: {}, size: {}, orgId: {}",

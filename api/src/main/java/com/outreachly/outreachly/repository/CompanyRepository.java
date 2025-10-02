@@ -41,13 +41,31 @@ public interface CompanyRepository extends JpaRepository<Company, UUID> {
                         @Param("headquartersCountry") String headquartersCountry,
                         Pageable pageable);
 
-        @Query(value = "SELECT COUNT(*) FROM companies c WHERE c.org_id = :orgId AND " +
+        // Global companies queries (ALL companies regardless of org_id)
+        @Query(value = "SELECT * FROM companies c WHERE " +
+                        "(:search IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+                        "(:companyType IS NULL OR c.company_type = :companyType) AND " +
+                        "(:size IS NULL OR c.size = :size) AND " +
+                        "(:headquartersCountry IS NULL OR c.headquarters_country = :headquartersCountry)", countQuery = "SELECT COUNT(*) FROM companies c WHERE "
+                                        +
+                                        "(:search IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))) AND "
+                                        +
+                                        "(:companyType IS NULL OR c.company_type = :companyType) AND " +
+                                        "(:size IS NULL OR c.size = :size) AND " +
+                                        "(:headquartersCountry IS NULL OR c.headquarters_country = :headquartersCountry)", nativeQuery = true)
+        Page<Company> findAllGlobalWithFilters(
+                        @Param("search") String search,
+                        @Param("companyType") String companyType,
+                        @Param("size") String size,
+                        @Param("headquartersCountry") String headquartersCountry,
+                        Pageable pageable);
+
+        @Query(value = "SELECT COUNT(*) FROM companies c WHERE " +
                         "(:search IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
                         "(:companyType IS NULL OR c.company_type = :companyType) AND " +
                         "(:size IS NULL OR c.size = :size) AND " +
                         "(:headquartersCountry IS NULL OR c.headquarters_country = :headquartersCountry)", nativeQuery = true)
-        Long countWithFiltersByOrgId(
-                        @Param("orgId") UUID orgId,
+        Long countAllGlobalWithFilters(
                         @Param("search") String search,
                         @Param("companyType") String companyType,
                         @Param("size") String size,

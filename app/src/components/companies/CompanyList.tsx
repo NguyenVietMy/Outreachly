@@ -242,18 +242,14 @@ export function CompanyList({
                 <div className="mt-6">
                   <Pagination>
                     <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious
-                          onClick={() =>
-                            onPageChange(pagination.currentPage - 1)
-                          }
-                          className={
-                            pagination.currentPage === 0
-                              ? "pointer-events-none opacity-50"
-                              : "cursor-pointer"
-                          }
-                        />
-                      </PaginationItem>
+                      <PaginationPrevious
+                        onClick={() => onPageChange(pagination.currentPage - 1)}
+                        className={
+                          pagination.currentPage === 0
+                            ? "pointer-events-none opacity-50"
+                            : "cursor-pointer"
+                        }
+                      />
 
                       {Array.from(
                         { length: Math.min(5, pagination.totalPages) },
@@ -273,18 +269,14 @@ export function CompanyList({
                         }
                       )}
 
-                      <PaginationItem>
-                        <PaginationNext
-                          onClick={() =>
-                            onPageChange(pagination.currentPage + 1)
-                          }
-                          className={
-                            pagination.currentPage >= pagination.totalPages - 1
-                              ? "pointer-events-none opacity-50"
-                              : "cursor-pointer"
-                          }
-                        />
-                      </PaginationItem>
+                      <PaginationNext
+                        onClick={() => onPageChange(pagination.currentPage + 1)}
+                        className={
+                          pagination.currentPage >= pagination.totalPages - 1
+                            ? "pointer-events-none opacity-50"
+                            : "cursor-pointer"
+                        }
+                      />
                     </PaginationContent>
                   </Pagination>
                 </div>

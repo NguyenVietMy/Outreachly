@@ -28,25 +28,51 @@ public class CompanyService {
                 (size != null && !size.trim().isEmpty()) ||
                 (headquartersCountry != null && !headquartersCountry.trim().isEmpty());
 
-        if (hasFilters) {
-            log.info(
-                    "Searching companies with filters: search='{}', type='{}', size='{}', country='{}', page: {}, size: {}, orgId: {}",
-                    search, companyType, size, headquartersCountry, page, pageSize, orgId);
-            Page<Company> filteredCompanies = companyRepository.findWithFiltersByOrgId(
-                    orgId,
-                    search != null ? search.trim() : null,
-                    companyType != null && !companyType.trim().isEmpty() ? companyType.trim() : null,
-                    size != null && !size.trim().isEmpty() ? size.trim() : null,
-                    headquartersCountry != null && !headquartersCountry.trim().isEmpty() ? headquartersCountry.trim()
-                            : null,
-                    pageable);
-            log.info("Found {} companies with filters for org {}", filteredCompanies.getTotalElements(), orgId);
-            return filteredCompanies;
+        if (orgId == null) {
+            // Global companies (org_id IS NULL)
+            if (hasFilters) {
+                log.info(
+                        "Searching global companies with filters: search='{}', type='{}', size='{}', country='{}', page: {}, size: {}",
+                        search, companyType, size, headquartersCountry, page, pageSize);
+                Page<Company> filteredCompanies = companyRepository.findAllGlobalWithFilters(
+                        search != null ? search.trim() : null,
+                        companyType != null && !companyType.trim().isEmpty() ? companyType.trim() : null,
+                        size != null && !size.trim().isEmpty() ? size.trim() : null,
+                        headquartersCountry != null && !headquartersCountry.trim().isEmpty()
+                                ? headquartersCountry.trim()
+                                : null,
+                        pageable);
+                log.info("Found {} global companies with filters", filteredCompanies.getTotalElements());
+                return filteredCompanies;
+            } else {
+                log.info("Fetching all global companies, page: {}, size: {}", page, pageSize);
+                Page<Company> allCompanies = companyRepository.findAll(pageable);
+                log.info("Found {} global companies in database", allCompanies.getTotalElements());
+                return allCompanies;
+            }
         } else {
-            log.info("Fetching all companies for org {}, page: {}, size: {}", orgId, page, pageSize);
-            Page<Company> allCompanies = companyRepository.findByOrgId(orgId, pageable);
-            log.info("Found {} companies in database for org {}", allCompanies.getTotalElements(), orgId);
-            return allCompanies;
+            // Organization-specific companies
+            if (hasFilters) {
+                log.info(
+                        "Searching companies with filters: search='{}', type='{}', size='{}', country='{}', page: {}, size: {}, orgId: {}",
+                        search, companyType, size, headquartersCountry, page, pageSize, orgId);
+                Page<Company> filteredCompanies = companyRepository.findWithFiltersByOrgId(
+                        orgId,
+                        search != null ? search.trim() : null,
+                        companyType != null && !companyType.trim().isEmpty() ? companyType.trim() : null,
+                        size != null && !size.trim().isEmpty() ? size.trim() : null,
+                        headquartersCountry != null && !headquartersCountry.trim().isEmpty()
+                                ? headquartersCountry.trim()
+                                : null,
+                        pageable);
+                log.info("Found {} companies with filters for org {}", filteredCompanies.getTotalElements(), orgId);
+                return filteredCompanies;
+            } else {
+                log.info("Fetching all companies for org {}, page: {}, size: {}", orgId, page, pageSize);
+                Page<Company> allCompanies = companyRepository.findByOrgId(orgId, pageable);
+                log.info("Found {} companies in database for org {}", allCompanies.getTotalElements(), orgId);
+                return allCompanies;
+            }
         }
     }
 
@@ -57,16 +83,33 @@ public class CompanyService {
                 (size != null && !size.trim().isEmpty()) ||
                 (headquartersCountry != null && !headquartersCountry.trim().isEmpty());
 
-        if (hasFilters) {
-            return companyRepository.countWithFiltersByOrgId(
-                    orgId,
-                    search != null ? search.trim() : null,
-                    companyType != null && !companyType.trim().isEmpty() ? companyType.trim() : null,
-                    size != null && !size.trim().isEmpty() ? size.trim() : null,
-                    headquartersCountry != null && !headquartersCountry.trim().isEmpty() ? headquartersCountry.trim()
-                            : null);
+        if (orgId == null) {
+            // Global companies (org_id IS NULL)
+            if (hasFilters) {
+                return companyRepository.countAllGlobalWithFilters(
+                        search != null ? search.trim() : null,
+                        companyType != null && !companyType.trim().isEmpty() ? companyType.trim() : null,
+                        size != null && !size.trim().isEmpty() ? size.trim() : null,
+                        headquartersCountry != null && !headquartersCountry.trim().isEmpty()
+                                ? headquartersCountry.trim()
+                                : null);
+            } else {
+                return companyRepository.count();
+            }
         } else {
-            return companyRepository.findByOrgId(orgId).size();
+            // Organization-specific companies
+            if (hasFilters) {
+                return companyRepository.countWithFiltersByOrgId(
+                        orgId,
+                        search != null ? search.trim() : null,
+                        companyType != null && !companyType.trim().isEmpty() ? companyType.trim() : null,
+                        size != null && !size.trim().isEmpty() ? size.trim() : null,
+                        headquartersCountry != null && !headquartersCountry.trim().isEmpty()
+                                ? headquartersCountry.trim()
+                                : null);
+            } else {
+                return companyRepository.findByOrgId(orgId).size();
+            }
         }
     }
 

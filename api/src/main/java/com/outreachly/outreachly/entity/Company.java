@@ -29,7 +29,7 @@ public class Company {
     @Column(unique = true)
     private String domain;
 
-    @Column(name = "org_id", nullable = false)
+    @Column(name = "org_id", nullable = true)
     private UUID orgId;
 
     @Column(name = "headquarters_country")
