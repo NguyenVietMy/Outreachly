@@ -46,10 +46,6 @@ public class CompanyController {
             // Companies are global (NULL org id) - show ALL companies
             UUID orgId = null;
 
-            log.info(
-                    "Fetching companies with filters: search='{}', type='{}', size='{}', country='{}', page: {}, size: {}, orgId: {}",
-                    search, companyType, size, headquartersCountry, page, pageSize, orgId);
-
             Page<Company> companies = companyService.getCompanies(search, companyType, size,
                     headquartersCountry, page, pageSize, orgId);
 

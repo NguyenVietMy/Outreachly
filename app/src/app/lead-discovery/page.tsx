@@ -13,6 +13,8 @@ interface Company {
   id: string;
   name: string;
   domain: string;
+  industry: string;
+  size: string;
   updatedAt: string;
 }
 
@@ -75,9 +77,7 @@ export default function LeadDiscoveryPage() {
         },
         credentials: "include",
       });
-      console.log("API Response:", response.status, response.statusText);
       const data = await response.json();
-      console.log("API Data:", data);
 
       if (response.ok) {
         setCompanies(data.companies);

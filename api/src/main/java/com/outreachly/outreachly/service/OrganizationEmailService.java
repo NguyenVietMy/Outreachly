@@ -35,7 +35,6 @@ public class OrganizationEmailService {
      */
     public EmailResponse sendEmail(UUID orgId, EmailRequest emailRequest) {
         EmailProvider provider = getOrganizationProvider(orgId);
-        log.debug("Sending email via {} for org: {}", provider.getProviderType().getDisplayName(), orgId);
         return provider.sendEmail(emailRequest);
     }
 
@@ -44,8 +43,6 @@ public class OrganizationEmailService {
      */
     public EmailResponse sendBulkEmail(UUID orgId, List<EmailRequest> emailRequests) {
         EmailProvider provider = getOrganizationProvider(orgId);
-        log.debug("Sending {} emails via {} for org: {}",
-                emailRequests.size(), provider.getProviderType().getDisplayName(), orgId);
         return provider.sendBulkEmail(emailRequests);
     }
 
@@ -54,8 +51,6 @@ public class OrganizationEmailService {
      */
     public EmailResponse sendEmail(UUID orgId, EmailRequest emailRequest, EmailProviderType providerType) {
         EmailProvider provider = emailProviderFactory.getProvider(providerType);
-        log.debug("Sending email via specific provider: {} for org: {}",
-                provider.getProviderType().getDisplayName(), orgId);
         return provider.sendEmail(emailRequest);
     }
 
@@ -71,7 +66,6 @@ public class OrganizationEmailService {
             return emailProviderFactory.getProvider(providerType);
         } else {
             // Fall back to global configuration
-            log.debug("No organization settings found for org: {}, using global configuration", orgId);
             return emailProviderFactory.getConfiguredProvider();
         }
     }

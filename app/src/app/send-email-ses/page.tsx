@@ -164,7 +164,6 @@ export default function SendEmailPage() {
 
   // Load email info, templates, and history
   useEffect(() => {
-    console.log("SendEmailPage useEffect triggered", { user: !!user });
     const loadEmailInfo = async () => {
       try {
         // Load rate limit

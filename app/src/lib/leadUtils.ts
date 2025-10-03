@@ -96,20 +96,11 @@ export async function createLeadsFromHunterData(
     // Convert Hunter emails to Lead data
     const leadData = emails.map((email) => mapHunterEmailToLead(email, domain));
 
-    console.log("Creating leads with data:", {
-      leadData: leadData,
-      campaignId: campaignId,
-      domain: domain,
-      leadCount: leadData.length,
-    });
-
     // Create leads via API
     const requestBody = {
       leads: leadData,
       campaignId: campaignId || null,
     };
-
-    console.log("Sending request body:", requestBody);
 
     const response = await fetch(`${API_BASE_URL}/api/leads/bulk-create`, {
       method: "POST",
@@ -129,7 +120,6 @@ export async function createLeadsFromHunterData(
     }
 
     const result = await response.json();
-    console.log("API Success result:", result);
 
     return {
       success: true,

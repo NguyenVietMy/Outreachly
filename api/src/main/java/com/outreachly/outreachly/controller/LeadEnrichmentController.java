@@ -184,7 +184,6 @@ public class LeadEnrichmentController {
                 log.info("Fetching leads for campaign: {} for organization: {}", campaignId, orgId);
                 // Get leads through campaign-lead relationship
                 List<Lead> campaignLeads = campaignLeadService.getActiveLeadsForCampaign(campaignId);
-                log.debug("Retrieved {} leads from campaign service for campaign {}", campaignLeads.size(), campaignId);
 
                 leads = campaignLeads.stream()
                         .filter(lead -> lead.getOrgId().equals(orgId))
@@ -196,7 +195,6 @@ public class LeadEnrichmentController {
                 log.info("Fetching all leads for organization: {}", orgId);
                 // Get all leads for the organization
                 leads = leadRepository.findByOrgId(orgId);
-                log.debug("Retrieved {} total leads for organization {}", leads.size(), orgId);
             }
 
             // Convert to DTO with campaign information
@@ -227,7 +225,6 @@ public class LeadEnrichmentController {
 
         try {
             List<Lead> leads = leadRepository.findAllById(request.getLeadIds());
-            log.debug("Found {} leads from database for IDs: {}", leads.size(), request.getLeadIds());
 
             // Filter leads that belong to the user's organization
             List<Lead> userLeads = leads.stream()
@@ -281,8 +278,6 @@ public class LeadEnrichmentController {
                         log.warn("Lead not found or not accessible - Lead ID: {}, User Org: {}", id, orgId);
                         return new IllegalArgumentException("Lead not found");
                     });
-
-            log.debug("Found lead: {} (Email: {}) for campaign assignment", lead.getId(), lead.getEmail());
 
             // Create campaign-lead relationship using service
             campaignLeadService.addLeadToCampaign(request.getCampaignId(), lead.getId(), user.getId());
@@ -351,9 +346,6 @@ public class LeadEnrichmentController {
             log.info("Campaign ID: {}", request.getCampaignId());
 
             for (LeadData leadData : request.getLeads()) {
-                log.debug("Creating lead: firstName={}, lastName={}, email={}, domain={}",
-                        leadData.getFirstName(), leadData.getLastName(), leadData.getEmail(), leadData.getDomain());
-
                 Lead lead = Lead.builder()
                         .orgId(orgId)
                         .firstName(leadData.getFirstName())

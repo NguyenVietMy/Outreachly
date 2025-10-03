@@ -52,7 +52,6 @@ export function ImportHistory() {
 
       if (response.ok) {
         const jobs = await response.json();
-        console.log("Import history response:", jobs);
         setImportJobs(jobs);
       } else {
         console.error("Failed to load import history:", response.status);

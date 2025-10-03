@@ -82,7 +82,6 @@ export function CompanyList({
 
       if (response.ok) {
         // Handle successful response - show modal with results
-        console.log("Found emails:", data);
         const emailCount = data.data?.emails?.length || 0;
         const domain = data.data?.domain || company.domain;
         const organization = data.data?.organization || company.name;

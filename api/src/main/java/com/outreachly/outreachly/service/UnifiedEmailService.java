@@ -30,7 +30,6 @@ public class UnifiedEmailService {
      */
     public EmailResponse sendEmail(EmailRequest emailRequest) {
         EmailProvider provider = emailProviderFactory.getConfiguredProvider();
-        log.debug("Sending email via {}", provider.getProviderType().getDisplayName());
         return provider.sendEmail(emailRequest);
     }
 
@@ -39,7 +38,6 @@ public class UnifiedEmailService {
      */
     public EmailResponse sendBulkEmail(List<EmailRequest> emailRequests) {
         EmailProvider provider = emailProviderFactory.getConfiguredProvider();
-        log.debug("Sending {} emails via {}", emailRequests.size(), provider.getProviderType().getDisplayName());
         return provider.sendBulkEmail(emailRequests);
     }
 
@@ -48,7 +46,6 @@ public class UnifiedEmailService {
      */
     public EmailResponse sendEmail(EmailRequest emailRequest, EmailProviderType providerType) {
         EmailProvider provider = emailProviderFactory.getProvider(providerType);
-        log.debug("Sending email via specific provider: {}", provider.getProviderType().getDisplayName());
         return provider.sendEmail(emailRequest);
     }
 
@@ -57,8 +54,6 @@ public class UnifiedEmailService {
      */
     public EmailResponse sendBulkEmail(List<EmailRequest> emailRequests, EmailProviderType providerType) {
         EmailProvider provider = emailProviderFactory.getProvider(providerType);
-        log.debug("Sending {} emails via specific provider: {}",
-                emailRequests.size(), provider.getProviderType().getDisplayName());
         return provider.sendBulkEmail(emailRequests);
     }
 

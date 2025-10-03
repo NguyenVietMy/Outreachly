@@ -115,18 +115,13 @@ export function CompanyFilters({
         {/* Search */}
         <div className="space-y-2">
           <Label htmlFor="search">Company Name</Label>
-          <div className="flex gap-2">
-            <Input
-              id="search"
-              placeholder="Search companies..."
-              value={localSearch}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              onKeyPress={handleKeyPress}
-            />
-            <Button size="sm" onClick={handleSearch}>
-              <Search className="w-4 h-4" />
-            </Button>
-          </div>
+          <Input
+            id="search"
+            placeholder="Search companies..."
+            value={localSearch}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            onKeyPress={handleKeyPress}
+          />
         </div>
 
         {/* Industry removed - now shown in table */}
@@ -195,6 +190,12 @@ export function CompanyFilters({
             </SelectContent>
           </Select>
         </div>
+
+        {/* Search Button */}
+        <Button size="sm" onClick={handleSearch} className="w-full">
+          <Search className="w-4 h-4 mr-2" />
+          Search
+        </Button>
 
         {/* Clear Filters */}
         <Button

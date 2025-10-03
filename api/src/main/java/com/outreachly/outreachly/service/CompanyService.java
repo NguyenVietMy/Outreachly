@@ -31,10 +31,7 @@ public class CompanyService {
         if (orgId == null) {
             // Global companies (org_id IS NULL)
             if (hasFilters) {
-                log.info(
-                        "Searching global companies with filters: search='{}', type='{}', size='{}', country='{}', page: {}, size: {}",
-                        search, companyType, size, headquartersCountry, page, pageSize);
-                Page<Company> filteredCompanies = companyRepository.findAllGlobalWithFilters(
+                return companyRepository.findAllGlobalWithFilters(
                         search != null ? search.trim() : null,
                         companyType != null && !companyType.trim().isEmpty() ? companyType.trim() : null,
                         size != null && !size.trim().isEmpty() ? size.trim() : null,
@@ -42,21 +39,13 @@ public class CompanyService {
                                 ? headquartersCountry.trim()
                                 : null,
                         pageable);
-                log.info("Found {} global companies with filters", filteredCompanies.getTotalElements());
-                return filteredCompanies;
             } else {
-                log.info("Fetching all global companies, page: {}, size: {}", page, pageSize);
-                Page<Company> allCompanies = companyRepository.findAll(pageable);
-                log.info("Found {} global companies in database", allCompanies.getTotalElements());
-                return allCompanies;
+                return companyRepository.findAll(pageable);
             }
         } else {
             // Organization-specific companies
             if (hasFilters) {
-                log.info(
-                        "Searching companies with filters: search='{}', type='{}', size='{}', country='{}', page: {}, size: {}, orgId: {}",
-                        search, companyType, size, headquartersCountry, page, pageSize, orgId);
-                Page<Company> filteredCompanies = companyRepository.findWithFiltersByOrgId(
+                return companyRepository.findWithFiltersByOrgId(
                         orgId,
                         search != null ? search.trim() : null,
                         companyType != null && !companyType.trim().isEmpty() ? companyType.trim() : null,
@@ -65,13 +54,8 @@ public class CompanyService {
                                 ? headquartersCountry.trim()
                                 : null,
                         pageable);
-                log.info("Found {} companies with filters for org {}", filteredCompanies.getTotalElements(), orgId);
-                return filteredCompanies;
             } else {
-                log.info("Fetching all companies for org {}, page: {}, size: {}", orgId, page, pageSize);
-                Page<Company> allCompanies = companyRepository.findByOrgId(orgId, pageable);
-                log.info("Found {} companies in database for org {}", allCompanies.getTotalElements(), orgId);
-                return allCompanies;
+                return companyRepository.findByOrgId(orgId, pageable);
             }
         }
     }
@@ -122,8 +106,6 @@ public class CompanyService {
     }
 
     public Company createCompany(String name, String domain, UUID orgId) {
-        log.info("Creating company: name='{}', domain='{}', orgId='{}'", name, domain, orgId);
-
         Company company = Company.builder()
                 .name(name)
                 .domain(domain)
@@ -134,8 +116,6 @@ public class CompanyService {
     }
 
     public Company updateCompany(UUID id, String name, String domain) {
-        log.info("Updating company: id='{}', name='{}', domain='{}'", id, name, domain);
-
         Company company = companyRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Company not found with id: " + id));
 
@@ -146,13 +126,10 @@ public class CompanyService {
     }
 
     public void deleteCompany(UUID id) {
-        log.info("Deleting company: id='{}'", id);
         companyRepository.deleteById(id);
     }
 
     public Company saveCompany(Company company) {
-        log.info("Saving company: id='{}', name='{}', domain='{}'", company.getId(), company.getName(),
-                company.getDomain());
         return companyRepository.save(company);
     }
 }

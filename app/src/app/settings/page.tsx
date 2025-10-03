@@ -156,8 +156,6 @@ export default function SettingsPage() {
   const loadEmailProviders = async () => {
     try {
       setLoadingProviders(true);
-      console.log("Loading email providers...");
-
       const response = await fetch(
         "http://localhost:8080/api/settings/email-providers",
         {
@@ -169,11 +167,8 @@ export default function SettingsPage() {
         }
       );
 
-      console.log("Response status:", response.status);
-
       if (response.ok) {
         const providers = await response.json();
-        console.log("Loaded providers:", providers);
 
         // Ensure each provider has a config object with default values
         const providersWithDefaults = providers.map((provider: any) => ({
@@ -262,7 +257,6 @@ export default function SettingsPage() {
     config: EmailProvider["config"]
   ) => {
     try {
-      console.log(`Switching to provider: ${providerId}`, config);
       setIsSaving(true);
       const response = await fetch(
         `http://localhost:8080/api/settings/email-providers/${providerId}/switch`,
@@ -276,11 +270,8 @@ export default function SettingsPage() {
         }
       );
 
-      console.log("Switch response status:", response.status);
-
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("Switch error:", errorText);
         throw new Error("Failed to switch email provider");
       }
 
@@ -538,10 +529,6 @@ export default function SettingsPage() {
                                         ...p,
                                         isActive: p.id === provider.id,
                                       }));
-                                      console.log(
-                                        "Updated providers:",
-                                        updated
-                                      );
                                       return updated;
                                     });
                                     // Call the backend to switch

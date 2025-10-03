@@ -74,7 +74,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (response.ok) {
         const data = await response.json();
-        console.log("Logout successful:", data.message);
       }
     } catch (error) {
       console.error("Logout failed:", error);

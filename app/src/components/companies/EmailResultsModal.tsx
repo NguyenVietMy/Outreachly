@@ -166,15 +166,6 @@ export function EmailResultsModal({
         (index) => emails[index]
       );
 
-      console.log("Selected emails for campaign:", {
-        selectedEmailData,
-        domain,
-        campaignId,
-        selectedCount: selectedEmails.size,
-        campaignIdType: typeof campaignId,
-        isDefault: campaignId === "default",
-      });
-
       // Create leads from Hunter data
       const result = await createLeadsFromHunterData(
         selectedEmailData,

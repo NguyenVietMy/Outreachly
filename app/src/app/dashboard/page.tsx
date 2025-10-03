@@ -13,52 +13,42 @@ import ComplianceTrustCues from "@/components/dashboard/ComplianceTrustCues";
 
 export default function Dashboard() {
   const handleOnboardingComplete = (itemId: string) => {
-    console.log(`Onboarding item completed: ${itemId}`);
     // Add your onboarding completion logic here
   };
 
   const handleViewCampaignDetails = (campaignId: string) => {
-    console.log(`View campaign details: ${campaignId}`);
     // Navigate to campaign details page
   };
 
   const handleImportLeads = () => {
-    console.log("Import leads clicked");
     // Navigate to import leads page
   };
 
   const handleViewLeadList = (listId: string) => {
-    console.log(`View lead list: ${listId}`);
     // Navigate to lead list details
   };
 
   const handleConfigureDomain = (profileId: string) => {
-    console.log(`Configure domain: ${profileId}`);
     // Navigate to domain configuration
   };
 
   const handleViewProfileDetails = (profileId: string) => {
-    console.log(`View profile details: ${profileId}`);
     // Navigate to profile details
   };
 
   const handleViewActivityDetails = (activityId: string) => {
-    console.log(`View activity details: ${activityId}`);
     // Navigate to activity details
   };
 
   const handleViewPrivacyPolicy = () => {
-    console.log("View privacy policy");
     // Open privacy policy
   };
 
   const handleViewTerms = () => {
-    console.log("View terms of service");
     // Open terms of service
   };
 
   const handleViewDPA = () => {
-    console.log("View data processing agreement");
     // Open DPA
   };
 

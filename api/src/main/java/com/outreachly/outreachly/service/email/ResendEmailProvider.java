@@ -2,9 +2,7 @@ package com.outreachly.outreachly.service.email;
 
 import com.outreachly.outreachly.dto.EmailRequest;
 import com.outreachly.outreachly.dto.EmailResponse;
-import com.outreachly.outreachly.entity.EmailEvent;
 import com.outreachly.outreachly.service.EmailEventService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;

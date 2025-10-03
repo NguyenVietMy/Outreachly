@@ -3,7 +3,6 @@ package com.outreachly.outreachly.config;
 import com.outreachly.outreachly.service.email.EmailProvider;
 import com.outreachly.outreachly.service.email.EmailProviderFactory;
 import com.outreachly.outreachly.service.email.EmailProviderType;
-import com.outreachly.outreachly.service.email.ResendEmailProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;

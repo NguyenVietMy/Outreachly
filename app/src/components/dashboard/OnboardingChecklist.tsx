@@ -39,7 +39,7 @@ export default function OnboardingChecklist({
       description: "Import CSV with your leads",
       completed: false,
       ctaText: "Import CSV",
-      ctaAction: () => console.log("Import CSV clicked"),
+      ctaAction: () => {},
       icon: Upload,
     },
     {
@@ -48,7 +48,7 @@ export default function OnboardingChecklist({
       description: "Validate email addresses and add missing data",
       completed: false,
       ctaText: "Verify Leads",
-      ctaAction: () => console.log("Verify leads clicked"),
+      ctaAction: () => {},
       icon: Users,
     },
     {
@@ -57,7 +57,7 @@ export default function OnboardingChecklist({
       description: "Design your first email template",
       completed: false,
       ctaText: "Create Template",
-      ctaAction: () => console.log("Create template clicked"),
+      ctaAction: () => {},
       icon: FileText,
     },
     {
@@ -66,7 +66,7 @@ export default function OnboardingChecklist({
       description: "Set up SPF/DKIM/DMARC for better deliverability",
       completed: false,
       ctaText: "Setup Domain",
-      ctaAction: () => console.log("Setup domain clicked"),
+      ctaAction: () => {},
       icon: Shield,
     },
     {
@@ -75,7 +75,7 @@ export default function OnboardingChecklist({
       description: "Send your first outreach campaign",
       completed: false,
       ctaText: "Launch Campaign",
-      ctaAction: () => console.log("Launch campaign clicked"),
+      ctaAction: () => {},
       icon: Rocket,
     },
   ]);
@@ -190,4 +190,3 @@ export default function OnboardingChecklist({
     </Card>
   );
 }
-

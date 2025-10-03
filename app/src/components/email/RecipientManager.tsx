@@ -57,7 +57,6 @@ export function RecipientManager({
 
   // Initialize recipient list from props
   useEffect(() => {
-    console.log("RecipientManager useEffect triggered", { recipients });
     const recipientsWithValidation = recipients.map((email) => ({
       email,
       isValid: validateEmail(email),

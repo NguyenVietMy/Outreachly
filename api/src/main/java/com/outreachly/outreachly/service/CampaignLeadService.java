@@ -26,14 +26,11 @@ public class CampaignLeadService {
      */
     @Transactional
     public CampaignLead addLeadToCampaign(UUID campaignId, UUID leadId, Long addedBy) {
-        log.debug("Attempting to add lead {} to campaign {} by user {}", leadId, campaignId, addedBy);
 
         // Check if relationship already exists
         Optional<CampaignLead> existingOpt = campaignLeadRepository.findByCampaignIdAndLeadId(campaignId, leadId);
         if (existingOpt.isPresent()) {
             CampaignLead existing = existingOpt.get();
-            log.debug("Campaign-lead relationship already exists: campaign={}, lead={}, status={}",
-                    campaignId, leadId, existing.getStatus());
 
             // If the relationship exists but is not active, reactivate it
             if (existing.getStatus() != CampaignLead.CampaignLeadStatus.active) {
@@ -86,16 +83,12 @@ public class CampaignLeadService {
      * Get all active leads for a campaign
      */
     public List<Lead> getActiveLeadsForCampaign(UUID campaignId) {
-        log.debug("Fetching active leads for campaign: {}", campaignId);
 
         List<CampaignLead> campaignLeads = campaignLeadRepository.findActiveByCampaignId(campaignId);
-        log.debug("Found {} campaign-lead relationships for campaign {}", campaignLeads.size(), campaignId);
 
         List<UUID> leadIds = campaignLeads.stream()
                 .map(CampaignLead::getLeadId)
                 .toList();
-
-        log.debug("Lead IDs to fetch: {}", leadIds);
 
         // Fetch leads with eager loading using the repository
         List<Lead> leads = leadIds.stream()
@@ -172,13 +165,10 @@ public class CampaignLeadService {
 
                 // Track what happened
                 if (previousStatus == null) {
-                    log.debug("Created new relationship for lead {}", leadId);
                 } else if (previousStatus == CampaignLead.CampaignLeadStatus.active) {
                     alreadyActiveCount++;
-                    log.debug("Lead {} was already active", leadId);
                 } else {
                     reactivatedCount++;
-                    log.debug("Reactivated lead {} from status {}", leadId, previousStatus);
                 }
             } catch (Exception e) {
                 errorCount++;

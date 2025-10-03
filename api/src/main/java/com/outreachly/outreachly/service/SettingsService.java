@@ -92,7 +92,6 @@ public class SettingsService {
                             .description(type.getDescription())
                             .build();
 
-                    log.debug("Provider {}: active={}, healthy={}", dto.getName(), dto.isActive(), dto.isHealthy());
                     return dto;
                 })
                 .collect(Collectors.toList());
