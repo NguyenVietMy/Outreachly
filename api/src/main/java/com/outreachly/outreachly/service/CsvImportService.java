@@ -30,6 +30,7 @@ import java.util.concurrent.CompletableFuture;
 public class CsvImportService {
 
     private final LeadRepository leadRepository;
+    private final OrgLeadService orgLeadService;
     private final ImportJobRepository importJobRepository;
     private final OrganizationRepository organizationRepository;
     // private final UserRepository userRepository; // Will be used when
@@ -298,14 +299,32 @@ public class CsvImportService {
                     }
                     processedEmails.add(email);
 
-                    // Check if lead already exists
-                    Optional<Lead> existingLead = leadRepository.findByEmailAndOrgId(email, job.getOrgId());
-                    if (existingLead.isPresent()) {
-                        continue; // Skip existing leads
-                    }
+                    // Ensure global lead exists (create if missing)
+                    Lead lead = leadRepository.findByEmailIgnoreCase(email).orElseGet(() -> {
+                        Lead newLead = Lead.builder()
+                                .orgId(java.util.UUID.fromString("b8470f71-e5c8-4974-b6af-3d7af17aa55c"))
+                                .firstName(trimValue(getValueFromRow(row, getFirstNameColumnNames())))
+                                .lastName(trimValue(getValueFromRow(row, getLastNameColumnNames())))
+                                .email(email)
+                                .domain(extractDomainFromEmail(email))
+                                .position(trimValue(getValueFromRow(row, getPositionColumnNames())))
+                                .positionRaw(trimValue(getValueFromRow(row, getPositionRawColumnNames())))
+                                .seniority(trimValue(getValueFromRow(row, getSeniorityColumnNames())))
+                                .department(trimValue(getValueFromRow(row, getDepartmentColumnNames())))
+                                .phone(trimValue(getValueFromRow(row, getPhoneColumnNames())))
+                                .linkedinUrl(trimValue(getValueFromRow(row, getLinkedInColumnNames())))
+                                .twitter(trimValue(getValueFromRow(row, getTwitterColumnNames())))
+                                .confidenceScore(parseInteger(getValueFromRow(row, getConfidenceScoreColumnNames())))
+                                .emailType(mapEmailType(getValueFromRow(row, getEmailTypeColumnNames())))
+                                .source("csv_import")
+                                .verifiedStatus(Lead.VerifiedStatus.unknown)
+                                .enrichedJson("{}")
+                                .build();
+                        return leadRepository.save(newLead);
+                    });
 
-                    Lead lead = buildLeadFromRow(row, job.getOrgId());
-                    lead = leadRepository.save(lead);
+                    // Ensure org_leads mapping exists for org
+                    orgLeadService.ensureOrgLeadForEmail(job.getOrgId(), email, "csv_import");
 
                     // If campaignId is provided, create campaign-lead relationship
                     // TODO: Implement campaign-lead relationship creation

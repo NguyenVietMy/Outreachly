@@ -10,6 +10,7 @@ import com.outreachly.outreachly.repository.CampaignRepository;
 import com.outreachly.outreachly.entity.Lead;
 import com.outreachly.outreachly.entity.Campaign;
 import com.outreachly.outreachly.service.CampaignLeadService;
+import com.outreachly.outreachly.service.OrgLeadService;
 import com.outreachly.outreachly.service.CsvImportService;
 import com.outreachly.outreachly.service.EnrichmentService;
 import com.outreachly.outreachly.service.EnrichmentPreviewService;
@@ -36,6 +37,7 @@ public class LeadEnrichmentController {
     private final LeadRepository leadRepository;
     private final CampaignLeadService campaignLeadService;
     private final CampaignRepository campaignRepository;
+    private final OrgLeadService orgLeadService;
 
     @PostMapping("/{id}/enrich")
     public ResponseEntity<?> enrichLead(@PathVariable UUID id, Authentication authentication) {
@@ -56,29 +58,37 @@ public class LeadEnrichmentController {
             if (user == null) {
                 return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
             }
-
+            UUID orgId = user.getOrgId();
             // Convert email to lowercase for consistent checking
             String normalizedEmail = email.toLowerCase().trim();
 
             // Check if email exists in Lead DB (case-insensitive)
             Optional<Lead> existingLead = leadRepository.findByEmailIgnoreCase(normalizedEmail);
 
-            if (existingLead.isPresent()) {
+            boolean existsGlobal = existingLead.isPresent();
+            boolean existsOrg = orgLeadService.findOrgLeadByEmail(orgId, normalizedEmail).isPresent();
+
+            if (existsGlobal) {
                 Lead lead = existingLead.get();
-                return ResponseEntity.ok(Map.of(
+                java.util.Map<String, Object> leadPayload = new java.util.LinkedHashMap<>();
+                leadPayload.put("id", lead.getId());
+                leadPayload.put("email", lead.getEmail());
+                leadPayload.put("firstName", lead.getFirstName());
+                leadPayload.put("lastName", lead.getLastName());
+                leadPayload.put("domain", lead.getDomain());
+                leadPayload.put("orgId", lead.getOrgId());
+
+                return ResponseEntity.ok(java.util.Map.of(
                         "exists", true,
-                        "lead", Map.of(
-                                "id", lead.getId(),
-                                "email", lead.getEmail(),
-                                "firstName", lead.getFirstName(),
-                                "lastName", lead.getLastName(),
-                                "domain", lead.getDomain(),
-                                "orgId", lead.getOrgId()),
-                        "exactEmail", lead.getEmail() // Return the exact email from DB
-                ));
+                        "existsGlobal", true,
+                        "existsOrg", existsOrg,
+                        "lead", leadPayload,
+                        "exactEmail", lead.getEmail()));
             } else {
                 return ResponseEntity.ok(Map.of(
                         "exists", false,
+                        "existsGlobal", false,
+                        "existsOrg", false,
                         "email", normalizedEmail));
             }
         } catch (Exception e) {
@@ -104,39 +114,52 @@ public class LeadEnrichmentController {
             // Convert email to lowercase for consistency
             String normalizedEmail = request.getEmail().toLowerCase().trim();
 
-            // Check if email already exists
-            Optional<Lead> existingLead = leadRepository.findByEmailIgnoreCase(normalizedEmail);
-            if (existingLead.isPresent()) {
-                return ResponseEntity.status(400).body(Map.of("error", "Lead with this email already exists"));
+            // Find or create global lead
+            final boolean[] createdGlobalHolder = new boolean[] { false };
+            Lead lead = leadRepository.findByEmailIgnoreCase(normalizedEmail)
+                    .orElseGet(() -> {
+                        Lead newLead = Lead.builder()
+                                .orgId(UUID.fromString("b8470f71-e5c8-4974-b6af-3d7af17aa55c"))
+                                .email(normalizedEmail)
+                                .firstName(request.getFirstName() != null ? request.getFirstName().trim() : null)
+                                .lastName(request.getLastName() != null ? request.getLastName().trim() : null)
+                                .domain(request.getDomain() != null ? request.getDomain().trim() : null)
+                                .phone(request.getPhone() != null ? request.getPhone().trim() : null)
+                                .linkedinUrl(request.getLinkedinUrl() != null ? request.getLinkedinUrl().trim() : null)
+                                .position(request.getPosition() != null ? request.getPosition().trim() : null)
+                                .positionRaw(request.getPositionRaw() != null ? request.getPositionRaw().trim() : null)
+                                .seniority(request.getSeniority() != null ? request.getSeniority().trim() : null)
+                                .department(request.getDepartment() != null ? request.getDepartment().trim() : null)
+                                .twitter(request.getTwitter() != null ? request.getTwitter().trim() : null)
+                                .source("user_created")
+                                .build();
+                        createdGlobalHolder[0] = true;
+                        return leadRepository.save(newLead);
+                    });
+
+            // Ensure org_leads mapping exists
+            var maybeOrgLead = orgLeadService.findOrgLeadByEmail(orgId, normalizedEmail);
+            boolean createdOrgLead = false;
+            if (maybeOrgLead.isEmpty()) {
+                orgLeadService.ensureOrgLeadForEmail(orgId, normalizedEmail,
+                        createdGlobalHolder[0] ? "user_created" : "user_created");
+                createdOrgLead = true;
             }
 
-            // Create new lead
-            Lead lead = Lead.builder()
-                    .orgId(orgId)
-                    .email(normalizedEmail)
-                    .firstName(request.getFirstName() != null ? request.getFirstName().trim() : null)
-                    .lastName(request.getLastName() != null ? request.getLastName().trim() : null)
-                    .domain(request.getDomain() != null ? request.getDomain().trim() : null)
-                    .phone(request.getPhone() != null ? request.getPhone().trim() : null)
-                    .linkedinUrl(request.getLinkedinUrl() != null ? request.getLinkedinUrl().trim() : null)
-                    .position(request.getPosition() != null ? request.getPosition().trim() : null)
-                    .positionRaw(request.getPositionRaw() != null ? request.getPositionRaw().trim() : null)
-                    .seniority(request.getSeniority() != null ? request.getSeniority().trim() : null)
-                    .department(request.getDepartment() != null ? request.getDepartment().trim() : null)
-                    .twitter(request.getTwitter() != null ? request.getTwitter().trim() : null)
-                    .build();
+            java.util.Map<String, Object> leadPayload = new java.util.LinkedHashMap<>();
+            leadPayload.put("id", lead.getId());
+            leadPayload.put("email", lead.getEmail());
+            leadPayload.put("firstName", lead.getFirstName());
+            leadPayload.put("lastName", lead.getLastName());
+            leadPayload.put("domain", lead.getDomain());
+            leadPayload.put("orgId", lead.getOrgId());
 
-            Lead savedLead = leadRepository.save(lead);
-
-            return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "lead", Map.of(
-                            "id", savedLead.getId(),
-                            "email", savedLead.getEmail(),
-                            "firstName", savedLead.getFirstName(),
-                            "lastName", savedLead.getLastName(),
-                            "domain", savedLead.getDomain(),
-                            "orgId", savedLead.getOrgId())));
+            java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
+            payload.put("success", true);
+            payload.put("createdGlobal", createdGlobalHolder[0]);
+            payload.put("createdOrgLead", createdOrgLead);
+            payload.put("lead", leadPayload);
+            return ResponseEntity.ok(payload);
         } catch (Exception e) {
             log.error("Error creating lead from email: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body(Map.of("error", "Failed to create lead: " + e.getMessage()));
@@ -287,8 +310,8 @@ public class LeadEnrichmentController {
                         leads.size(), orgId, campaignId);
             } else {
                 log.info("Fetching all leads for organization: {}", orgId);
-                // Get all leads for the organization
-                leads = leadRepository.findByOrgId(orgId);
+                // Get all leads for the organization via org_leads mapping
+                leads = orgLeadService.getLeadsForOrg(orgId);
             }
 
             // Convert to DTO with campaign information
@@ -429,51 +452,53 @@ public class LeadEnrichmentController {
         }
 
         UUID orgId = getOrgIdOrForbidden(user);
-        log.info("Starting bulk lead creation - User: {}, Org: {}, Lead count: {}",
+        log.info("Starting org mapping for selected leads - User: {}, Org: {}, Count: {}",
                 user.getId(), orgId, request.getLeads().size());
 
         try {
-            List<Lead> leadsToCreate = new ArrayList<>();
             List<String> createdLeadIds = new ArrayList<>();
-
-            log.info("Processing {} leads for bulk creation", request.getLeads().size());
             log.info("Campaign ID: {}", request.getCampaignId());
 
+            // For each selected email: ensure global lead exists (hunter_api) and ensure
+            // org_leads mapping
             for (LeadData leadData : request.getLeads()) {
-                Lead lead = Lead.builder()
-                        .orgId(orgId)
-                        .firstName(leadData.getFirstName())
-                        .lastName(leadData.getLastName())
-                        .email(leadData.getEmail())
-                        .domain(leadData.getDomain())
-                        .position(leadData.getPosition())
-                        .positionRaw(leadData.getPositionRaw())
-                        .seniority(leadData.getSeniority())
-                        .department(leadData.getDepartment())
-                        .linkedinUrl(leadData.getLinkedinUrl())
-                        .confidenceScore(leadData.getConfidenceScore())
-                        .emailType(leadData.getEmailType())
-                        .verifiedStatus(leadData.getVerifiedStatus())
-                        .source("hunter_api")
-                        .build();
+                String email = leadData.getEmail() == null ? null : leadData.getEmail().trim().toLowerCase();
+                if (email == null || email.isBlank())
+                    continue;
 
-                leadsToCreate.add(lead);
+                // Find or create global lead (source=hunter_api)
+                Lead lead = leadRepository.findByEmailIgnoreCase(email).orElseGet(() -> {
+                    Lead newLead = Lead.builder()
+                            .orgId(UUID.fromString("b8470f71-e5c8-4974-b6af-3d7af17aa55c"))
+                            .firstName(leadData.getFirstName())
+                            .lastName(leadData.getLastName())
+                            .email(email)
+                            .domain(leadData.getDomain())
+                            .position(leadData.getPosition())
+                            .positionRaw(leadData.getPositionRaw())
+                            .seniority(leadData.getSeniority())
+                            .department(leadData.getDepartment())
+                            .linkedinUrl(leadData.getLinkedinUrl())
+                            .confidenceScore(leadData.getConfidenceScore())
+                            .emailType(leadData.getEmailType())
+                            .verifiedStatus(leadData.getVerifiedStatus())
+                            .source("hunter_api")
+                            .build();
+                    return leadRepository.save(newLead);
+                });
+
+                // Ensure org_leads mapping exists for this org and email
+                orgLeadService.ensureOrgLeadForEmail(orgId, email, "hunter_api");
+
+                createdLeadIds.add(lead.getId().toString());
             }
 
-            // Save all leads
-            List<Lead> savedLeads = leadRepository.saveAll(leadsToCreate);
-
-            // Extract IDs for response
-            for (Lead savedLead : savedLeads) {
-                createdLeadIds.add(savedLead.getId().toString());
-            }
-
-            log.info("Successfully created {} leads for user {} in organization {}",
-                    savedLeads.size(), user.getId(), orgId);
+            log.info("Successfully ensured org mappings for {} leads for org {}",
+                    createdLeadIds.size(), orgId);
 
             // If campaign ID is provided, add leads to campaign
             if (request.getCampaignId() != null) {
-                List<UUID> leadIds = savedLeads.stream().map(Lead::getId).toList();
+                List<UUID> leadIds = createdLeadIds.stream().map(UUID::fromString).toList();
                 log.info("Adding {} leads to campaign {} for user {}",
                         leadIds.size(), request.getCampaignId(), user.getId());
 
@@ -497,9 +522,9 @@ public class LeadEnrichmentController {
             }
 
             return ResponseEntity.ok(Map.of(
-                    "message", "Leads created successfully",
+                    "message", "Org mappings ensured successfully",
                     "leadIds", createdLeadIds,
-                    "count", savedLeads.size()));
+                    "count", createdLeadIds.size()));
         } catch (Exception e) {
             log.error("Error creating leads: {}", e.getMessage(), e);
             e.printStackTrace(); // Add stack trace for debugging

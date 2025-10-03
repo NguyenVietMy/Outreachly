@@ -1,6 +1,8 @@
 package com.outreachly.outreachly.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.outreachly.outreachly.entity.Lead;
+import com.outreachly.outreachly.repository.LeadRepository;
 import com.outreachly.outreachly.entity.Company;
 import com.outreachly.outreachly.entity.User;
 import com.outreachly.outreachly.service.CompanyService;
@@ -24,8 +26,9 @@ import java.util.UUID;
 public class CompanyController {
 
     private final CompanyService companyService;
-    private final HunterClient hunterClient;
+    private final LeadRepository leadRepository;
     private final UserService userService;
+    private final HunterClient hunterClient;
 
     @GetMapping
     public ResponseEntity<?> getCompanies(
@@ -38,10 +41,8 @@ public class CompanyController {
             Authentication authentication) {
 
         try {
-            User user = getUser(authentication);
-            if (user == null) {
-                return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-            }
+            // Auth not required for global read; endpoint still protected by security
+            // config
 
             // Companies are global (NULL org id) - show ALL companies
             UUID orgId = null;
@@ -142,8 +143,10 @@ public class CompanyController {
     }
 
     @GetMapping("/{id}/find-emails")
-    public ResponseEntity<?> findEmails(@PathVariable UUID id, @RequestParam(defaultValue = "10") int limit) {
+    public ResponseEntity<?> findEmails(@PathVariable UUID id, @RequestParam(defaultValue = "10") int limit,
+            Authentication authentication) {
         try {
+            // auth context not used for global persistence
             log.info("Finding emails for company: id='{}', limit={}", id, limit);
 
             Company company = companyService.getCompanyById(id)
@@ -216,10 +219,95 @@ public class CompanyController {
                 }
             }
 
+            // Persist ALL found emails into global leads (if missing)
+            try {
+                if (domainSearchResult.has("data") && domainSearchResult.get("data").has("emails")) {
+                    JsonNode emails = domainSearchResult.get("data").get("emails");
+                    for (JsonNode e : emails) {
+                        String value = safeText(e, "value");
+                        if (value == null || value.isBlank())
+                            continue;
+
+                        String email = value.toLowerCase();
+                        if (leadRepository.findByEmailIgnoreCase(email).isEmpty()) {
+                            Lead toSave = Lead.builder()
+                                    .orgId(java.util.UUID.fromString("b8470f71-e5c8-4974-b6af-3d7af17aa55c"))
+                                    .email(email)
+                                    .firstName(safeText(e, "first_name"))
+                                    .lastName(safeText(e, "last_name"))
+                                    .domain(company.getDomain())
+                                    .position(safeText(e, "position"))
+                                    .positionRaw(safeText(e, "position_raw"))
+                                    .seniority(safeText(e, "seniority"))
+                                    .department(safeText(e, "department"))
+                                    .linkedinUrl(safeText(e, "linkedin"))
+                                    .twitter(safeText(e, "twitter"))
+                                    .confidenceScore(safeInt(e, "confidence"))
+                                    .emailType(mapEmailType(safeText(e, "type")))
+                                    .verifiedStatus(mapVerificationStatus(pathText(e, "verification", "status")))
+                                    .source("hunter_api")
+                                    .build();
+                            leadRepository.save(toSave);
+                        }
+                    }
+                }
+            } catch (Exception persistEx) {
+                log.warn("Persisting global leads from domain search failed: {}", persistEx.getMessage());
+            }
+
             return ResponseEntity.ok(domainSearchResult);
         } catch (Exception e) {
             log.error("Error finding emails for company {}: {}", id, e.getMessage(), e);
             return ResponseEntity.status(500).body(Map.of("error", "Failed to find emails: " + e.getMessage()));
+        }
+    }
+
+    private String safeText(JsonNode node, String field) {
+        return (node != null && node.has(field) && !node.get(field).isNull()) ? node.get(field).asText() : null;
+    }
+
+    private String pathText(JsonNode node, String field, String subfield) {
+        if (node != null && node.has(field) && !node.get(field).isNull()) {
+            JsonNode inner = node.get(field);
+            return (inner.has(subfield) && !inner.get(subfield).isNull()) ? inner.get(subfield).asText() : null;
+        }
+        return null;
+    }
+
+    private Integer safeInt(JsonNode node, String field) {
+        return (node != null && node.has(field) && !node.get(field).isNull()) ? node.get(field).asInt() : null;
+    }
+
+    private Lead.EmailType mapEmailType(String type) {
+        if (type == null)
+            return Lead.EmailType.unknown;
+        switch (type.toLowerCase()) {
+            case "personal":
+                return Lead.EmailType.personal;
+            case "generic":
+                return Lead.EmailType.generic;
+            case "role":
+                return Lead.EmailType.role;
+            case "catch_all":
+            case "catchall":
+                return Lead.EmailType.catch_all;
+            default:
+                return Lead.EmailType.unknown;
+        }
+    }
+
+    private Lead.VerifiedStatus mapVerificationStatus(String status) {
+        if (status == null)
+            return Lead.VerifiedStatus.unknown;
+        switch (status) {
+            case "deliverable":
+                return Lead.VerifiedStatus.valid;
+            case "accept_all":
+                return Lead.VerifiedStatus.risky;
+            case "undeliverable":
+                return Lead.VerifiedStatus.invalid;
+            default:
+                return Lead.VerifiedStatus.unknown;
         }
     }
 
