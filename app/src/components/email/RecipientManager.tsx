@@ -27,6 +27,15 @@ import {
   Filter,
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { API_BASE_URL } from "@/lib/config";
 
 interface Recipient {
   email: string;
@@ -53,6 +62,21 @@ export function RecipientManager({
   const [newEmail, setNewEmail] = useState("");
   const [filter, setFilter] = useState<"all" | "valid" | "invalid">("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [showAddLeadModal, setShowAddLeadModal] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState("");
+  const [leadFormData, setLeadFormData] = useState({
+    firstName: "",
+    lastName: "",
+    domain: "",
+    phone: "",
+    linkedinUrl: "",
+    position: "",
+    positionRaw: "",
+    seniority: "",
+    department: "",
+    twitter: "",
+  });
+  const [isCreatingLead, setIsCreatingLead] = useState(false);
   const { toast } = useToast();
 
   // Initialize recipient list from props
@@ -70,7 +94,7 @@ export function RecipientManager({
     return emailRegex.test(email);
   };
 
-  const addRecipient = (email: string) => {
+  const addRecipient = async (email: string) => {
     if (!email.trim()) return;
 
     const trimmedEmail = email.trim();
@@ -93,22 +117,189 @@ export function RecipientManager({
       return;
     }
 
-    const newRecipient: Recipient = {
-      email: trimmedEmail,
-      isValid: validateEmail(trimmedEmail),
-      isVerified: false,
-    };
+    // Check if email exists in Lead DB
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/leads/check-email?email=${encodeURIComponent(trimmedEmail)}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+        }
+      );
 
-    const updatedList = [...recipientList, newRecipient];
-    setRecipientList(updatedList);
-    onRecipientsChange(updatedList.map((r) => r.email));
-    setNewEmail("");
+      if (response.ok) {
+        const data = await response.json();
+
+        if (data.exists) {
+          // Email exists in Lead DB, add directly using exact email from DB
+          const exactEmail = data.exactEmail || trimmedEmail;
+          const newRecipient: Recipient = {
+            email: exactEmail,
+            isValid: validateEmail(exactEmail),
+            isVerified: false,
+          };
+
+          const updatedList = [...recipientList, newRecipient];
+          setRecipientList(updatedList);
+          onRecipientsChange(updatedList.map((r) => r.email));
+          setNewEmail("");
+
+          toast({
+            title: "Lead Found",
+            description: `Added ${data.lead.firstName || ""} ${data.lead.lastName || ""} (${exactEmail}) from your leads`,
+          });
+        } else {
+          // Email doesn't exist, show modal to add lead
+          setPendingEmail(trimmedEmail);
+          setLeadFormData({
+            firstName: "",
+            lastName: "",
+            domain: trimmedEmail.split("@")[1] || "",
+            phone: "",
+            linkedinUrl: "",
+            position: "",
+            positionRaw: "",
+            seniority: "",
+            department: "",
+            twitter: "",
+          });
+          setShowAddLeadModal(true);
+        }
+      } else {
+        // Fallback: add without checking
+        const newRecipient: Recipient = {
+          email: trimmedEmail,
+          isValid: validateEmail(trimmedEmail),
+          isVerified: false,
+        };
+
+        const updatedList = [...recipientList, newRecipient];
+        setRecipientList(updatedList);
+        onRecipientsChange(updatedList.map((r) => r.email));
+        setNewEmail("");
+      }
+    } catch (error) {
+      // Fallback: add without checking
+      const newRecipient: Recipient = {
+        email: trimmedEmail,
+        isValid: validateEmail(trimmedEmail),
+        isVerified: false,
+      };
+
+      const updatedList = [...recipientList, newRecipient];
+      setRecipientList(updatedList);
+      onRecipientsChange(updatedList.map((r) => r.email));
+      setNewEmail("");
+    }
   };
 
   const removeRecipient = (index: number) => {
     const updatedList = recipientList.filter((_, i) => i !== index);
     setRecipientList(updatedList);
     onRecipientsChange(updatedList.map((r) => r.email));
+  };
+
+  const createLeadAndAddRecipient = async () => {
+    if (!pendingEmail.trim()) return;
+
+    setIsCreatingLead(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/leads/create-from-email`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            email: pendingEmail,
+            firstName: leadFormData.firstName.trim() || null,
+            lastName: leadFormData.lastName.trim() || null,
+            domain: leadFormData.domain.trim() || null,
+            phone: leadFormData.phone.trim() || null,
+            linkedinUrl: leadFormData.linkedinUrl.trim() || null,
+            position: leadFormData.position.trim() || null,
+            positionRaw: leadFormData.positionRaw.trim() || null,
+            seniority: leadFormData.seniority.trim() || null,
+            department: leadFormData.department.trim() || null,
+            twitter: leadFormData.twitter.trim() || null,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+
+        // Add recipient to list
+        const newRecipient: Recipient = {
+          email: pendingEmail,
+          isValid: validateEmail(pendingEmail),
+          isVerified: false,
+        };
+
+        const updatedList = [...recipientList, newRecipient];
+        setRecipientList(updatedList);
+        onRecipientsChange(updatedList.map((r) => r.email));
+        setNewEmail("");
+
+        // Close modal and reset form
+        setShowAddLeadModal(false);
+        setPendingEmail("");
+        setLeadFormData({
+          firstName: "",
+          lastName: "",
+          domain: "",
+          phone: "",
+          linkedinUrl: "",
+          position: "",
+          positionRaw: "",
+          seniority: "",
+          department: "",
+          twitter: "",
+        });
+
+        toast({
+          title: "Lead Created",
+          description: `Successfully created lead for ${pendingEmail}`,
+        });
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "Error Creating Lead",
+          description: errorData.error || "Failed to create lead",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error Creating Lead",
+        description: "Failed to create lead. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingLead(false);
+    }
+  };
+
+  const cancelAddLead = () => {
+    setShowAddLeadModal(false);
+    setPendingEmail("");
+    setLeadFormData({
+      firstName: "",
+      lastName: "",
+      domain: "",
+      phone: "",
+      linkedinUrl: "",
+      position: "",
+      positionRaw: "",
+      seniority: "",
+      department: "",
+      twitter: "",
+    });
   };
 
   const exportRecipients = () => {
@@ -327,6 +518,210 @@ export function RecipientManager({
           <AlertDescription>{errors.recipients}</AlertDescription>
         </Alert>
       )}
+
+      {/* Add Lead Modal */}
+      <Dialog open={showAddLeadModal} onOpenChange={setShowAddLeadModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add New Lead</DialogTitle>
+            <DialogDescription>
+              The email <strong>{pendingEmail}</strong> is not in your leads
+              database. Would you like to add this person as a new lead?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4 max-h-96 overflow-y-auto">
+            <div className="space-y-2">
+              <Label htmlFor="modal-email">Email</Label>
+              <Input
+                id="modal-email"
+                value={pendingEmail}
+                disabled
+                className="bg-gray-50"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="modal-firstName">First Name</Label>
+                <Input
+                  id="modal-firstName"
+                  value={leadFormData.firstName}
+                  onChange={(e) =>
+                    setLeadFormData((prev) => ({
+                      ...prev,
+                      firstName: e.target.value,
+                    }))
+                  }
+                  placeholder="Enter first name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="modal-lastName">Last Name</Label>
+                <Input
+                  id="modal-lastName"
+                  value={leadFormData.lastName}
+                  onChange={(e) =>
+                    setLeadFormData((prev) => ({
+                      ...prev,
+                      lastName: e.target.value,
+                    }))
+                  }
+                  placeholder="Enter last name"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="modal-domain">Company Domain</Label>
+              <Input
+                id="modal-domain"
+                value={leadFormData.domain}
+                onChange={(e) =>
+                  setLeadFormData((prev) => ({
+                    ...prev,
+                    domain: e.target.value,
+                  }))
+                }
+                placeholder="Enter company domain"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="modal-phone">Phone</Label>
+              <Input
+                id="modal-phone"
+                value={leadFormData.phone}
+                onChange={(e) =>
+                  setLeadFormData((prev) => ({
+                    ...prev,
+                    phone: e.target.value,
+                  }))
+                }
+                placeholder="Enter phone number"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="modal-linkedin">LinkedIn URL</Label>
+              <Input
+                id="modal-linkedin"
+                value={leadFormData.linkedinUrl}
+                onChange={(e) =>
+                  setLeadFormData((prev) => ({
+                    ...prev,
+                    linkedinUrl: e.target.value,
+                  }))
+                }
+                placeholder="https://linkedin.com/in/username"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="modal-position">Position</Label>
+                <Input
+                  id="modal-position"
+                  value={leadFormData.position}
+                  onChange={(e) =>
+                    setLeadFormData((prev) => ({
+                      ...prev,
+                      position: e.target.value,
+                    }))
+                  }
+                  placeholder="e.g., Software Engineer"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="modal-positionRaw">Position (Raw)</Label>
+                <Input
+                  id="modal-positionRaw"
+                  value={leadFormData.positionRaw}
+                  onChange={(e) =>
+                    setLeadFormData((prev) => ({
+                      ...prev,
+                      positionRaw: e.target.value,
+                    }))
+                  }
+                  placeholder="e.g., Senior Software Engineer"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="modal-seniority">Seniority</Label>
+                <Input
+                  id="modal-seniority"
+                  value={leadFormData.seniority}
+                  onChange={(e) =>
+                    setLeadFormData((prev) => ({
+                      ...prev,
+                      seniority: e.target.value,
+                    }))
+                  }
+                  placeholder="e.g., Senior, Junior, Manager"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="modal-department">Department</Label>
+                <Input
+                  id="modal-department"
+                  value={leadFormData.department}
+                  onChange={(e) =>
+                    setLeadFormData((prev) => ({
+                      ...prev,
+                      department: e.target.value,
+                    }))
+                  }
+                  placeholder="e.g., Engineering, Sales, Marketing"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="modal-twitter">Twitter</Label>
+              <Input
+                id="modal-twitter"
+                value={leadFormData.twitter}
+                onChange={(e) =>
+                  setLeadFormData((prev) => ({
+                    ...prev,
+                    twitter: e.target.value,
+                  }))
+                }
+                placeholder="@username or https://twitter.com/username"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={cancelAddLead}
+              disabled={isCreatingLead}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={createLeadAndAddRecipient}
+              disabled={isCreatingLead}
+            >
+              {isCreatingLead ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Creating...
+                </>
+              ) : (
+                "Create Lead & Add"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

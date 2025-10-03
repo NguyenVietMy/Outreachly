@@ -49,6 +49,100 @@ public class LeadEnrichmentController {
         return ResponseEntity.ok(Map.of("jobId", job.getId(), "status", job.getStatus()));
     }
 
+    @GetMapping("/check-email")
+    public ResponseEntity<?> checkEmailExists(@RequestParam String email, Authentication authentication) {
+        try {
+            User user = getUser(authentication);
+            if (user == null) {
+                return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+            }
+
+            // Convert email to lowercase for consistent checking
+            String normalizedEmail = email.toLowerCase().trim();
+
+            // Check if email exists in Lead DB (case-insensitive)
+            Optional<Lead> existingLead = leadRepository.findByEmailIgnoreCase(normalizedEmail);
+
+            if (existingLead.isPresent()) {
+                Lead lead = existingLead.get();
+                return ResponseEntity.ok(Map.of(
+                        "exists", true,
+                        "lead", Map.of(
+                                "id", lead.getId(),
+                                "email", lead.getEmail(),
+                                "firstName", lead.getFirstName(),
+                                "lastName", lead.getLastName(),
+                                "domain", lead.getDomain(),
+                                "orgId", lead.getOrgId()),
+                        "exactEmail", lead.getEmail() // Return the exact email from DB
+                ));
+            } else {
+                return ResponseEntity.ok(Map.of(
+                        "exists", false,
+                        "email", normalizedEmail));
+            }
+        } catch (Exception e) {
+            log.error("Error checking email existence: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to check email: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/create-from-email")
+    public ResponseEntity<?> createLeadFromEmail(@RequestBody CreateLeadFromEmailRequest request,
+            Authentication authentication) {
+        try {
+            User user = getUser(authentication);
+            if (user == null) {
+                return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+            }
+
+            UUID orgId = user.getOrgId();
+            if (orgId == null) {
+                return ResponseEntity.status(403).body(Map.of("error", "Organization required"));
+            }
+
+            // Convert email to lowercase for consistency
+            String normalizedEmail = request.getEmail().toLowerCase().trim();
+
+            // Check if email already exists
+            Optional<Lead> existingLead = leadRepository.findByEmailIgnoreCase(normalizedEmail);
+            if (existingLead.isPresent()) {
+                return ResponseEntity.status(400).body(Map.of("error", "Lead with this email already exists"));
+            }
+
+            // Create new lead
+            Lead lead = Lead.builder()
+                    .orgId(orgId)
+                    .email(normalizedEmail)
+                    .firstName(request.getFirstName() != null ? request.getFirstName().trim() : null)
+                    .lastName(request.getLastName() != null ? request.getLastName().trim() : null)
+                    .domain(request.getDomain() != null ? request.getDomain().trim() : null)
+                    .phone(request.getPhone() != null ? request.getPhone().trim() : null)
+                    .linkedinUrl(request.getLinkedinUrl() != null ? request.getLinkedinUrl().trim() : null)
+                    .position(request.getPosition() != null ? request.getPosition().trim() : null)
+                    .positionRaw(request.getPositionRaw() != null ? request.getPositionRaw().trim() : null)
+                    .seniority(request.getSeniority() != null ? request.getSeniority().trim() : null)
+                    .department(request.getDepartment() != null ? request.getDepartment().trim() : null)
+                    .twitter(request.getTwitter() != null ? request.getTwitter().trim() : null)
+                    .build();
+
+            Lead savedLead = leadRepository.save(lead);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "lead", Map.of(
+                            "id", savedLead.getId(),
+                            "email", savedLead.getEmail(),
+                            "firstName", savedLead.getFirstName(),
+                            "lastName", savedLead.getLastName(),
+                            "domain", savedLead.getDomain(),
+                            "orgId", savedLead.getOrgId())));
+        } catch (Exception e) {
+            log.error("Error creating lead from email: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to create lead: " + e.getMessage()));
+        }
+    }
+
     @PostMapping("/enrich")
     public ResponseEntity<?> enrichList(@RequestParam("list") UUID listId, Authentication authentication) {
         User user = getUser(authentication);
@@ -740,6 +834,108 @@ public class LeadEnrichmentController {
 
         public void setVerifiedStatus(Lead.VerifiedStatus verifiedStatus) {
             this.verifiedStatus = verifiedStatus;
+        }
+    }
+
+    public static class CreateLeadFromEmailRequest {
+        private String email;
+        private String firstName;
+        private String lastName;
+        private String domain;
+        private String phone;
+        private String linkedinUrl;
+        private String position;
+        private String positionRaw;
+        private String seniority;
+        private String department;
+        private String twitter;
+
+        public String getEmail() {
+            return email;
+        }
+
+        public void setEmail(String email) {
+            this.email = email;
+        }
+
+        public String getFirstName() {
+            return firstName;
+        }
+
+        public void setFirstName(String firstName) {
+            this.firstName = firstName;
+        }
+
+        public String getLastName() {
+            return lastName;
+        }
+
+        public void setLastName(String lastName) {
+            this.lastName = lastName;
+        }
+
+        public String getDomain() {
+            return domain;
+        }
+
+        public void setDomain(String domain) {
+            this.domain = domain;
+        }
+
+        public String getPhone() {
+            return phone;
+        }
+
+        public void setPhone(String phone) {
+            this.phone = phone;
+        }
+
+        public String getLinkedinUrl() {
+            return linkedinUrl;
+        }
+
+        public void setLinkedinUrl(String linkedinUrl) {
+            this.linkedinUrl = linkedinUrl;
+        }
+
+        public String getPosition() {
+            return position;
+        }
+
+        public void setPosition(String position) {
+            this.position = position;
+        }
+
+        public String getPositionRaw() {
+            return positionRaw;
+        }
+
+        public void setPositionRaw(String positionRaw) {
+            this.positionRaw = positionRaw;
+        }
+
+        public String getSeniority() {
+            return seniority;
+        }
+
+        public void setSeniority(String seniority) {
+            this.seniority = seniority;
+        }
+
+        public String getDepartment() {
+            return department;
+        }
+
+        public void setDepartment(String department) {
+            this.department = department;
+        }
+
+        public String getTwitter() {
+            return twitter;
+        }
+
+        public void setTwitter(String twitter) {
+            this.twitter = twitter;
         }
     }
 }

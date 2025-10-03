@@ -30,4 +30,7 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
 
     @Query("SELECT DISTINCT l FROM Lead l LEFT JOIN FETCH l.campaignLeads cl LEFT JOIN FETCH cl.campaign WHERE l.id = :id")
     Optional<Lead> findByIdWithCampaigns(@Param("id") UUID id);
+
+    @Query("SELECT l FROM Lead l WHERE LOWER(l.email) = LOWER(:email)")
+    Optional<Lead> findByEmailIgnoreCase(@Param("email") String email);
 }
