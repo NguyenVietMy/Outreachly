@@ -134,8 +134,27 @@ export function RecipientManager({
         const data = await response.json();
 
         if (data.exists) {
-          // Email exists in Lead DB, add directly using exact email from DB
           const exactEmail = data.exactEmail || trimmedEmail;
+
+          // If global exists but org mapping doesn't, create org_leads mapping
+          if (data.existsGlobal && !data.existsOrg) {
+            try {
+              await fetch(`${API_BASE_URL}/api/leads/create-from-email`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({
+                  email: trimmedEmail,
+                  firstName: data.lead?.firstName || null,
+                  lastName: data.lead?.lastName || null,
+                  domain: data.lead?.domain || null,
+                }),
+              });
+            } catch (e) {
+              // non-fatal; continue to add recipient
+            }
+          }
+
           const newRecipient: Recipient = {
             email: exactEmail,
             isValid: validateEmail(exactEmail),
@@ -148,8 +167,10 @@ export function RecipientManager({
           setNewEmail("");
 
           toast({
-            title: "Lead Found",
-            description: `Added ${data.lead.firstName || ""} ${data.lead.lastName || ""} (${exactEmail}) from your leads`,
+            title: data.existsOrg ? "Lead Found" : "Lead Mapped",
+            description: data.existsOrg
+              ? `Added ${data.lead?.firstName || ""} ${data.lead?.lastName || ""} (${exactEmail}) from your leads`
+              : `Created org mapping and added ${exactEmail}`,
           });
         } else {
           // Email doesn't exist, show modal to add lead
