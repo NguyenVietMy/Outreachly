@@ -300,8 +300,12 @@ public class LeadEnrichmentController {
                 // Get leads through campaign-lead relationship
                 List<Lead> campaignLeads = campaignLeadService.getActiveLeadsForCampaign(campaignId);
 
+                // Restrict to leads that are mapped to the user's organization via org_leads
+                java.util.Set<java.util.UUID> orgLeadIds = new java.util.HashSet<>(
+                        orgLeadService.getLeadsForOrg(orgId).stream().map(Lead::getId).toList());
+
                 leads = campaignLeads.stream()
-                        .filter(lead -> lead.getOrgId().equals(orgId))
+                        .filter(lead -> orgLeadIds.contains(lead.getId()))
                         .toList();
 
                 log.info("Filtered to {} leads belonging to organization {} for campaign {}",
@@ -341,9 +345,9 @@ public class LeadEnrichmentController {
         try {
             List<Lead> leads = leadRepository.findAllById(request.getLeadIds());
 
-            // Filter leads that belong to the user's organization
+            // Filter leads that are mapped to the user's organization via org_leads
             List<Lead> userLeads = leads.stream()
-                    .filter(lead -> lead.getOrgId().equals(orgId))
+                    .filter(lead -> orgLeadService.hasMapping(orgId, lead.getId()))
                     .toList();
 
             log.info("Filtered to {} leads belonging to organization {} out of {} total leads",
@@ -388,11 +392,15 @@ public class LeadEnrichmentController {
 
         try {
             Lead lead = leadRepository.findById(id)
-                    .filter(l -> l.getOrgId().equals(orgId))
                     .orElseThrow(() -> {
-                        log.warn("Lead not found or not accessible - Lead ID: {}, User Org: {}", id, orgId);
+                        log.warn("Lead not found - Lead ID: {}", id);
                         return new IllegalArgumentException("Lead not found");
                     });
+
+            if (!orgLeadService.hasMapping(orgId, lead.getId())) {
+                log.warn("Lead not accessible for org - Lead ID: {}, Org: {}", id, orgId);
+                return ResponseEntity.status(403).body(Map.of("error", "Lead not accessible for this organization"));
+            }
 
             // Create campaign-lead relationship using service
             campaignLeadService.addLeadToCampaign(request.getCampaignId(), lead.getId(), user.getId());
@@ -421,9 +429,9 @@ public class LeadEnrichmentController {
         try {
             List<Lead> leads = leadRepository.findAllById(request.getLeadIds());
 
-            // Filter leads that belong to the user's organization
+            // Filter leads that are mapped to the user's organization via org_leads
             List<Lead> userLeads = leads.stream()
-                    .filter(lead -> lead.getOrgId().equals(orgId))
+                    .filter(lead -> orgLeadService.hasMapping(orgId, lead.getId()))
                     .toList();
 
             // Remove campaign-lead relationships using service

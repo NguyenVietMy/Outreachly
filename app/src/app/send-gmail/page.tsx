@@ -48,6 +48,7 @@ import { RichTextEditor } from "@/components/email/RichTextEditor";
 import DashboardLayout from "@/components/DashboardLayout";
 import AuthGuard from "@/components/AuthGuard";
 import { useLeads, Lead } from "@/hooks/useLeads";
+import TemplateBrowserModal from "@/components/templates/TemplateBrowserModal";
 
 interface GmailFormData {
   recipients: string[];
@@ -958,91 +959,19 @@ export default function SendGmailPage() {
           </div>
         </div>
 
-        {/* Template Modal */}
-        <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
-          <DialogContent className="w-1/4 max-w-md h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Email Templates</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3">
-              {templates.length > 0 ? (
-                <div className="space-y-3">
-                  {templates.map((template) => (
-                    <Card
-                      key={template.id}
-                      className={`hover:shadow-md transition-all cursor-pointer ${
-                        formData.templateId === template.id
-                          ? "ring-2 ring-blue-500 bg-blue-50"
-                          : "hover:bg-gray-50"
-                      }`}
-                      onClick={() => {
-                        if (formData.templateId === template.id) {
-                          // If already selected, use it
-                          loadTemplate(template);
-                        } else {
-                          // If not selected, select it
-                          setFormData((prev) => ({
-                            ...prev,
-                            templateId: template.id,
-                          }));
-                        }
-                      }}
-                    >
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">
-                          {template.name}
-                        </CardTitle>
-                        <Badge variant="secondary" className="w-fit text-xs">
-                          {template.category || "No tag"}
-                        </Badge>
-                      </CardHeader>
-                      <CardContent className="pt-0 pb-4">
-                        <div className="text-xs text-gray-600 space-y-2">
-                          {template.subject && (
-                            <div>
-                              <strong>Subject:</strong> {template.subject}
-                            </div>
-                          )}
-                          {template.contentJson && (
-                            <div className="text-xs text-gray-500 line-clamp-3">
-                              {(() => {
-                                try {
-                                  const contentData = JSON.parse(
-                                    template.contentJson || "{}"
-                                  );
-                                  const content =
-                                    contentData.body ||
-                                    contentData.content ||
-                                    "";
-                                  return content.length > 100
-                                    ? content.substring(0, 100) + "..."
-                                    : content;
-                                } catch {
-                                  return "Template content preview unavailable";
-                                }
-                              })()}
-                            </div>
-                          )}
-                          <div className="text-xs text-gray-500">
-                            Platform: {template.platform}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <p className="text-lg font-medium">No templates available</p>
-                  <p className="text-sm">
-                    Create templates in the Templates page first
-                  </p>
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
+        <TemplateBrowserModal
+          open={showTemplates}
+          onOpenChange={setShowTemplates}
+          platform="EMAIL"
+          selectedTemplateId={formData.templateId || null}
+          onSelect={(t: any) =>
+            setFormData((prev) => ({
+              ...prev,
+              templateId: t.id,
+            }))
+          }
+          onUse={(t: any) => loadTemplate(t as unknown as EmailTemplate)}
+        />
       </DashboardLayout>
     </AuthGuard>
   );

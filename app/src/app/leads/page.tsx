@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import AuthGuard from "@/components/AuthGuard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,14 +43,10 @@ import {
 } from "lucide-react";
 import { useLeads, Lead } from "@/hooks/useLeads";
 import { useCampaigns, Campaign } from "@/hooks/useCampaigns";
+import { listTemplates, parseContent, TemplateModel } from "@/lib/templates";
+import TemplateBrowserModal from "@/components/templates/TemplateBrowserModal";
 
-// Mock data for demonstration (keeping for templates and activities)
-
-const mockTemplates = [
-  { id: "1", name: "Welcome Email", description: "Initial outreach template" },
-  { id: "2", name: "Follow-up Email", description: "Second touch template" },
-  { id: "3", name: "Product Demo", description: "Demo request template" },
-];
+// Activity mock stays for now; templates will be fetched live
 
 const mockActivities = [
   {
@@ -109,7 +105,13 @@ export default function LeadsPage() {
   const [showLeadModal, setShowLeadModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showTemplatePreview, setShowTemplatePreview] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+  const [selectedTemplate, setSelectedTemplate] =
+    useState<TemplateModel | null>(null);
+  const [recentTemplates, setRecentTemplates] = useState<TemplateModel[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templatesError, setTemplatesError] = useState<string | null>(null);
+  const [allTemplates, setAllTemplates] = useState<TemplateModel[]>([]);
+  const [showAllTemplates, setShowAllTemplates] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [showCreateCampaign, setShowCreateCampaign] = useState(false);
@@ -269,6 +271,30 @@ export default function LeadsPage() {
     });
     setSearchTerm("");
   };
+
+  // Load recent templates (latest 3)
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      setTemplatesLoading(true);
+      setTemplatesError(null);
+      try {
+        const templates = await listTemplates();
+        if (!mounted) return;
+        setAllTemplates(templates);
+        setRecentTemplates(templates.slice(0, 3));
+      } catch (e: any) {
+        if (!mounted) return;
+        setTemplatesError(e?.message || "Failed to load templates");
+      } finally {
+        if (mounted) setTemplatesLoading(false);
+      }
+    };
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const getActiveFiltersCount = () => {
     let count = 0;
@@ -1040,28 +1066,53 @@ export default function LeadsPage() {
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle>Recent Templates</CardTitle>
-                <Button variant="outline">View All Templates</Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowAllTemplates(true)}
+                >
+                  View All Templates
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {mockTemplates.map((template) => (
-                  <div
-                    key={template.id}
-                    className="p-4 border rounded-lg cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleTemplatePreview(template)}
-                  >
-                    <h3 className="font-medium">{template.name}</h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {template.description}
-                    </p>
-                    <Button size="sm" variant="ghost" className="mt-2">
-                      <Eye className="w-4 h-4 mr-1" />
-                      Preview
-                    </Button>
-                  </div>
-                ))}
-              </div>
+              {templatesLoading ? (
+                <div className="text-sm text-muted-foreground">
+                  Loading templates...
+                </div>
+              ) : templatesError ? (
+                <div className="text-sm text-red-600">{templatesError}</div>
+              ) : recentTemplates.length === 0 ? (
+                <div className="text-sm text-muted-foreground">
+                  No templates yet. Create one in Templates.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {recentTemplates.map((t) => {
+                    const content = parseContent<any>(t.contentJson);
+                    return (
+                      <div
+                        key={t.id}
+                        className="p-4 border rounded-lg cursor-pointer hover:bg-gray-50"
+                        onClick={() => handleTemplatePreview(t)}
+                      >
+                        <h3 className="font-medium">{t.name}</h3>
+                        {t.platform === "EMAIL" && content?.subject && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {content.subject}
+                          </p>
+                        )}
+                        <p className="text-sm text-muted-foreground mt-1 line-clamp-3">
+                          {content?.body || ""}
+                        </p>
+                        <Button size="sm" variant="ghost" className="mt-2">
+                          <Eye className="w-4 h-4 mr-1" />
+                          Preview
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -1260,6 +1311,15 @@ export default function LeadsPage() {
           </DialogContent>
         </Dialog>
 
+        {/* All Templates Modal - Reuse shared browser */}
+        <TemplateBrowserModal
+          open={showAllTemplates}
+          onOpenChange={setShowAllTemplates}
+          platform="ALL"
+          onSelect={(t: TemplateModel) => setSelectedTemplate(t)}
+          onUse={(t: TemplateModel) => handleTemplatePreview(t)}
+        />
+
         {/* Template Preview Modal */}
         <Dialog
           open={showTemplatePreview}
@@ -1272,14 +1332,26 @@ export default function LeadsPage() {
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              <p className="text-muted-foreground">
-                {selectedTemplate?.description}
-              </p>
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm">
-                  [Template content would be displayed here]
-                </p>
-              </div>
+              {selectedTemplate && (
+                <div className="space-y-2">
+                  {selectedTemplate.platform === "EMAIL" && (
+                    <div>
+                      <p className="text-xs text-gray-500">Subject</p>
+                      <div className="p-3 bg-gray-50 rounded text-sm">
+                        {parseContent<any>(selectedTemplate.contentJson)
+                          ?.subject || ""}
+                      </div>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-xs text-gray-500">Content</p>
+                    <div className="p-3 bg-gray-50 rounded text-sm whitespace-pre-wrap">
+                      {parseContent<any>(selectedTemplate.contentJson)?.body ||
+                        ""}
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="flex gap-2">
                 <Button>Use Template</Button>
                 <Button variant="outline">Close</Button>
