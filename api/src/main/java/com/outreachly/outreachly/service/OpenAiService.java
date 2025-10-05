@@ -71,7 +71,8 @@ public class OpenAiService {
 
         prompt.append("\nRequirements:\n");
         prompt.append(
-                "- Use variables like {{first_name}}, {{last_name}}, {{company}}, {{title}} for personalization\n");
+                "- ONLY use these exact variables for personalization: {{first_name}}, {{last_name}}, {{company}}, {{title}}\n");
+        prompt.append("- DO NOT use any other variables like {{industry}}, {{position}}, {{department}}, etc.\n");
         prompt.append("- Keep emails under 150 words for better engagement\n");
         prompt.append("- Make subject lines compelling and under 50 characters\n");
         prompt.append("- Include a clear call-to-action\n");

@@ -10,6 +10,7 @@ import com.outreachly.outreachly.repository.CampaignRepository;
 import com.outreachly.outreachly.entity.Lead;
 import com.outreachly.outreachly.entity.Campaign;
 import com.outreachly.outreachly.service.CampaignLeadService;
+import com.outreachly.outreachly.repository.OrgLeadRepository;
 import com.outreachly.outreachly.service.OrgLeadService;
 import com.outreachly.outreachly.service.EnrichmentService;
 import com.outreachly.outreachly.service.EnrichmentPreviewService;
@@ -36,6 +37,10 @@ public class LeadEnrichmentController {
     private final CampaignLeadService campaignLeadService;
     private final CampaignRepository campaignRepository;
     private final OrgLeadService orgLeadService;
+    private final OrgLeadRepository orgLeadRepository;
+
+    private static final java.util.UUID GLOBAL_ORG_ID = java.util.UUID
+            .fromString("b8470f71-e5c8-4974-b6af-3d7af17aa55c");
 
     @PostMapping("/{id}/enrich")
     public ResponseEntity<?> enrichLead(@PathVariable UUID id, Authentication authentication) {
@@ -47,6 +52,388 @@ public class LeadEnrichmentController {
         EnrichmentJob job = enrichmentService.createJob(orgId, id);
         // Let the scheduled processor handle the job to avoid race conditions
         return ResponseEntity.ok(Map.of("jobId", job.getId(), "status", job.getStatus()));
+    }
+
+    // Create a lead (global + org mapping) with edge cases
+    @PostMapping
+    public ResponseEntity<?> createLead(@RequestBody CreateLeadRequest request, Authentication authentication) {
+        try {
+            User user = getUser(authentication);
+            if (user == null)
+                return ResponseEntity.status(401).build();
+
+            UUID orgId = getOrgIdOrForbidden(user);
+
+            String email = request.getEmail() == null ? null : request.getEmail().trim().toLowerCase();
+            String firstName = request.getFirstName() == null ? null : request.getFirstName().trim();
+
+            if (email == null || email.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "email is required"));
+            }
+            if (firstName == null || firstName.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "firstName is required"));
+            }
+
+            var existingGlobal = leadRepository.findByEmailIgnoreCase(email);
+            boolean existsGlobal = existingGlobal.isPresent();
+            boolean existsOrg = orgLeadService.findOrgLeadByEmail(orgId, email).isPresent();
+
+            if (existsGlobal && existsOrg) {
+                return ResponseEntity.badRequest().body(Map.of("error", "This email already exists in your contact"));
+            }
+
+            Lead lead;
+            if (existsGlobal) {
+                // Only create org mapping
+                lead = existingGlobal.get();
+                orgLeadService.ensureOrgLeadForEmail(orgId, email, "user_created");
+            } else {
+                // Create global lead then org mapping
+                lead = Lead.builder()
+                        .orgId(GLOBAL_ORG_ID)
+                        .email(email)
+                        .firstName(firstName)
+                        .lastName(request.getLastName())
+                        .domain(request.getDomain())
+                        .phone(request.getPhone())
+                        .linkedinUrl(request.getLinkedinUrl())
+                        .position(request.getPosition())
+                        .positionRaw(request.getPositionRaw())
+                        .seniority(request.getSeniority())
+                        .department(request.getDepartment())
+                        .twitter(request.getTwitter())
+                        .emailType(request.getEmailType())
+                        .verifiedStatus(request.getVerifiedStatus())
+                        .customTextField(request.getCustomTextField())
+                        .source("user_created")
+                        .build();
+                lead = leadRepository.save(lead);
+                orgLeadService.ensureOrgLeadForEmail(orgId, email, "user_created");
+            }
+
+            return ResponseEntity
+                    .ok(LeadWithCampaignsDto.fromLead(leadRepository.findByIdWithCampaigns(lead.getId()).orElse(lead)));
+        } catch (Exception e) {
+            log.error("Error creating lead: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to create lead: " + e.getMessage()));
+        }
+    }
+
+    // Update a lead (global record) with allowed fields only; email immutable
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateLead(@PathVariable UUID id, @RequestBody UpdateLeadRequest request,
+            Authentication authentication) {
+        try {
+            User user = getUser(authentication);
+            if (user == null)
+                return ResponseEntity.status(401).build();
+
+            UUID orgId = getOrgIdOrForbidden(user);
+
+            if (!orgLeadService.hasMapping(orgId, id)) {
+                return ResponseEntity.status(403).body(Map.of("error", "Lead not accessible for this organization"));
+            }
+
+            Lead lead = leadRepository.findById(id)
+                    .orElseThrow(() -> new IllegalArgumentException("Lead not found"));
+
+            // Do not allow email or source or confidenceScore changes
+            if (request.getFirstName() != null)
+                lead.setFirstName(request.getFirstName().trim());
+            if (request.getLastName() != null)
+                lead.setLastName(request.getLastName().trim());
+            if (request.getPosition() != null)
+                lead.setPosition(request.getPosition().trim());
+            if (request.getPositionRaw() != null)
+                lead.setPositionRaw(request.getPositionRaw().trim());
+            if (request.getSeniority() != null)
+                lead.setSeniority(request.getSeniority().trim());
+            if (request.getDepartment() != null)
+                lead.setDepartment(request.getDepartment().trim());
+            if (request.getPhone() != null)
+                lead.setPhone(request.getPhone().trim());
+            if (request.getDomain() != null)
+                lead.setDomain(request.getDomain().trim());
+            if (request.getLinkedinUrl() != null)
+                lead.setLinkedinUrl(request.getLinkedinUrl().trim());
+            if (request.getTwitter() != null)
+                lead.setTwitter(request.getTwitter().trim());
+            if (request.getCustomTextField() != null)
+                lead.setCustomTextField(request.getCustomTextField());
+            if (request.getEmailType() != null)
+                lead.setEmailType(request.getEmailType());
+            // verifiedStatus, confidenceScore, source, email are immutable here
+
+            lead = leadRepository.save(lead);
+            return ResponseEntity
+                    .ok(LeadWithCampaignsDto.fromLead(leadRepository.findByIdWithCampaigns(lead.getId()).orElse(lead)));
+        } catch (Exception e) {
+            log.error("Error updating lead {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to update lead: " + e.getMessage()));
+        }
+    }
+
+    // Delete mapping for user's org (does not delete global lead)
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteLeadForOrg(@PathVariable UUID id, Authentication authentication) {
+        try {
+            User user = getUser(authentication);
+            if (user == null)
+                return ResponseEntity.status(401).build();
+
+            UUID orgId = getOrgIdOrForbidden(user);
+
+            var mapping = orgLeadRepository.findByOrgIdAndLeadId(orgId, id);
+            if (mapping.isEmpty()) {
+                return ResponseEntity.status(404).body(Map.of("error", "Lead not found in your organization"));
+            }
+            orgLeadRepository.delete(mapping.get());
+            return ResponseEntity.ok(Map.of("message", "Lead removed from your organization"));
+        } catch (Exception e) {
+            log.error("Error deleting org lead mapping for {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to delete lead: " + e.getMessage()));
+        }
+    }
+
+    // Request DTOs for create/update
+    public static class CreateLeadRequest {
+        private String email;
+        private String firstName;
+        private String lastName;
+        private String domain;
+        private String phone;
+        private String linkedinUrl;
+        private String position;
+        private String positionRaw;
+        private String seniority;
+        private String department;
+        private String twitter;
+        private Lead.EmailType emailType;
+        private Lead.VerifiedStatus verifiedStatus;
+        private String customTextField;
+
+        public String getEmail() {
+            return email;
+        }
+
+        public void setEmail(String email) {
+            this.email = email;
+        }
+
+        public String getFirstName() {
+            return firstName;
+        }
+
+        public void setFirstName(String firstName) {
+            this.firstName = firstName;
+        }
+
+        public String getLastName() {
+            return lastName;
+        }
+
+        public void setLastName(String lastName) {
+            this.lastName = lastName;
+        }
+
+        public String getDomain() {
+            return domain;
+        }
+
+        public void setDomain(String domain) {
+            this.domain = domain;
+        }
+
+        public String getPhone() {
+            return phone;
+        }
+
+        public void setPhone(String phone) {
+            this.phone = phone;
+        }
+
+        public String getLinkedinUrl() {
+            return linkedinUrl;
+        }
+
+        public void setLinkedinUrl(String linkedinUrl) {
+            this.linkedinUrl = linkedinUrl;
+        }
+
+        public String getPosition() {
+            return position;
+        }
+
+        public void setPosition(String position) {
+            this.position = position;
+        }
+
+        public String getPositionRaw() {
+            return positionRaw;
+        }
+
+        public void setPositionRaw(String positionRaw) {
+            this.positionRaw = positionRaw;
+        }
+
+        public String getSeniority() {
+            return seniority;
+        }
+
+        public void setSeniority(String seniority) {
+            this.seniority = seniority;
+        }
+
+        public String getDepartment() {
+            return department;
+        }
+
+        public void setDepartment(String department) {
+            this.department = department;
+        }
+
+        public String getTwitter() {
+            return twitter;
+        }
+
+        public void setTwitter(String twitter) {
+            this.twitter = twitter;
+        }
+
+        public Lead.EmailType getEmailType() {
+            return emailType;
+        }
+
+        public void setEmailType(Lead.EmailType emailType) {
+            this.emailType = emailType;
+        }
+
+        public Lead.VerifiedStatus getVerifiedStatus() {
+            return verifiedStatus;
+        }
+
+        public void setVerifiedStatus(Lead.VerifiedStatus verifiedStatus) {
+            this.verifiedStatus = verifiedStatus;
+        }
+
+        public String getCustomTextField() {
+            return customTextField;
+        }
+
+        public void setCustomTextField(String customTextField) {
+            this.customTextField = customTextField;
+        }
+    }
+
+    public static class UpdateLeadRequest {
+        private String firstName;
+        private String lastName;
+        private String domain;
+        private String phone;
+        private String linkedinUrl;
+        private String position;
+        private String positionRaw;
+        private String seniority;
+        private String department;
+        private String twitter;
+        private String customTextField;
+        private Lead.EmailType emailType;
+
+        public String getFirstName() {
+            return firstName;
+        }
+
+        public void setFirstName(String firstName) {
+            this.firstName = firstName;
+        }
+
+        public String getLastName() {
+            return lastName;
+        }
+
+        public void setLastName(String lastName) {
+            this.lastName = lastName;
+        }
+
+        public String getDomain() {
+            return domain;
+        }
+
+        public void setDomain(String domain) {
+            this.domain = domain;
+        }
+
+        public String getPhone() {
+            return phone;
+        }
+
+        public void setPhone(String phone) {
+            this.phone = phone;
+        }
+
+        public String getLinkedinUrl() {
+            return linkedinUrl;
+        }
+
+        public void setLinkedinUrl(String linkedinUrl) {
+            this.linkedinUrl = linkedinUrl;
+        }
+
+        public String getPosition() {
+            return position;
+        }
+
+        public void setPosition(String position) {
+            this.position = position;
+        }
+
+        public String getPositionRaw() {
+            return positionRaw;
+        }
+
+        public void setPositionRaw(String positionRaw) {
+            this.positionRaw = positionRaw;
+        }
+
+        public String getSeniority() {
+            return seniority;
+        }
+
+        public void setSeniority(String seniority) {
+            this.seniority = seniority;
+        }
+
+        public String getDepartment() {
+            return department;
+        }
+
+        public void setDepartment(String department) {
+            this.department = department;
+        }
+
+        public String getTwitter() {
+            return twitter;
+        }
+
+        public void setTwitter(String twitter) {
+            this.twitter = twitter;
+        }
+
+        public String getCustomTextField() {
+            return customTextField;
+        }
+
+        public void setCustomTextField(String customTextField) {
+            this.customTextField = customTextField;
+        }
+
+        public Lead.EmailType getEmailType() {
+            return emailType;
+        }
+
+        public void setEmailType(Lead.EmailType emailType) {
+            this.emailType = emailType;
+        }
     }
 
     @GetMapping("/check-email")

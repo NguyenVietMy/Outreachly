@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 import { useLeads, Lead } from "@/hooks/useLeads";
 import { useCampaigns, Campaign } from "@/hooks/useCampaigns";
+import Link from "next/link";
 import { listTemplates, parseContent, TemplateModel } from "@/lib/templates";
 import TemplateBrowserModal from "@/components/templates/TemplateBrowserModal";
 
@@ -432,6 +433,11 @@ export default function LeadsPage() {
                   ) : null}
                   Refresh
                 </Button>
+                <Link href="/leads/modify">
+                  <Button className="bg-gray-700 hover:bg-gray-800">
+                    Modify Leads
+                  </Button>
+                </Link>
                 <Button
                   className="bg-blue-600 hover:bg-blue-700"
                   onClick={() => setShowCreateCampaign(true)}

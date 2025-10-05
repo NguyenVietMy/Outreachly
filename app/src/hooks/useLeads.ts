@@ -187,6 +187,87 @@ export function useLeads(campaignId?: string) {
     }
   };
 
+  // Create a lead
+  const createLead = async (payload: {
+    email: string;
+    firstName: string;
+    lastName?: string;
+    domain?: string;
+    phone?: string;
+    linkedinUrl?: string;
+    position?: string;
+    positionRaw?: string;
+    seniority?: string;
+    department?: string;
+    twitter?: string;
+    emailType?: Lead["emailType"];
+    verifiedStatus?: Lead["verifiedStatus"];
+    customTextField?: string;
+  }) => {
+    const response = await fetch(`${API_URL}/api/leads`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.error || "Failed to create lead");
+    }
+    await fetchLeads();
+    return data as Lead;
+  };
+
+  // Update a lead (email immutable)
+  const updateLead = async (
+    id: string,
+    payload: Partial<
+      Pick<
+        Lead,
+        | "firstName"
+        | "lastName"
+        | "position"
+        | "positionRaw"
+        | "seniority"
+        | "department"
+        | "phone"
+        | "domain"
+        | "linkedinUrl"
+        | "twitter"
+        | "customTextField"
+        | "emailType"
+      >
+    >
+  ) => {
+    const response = await fetch(`${API_URL}/api/leads/${id}`, {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.error || "Failed to update lead");
+    }
+    await fetchLeads();
+    return data as Lead;
+  };
+
+  // Delete lead mapping for org
+  const deleteLead = async (id: string) => {
+    const response = await fetch(`${API_URL}/api/leads/${id}`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data?.error || "Failed to delete lead");
+    }
+    await fetchLeads();
+    return true;
+  };
+
   // Remove leads from campaign
   const removeLeadsFromCampaign = async (
     leadIds: string[],
@@ -229,5 +310,8 @@ export function useLeads(campaignId?: string) {
     exportLeads,
     assignLeadsToCampaign,
     removeLeadsFromCampaign,
+    createLead,
+    updateLead,
+    deleteLead,
   };
 }

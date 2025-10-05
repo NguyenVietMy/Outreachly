@@ -184,12 +184,15 @@ public class TemplateController {
                 used.add(matcher.group(1).trim());
             }
 
+            log.info("Template validation - Used variables: {}, Allowed: {}", used, ALLOWED_VARS);
+
             // For now require that if variables are referenced, they are within allowed set
             List<String> invalid = used.stream()
                     .filter(v -> !ALLOWED_VARS.contains(v))
                     .distinct()
                     .collect(Collectors.toList());
 
+            log.info("Template validation - Invalid variables: {}", invalid);
             return invalid; // treat invalid variables as "missing/invalid" for the client
         } catch (Exception e) {
             log.warn("validateRequiredVariables parse error", e);
