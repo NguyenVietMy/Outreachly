@@ -14,12 +14,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -897,16 +901,36 @@ export default function SendGmailPage() {
                   </CardHeader>
                   <CardContent className="pt-4">
                     <div className="space-y-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="w-full justify-start"
-                        onClick={testGmailConnection}
-                      >
-                        <MailCheck className="h-4 w-4 mr-2" />
-                        Test Gmail Connection
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start"
+                          >
+                            <MailCheck className="h-4 w-4 mr-2" />
+                            Test Gmail Connection
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              Send test email?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Confirm sending a test email to address: "
+                              {gmailStatus?.user || "your Gmail account"}"
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={testGmailConnection}>
+                              Send test email
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                       <Button
                         type="button"
                         variant="outline"

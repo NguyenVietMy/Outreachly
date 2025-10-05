@@ -33,6 +33,7 @@ public class CsvImportService {
     private final OrgLeadService orgLeadService;
     private final ImportJobRepository importJobRepository;
     private final OrganizationRepository organizationRepository;
+    private final CampaignLeadService campaignLeadService;
     // private final UserRepository userRepository; // Will be used when
     // implementing proper user lookup
     // private final EmailValidator emailValidator = EmailValidator.getInstance();
@@ -300,7 +301,7 @@ public class CsvImportService {
                     processedEmails.add(email);
 
                     // Ensure global lead exists (create if missing)
-                    leadRepository.findByEmailIgnoreCase(email).orElseGet(() -> {
+                    Lead lead = leadRepository.findByEmailIgnoreCase(email).orElseGet(() -> {
                         Lead newLead = Lead.builder()
                                 .orgId(java.util.UUID.fromString("b8470f71-e5c8-4974-b6af-3d7af17aa55c"))
                                 .firstName(trimValue(getValueFromRow(row, getFirstNameColumnNames())))
@@ -327,9 +328,16 @@ public class CsvImportService {
                     orgLeadService.ensureOrgLeadForEmail(job.getOrgId(), email, "csv_import");
 
                     // If campaignId is provided, create campaign-lead relationship
-                    // TODO: Implement campaign-lead relationship creation
                     if (campaignId != null) {
-                        log.warn("Campaign ID provided but campaign-lead relationship not implemented yet");
+                        try {
+                            campaignLeadService.addLeadToCampaign(campaignId, lead.getId(), job.getUserId());
+                            log.info("Successfully added lead {} to campaign {} during CSV import", lead.getId(),
+                                    campaignId);
+                        } catch (Exception e) {
+                            log.error("Failed to add lead {} to campaign {} during CSV import: {}", lead.getId(),
+                                    campaignId, e.getMessage());
+                            // Don't fail the entire import for campaign assignment errors
+                        }
                     }
 
                     processedRows++;
