@@ -261,9 +261,14 @@ public class EnrichmentService {
                 if (lead.getEmail() != null && !lead.getEmail().isBlank()) {
                     // keep previous
                     var prev = objectMapper.readTree(lead.getEnrichedJson() == null ? "{}" : lead.getEnrichedJson());
-                    ((com.fasterxml.jackson.databind.node.ObjectNode) prev.with("previous")).put("email",
-                            lead.getEmail());
-                    lead.setEnrichedJson(prev.toString());
+                    com.fasterxml.jackson.databind.node.ObjectNode prevObj = (com.fasterxml.jackson.databind.node.ObjectNode) prev;
+                    com.fasterxml.jackson.databind.node.ObjectNode previousNode = (com.fasterxml.jackson.databind.node.ObjectNode) prevObj
+                            .get("previous");
+                    if (previousNode == null) {
+                        previousNode = prevObj.putObject("previous");
+                    }
+                    previousNode.put("email", lead.getEmail());
+                    lead.setEnrichedJson(prevObj.toString());
                 }
                 lead.setEmail(newEmail);
                 log.info("Updated lead {} email to: {} (confidence: {})", lead.getId(), newEmail, score);
@@ -271,8 +276,14 @@ public class EnrichmentService {
 
             // store raw providers
             var root = objectMapper.readTree(lead.getEnrichedJson() == null ? "{}" : lead.getEnrichedJson());
-            ((com.fasterxml.jackson.databind.node.ObjectNode) root.with("providers")).set("hunter", result);
-            lead.setEnrichedJson(root.toString());
+            com.fasterxml.jackson.databind.node.ObjectNode rootObj = (com.fasterxml.jackson.databind.node.ObjectNode) root;
+            com.fasterxml.jackson.databind.node.ObjectNode providersNode = (com.fasterxml.jackson.databind.node.ObjectNode) rootObj
+                    .get("providers");
+            if (providersNode == null) {
+                providersNode = rootObj.putObject("providers");
+            }
+            providersNode.set("hunter", result);
+            lead.setEnrichedJson(rootObj.toString());
 
             log.info("Lead {} enrichment applied successfully. Email: {}, Verified Status: {}",
                     lead.getId(), lead.getEmail(), lead.getVerifiedStatus());

@@ -300,7 +300,7 @@ public class CsvImportService {
                     processedEmails.add(email);
 
                     // Ensure global lead exists (create if missing)
-                    Lead lead = leadRepository.findByEmailIgnoreCase(email).orElseGet(() -> {
+                    leadRepository.findByEmailIgnoreCase(email).orElseGet(() -> {
                         Lead newLead = Lead.builder()
                                 .orgId(java.util.UUID.fromString("b8470f71-e5c8-4974-b6af-3d7af17aa55c"))
                                 .firstName(trimValue(getValueFromRow(row, getFirstNameColumnNames())))
@@ -372,38 +372,7 @@ public class CsvImportService {
                 });
     }
 
-    private Lead buildLeadFromRow(Map<String, String> row, UUID orgId) {
-        // Get email flexibly (including BOM versions)
-        String email = getValueFromRow(row, getEmailColumnNames());
-        String domain = extractDomainFromEmail(email);
-
-        // Use provided domain if available, otherwise extract from email
-        String providedDomain = getValueFromRow(row, getDomainColumnNames());
-        if (providedDomain != null && !providedDomain.trim().isEmpty()) {
-            domain = providedDomain.trim().toLowerCase();
-        }
-
-        return Lead.builder()
-                .orgId(orgId)
-                .firstName(trimValue(getValueFromRow(row, getFirstNameColumnNames())))
-                .lastName(trimValue(getValueFromRow(row, getLastNameColumnNames())))
-                .domain(domain)
-                .position(trimValue(getValueFromRow(row, getPositionColumnNames())))
-                .positionRaw(trimValue(getValueFromRow(row, getPositionRawColumnNames())))
-                .seniority(trimValue(getValueFromRow(row, getSeniorityColumnNames())))
-                .department(trimValue(getValueFromRow(row, getDepartmentColumnNames())))
-                .email(email)
-                .phone(trimValue(getValueFromRow(row, getPhoneColumnNames())))
-                .linkedinUrl(trimValue(getValueFromRow(row, getLinkedInColumnNames())))
-                .twitter(trimValue(getValueFromRow(row, getTwitterColumnNames())))
-                .confidenceScore(parseInteger(getValueFromRow(row, getConfidenceScoreColumnNames())))
-                .emailType(mapEmailType(getValueFromRow(row, getEmailTypeColumnNames())))
-                .customTextField(trimValue(getValueFromRow(row, getCustomTextFieldColumnNames())))
-                .source("csv_import")
-                .verifiedStatus(Lead.VerifiedStatus.unknown)
-                .enrichedJson("{}")
-                .build();
-    }
+    // Removed unused helper to avoid linter warning
 
     private String extractDomainFromEmail(String email) {
         if (email != null && email.contains("@")) {
@@ -598,6 +567,7 @@ public class CsvImportService {
         };
     }
 
+    @SuppressWarnings("unused")
     private String[] getDomainColumnNames() {
         return new String[] {
                 "domain", "?domain",
@@ -608,6 +578,7 @@ public class CsvImportService {
         };
     }
 
+    @SuppressWarnings("unused")
     private String[] getCustomTextFieldColumnNames() {
         return new String[] {
                 "custom_text_field", "?custom_text_field",

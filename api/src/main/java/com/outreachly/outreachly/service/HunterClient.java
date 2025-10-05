@@ -93,7 +93,7 @@ public class HunterClient {
             int idx = (start + i) % keys.size();
             String key = keys.get(idx);
 
-            UriComponentsBuilder b = UriComponentsBuilder.fromHttpUrl(baseUrl + path);
+            UriComponentsBuilder b = UriComponentsBuilder.fromUriString(baseUrl + path);
             for (Map.Entry<String, String> e : params.entrySet()) {
                 if (e.getValue() != null) {
                     b.queryParam(e.getKey(), e.getValue());

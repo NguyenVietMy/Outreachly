@@ -27,12 +27,10 @@ import java.util.Map;
 @Slf4j
 public class ResendEmailProvider extends AbstractEmailProvider {
 
-    private final EmailEventService emailEventService;
     private final WebClient webClient;
 
     public ResendEmailProvider(EmailEventService emailEventService, WebClient webClient) {
         super(emailEventService);
-        this.emailEventService = emailEventService;
         this.webClient = webClient;
     }
 

@@ -3,7 +3,6 @@ package com.outreachly.outreachly.controller;
 import com.outreachly.outreachly.entity.Campaign;
 import com.outreachly.outreachly.entity.User;
 import com.outreachly.outreachly.repository.CampaignRepository;
-import com.outreachly.outreachly.service.CsvImportService;
 import com.outreachly.outreachly.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +22,7 @@ public class CampaignController {
 
     private final CampaignRepository campaignRepository;
     private final UserService userService;
-    private final CsvImportService csvImportService;
+    // Removed unused CsvImportService field
 
     @GetMapping
     public ResponseEntity<?> getAllCampaigns(Authentication authentication) {

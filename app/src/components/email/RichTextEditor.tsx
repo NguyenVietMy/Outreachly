@@ -14,28 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Bold,
-  Italic,
-  Underline,
-  List,
-  ListOrdered,
-  Quote,
-  Link,
-  Image,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-  Eye,
-  EyeOff,
-  Type,
-  Palette,
-  Code,
-  Undo,
-  Redo,
-  Save,
-  BookOpen,
-} from "lucide-react";
+import { Eye, BookOpen } from "lucide-react";
 
 interface RichTextEditorProps {
   value: string;
@@ -62,77 +41,11 @@ export function RichTextEditor({
   const [historyIndex, setHistoryIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const executeCommand = (command: string, value?: string) => {
-    if (!isHtml) {
-      // For plain text, we'll just insert formatting markers
-      const textarea = textareaRef.current;
-      if (!textarea) return;
-
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const selectedText = value || textarea.value.substring(start, end);
-
-      let formattedText = "";
-      switch (command) {
-        case "bold":
-          formattedText = `**${selectedText}**`;
-          break;
-        case "italic":
-          formattedText = `*${selectedText}*`;
-          break;
-        case "underline":
-          formattedText = `__${selectedText}__`;
-          break;
-        case "list":
-          formattedText = `• ${selectedText}`;
-          break;
-        case "orderedList":
-          formattedText = `1. ${selectedText}`;
-          break;
-        case "quote":
-          formattedText = `> ${selectedText}`;
-          break;
-        case "link":
-          formattedText = `[${selectedText}](url)`;
-          break;
-        default:
-          formattedText = selectedText;
-      }
-
-      const newValue =
-        textarea.value.substring(0, start) +
-        formattedText +
-        textarea.value.substring(end);
-
-      onChange(newValue);
-      saveToHistory(newValue);
-    } else {
-      // For HTML, we'll use document.execCommand (deprecated but simple)
-      document.execCommand(command, false, value);
-    }
-  };
-
   const saveToHistory = (newValue: string) => {
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(newValue);
     setHistory(newHistory);
     setHistoryIndex(newHistory.length - 1);
-  };
-
-  const undo = () => {
-    if (historyIndex > 0) {
-      const newIndex = historyIndex - 1;
-      setHistoryIndex(newIndex);
-      onChange(history[newIndex]);
-    }
-  };
-
-  const redo = () => {
-    if (historyIndex < history.length - 1) {
-      const newIndex = historyIndex + 1;
-      setHistoryIndex(newIndex);
-      onChange(history[newIndex]);
-    }
   };
 
   const insertVariable = (variable: string) => {
@@ -236,115 +149,6 @@ export function RichTextEditor({
 
       <div className="space-y-4">
         <div className="space-y-3">
-          {/* Toolbar */}
-          <Card>
-            <CardContent className="p-3">
-              <div className="flex flex-wrap gap-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={undo}
-                  disabled={historyIndex <= 0}
-                  title="Undo"
-                >
-                  <Undo className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={redo}
-                  disabled={historyIndex >= history.length - 1}
-                  title="Redo"
-                >
-                  <Redo className="h-4 w-4" />
-                </Button>
-
-                <div className="w-px h-6 bg-gray-300 mx-1" />
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => executeCommand("bold")}
-                  title="Bold"
-                >
-                  <Bold className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => executeCommand("italic")}
-                  title="Italic"
-                >
-                  <Italic className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => executeCommand("underline")}
-                  title="Underline"
-                >
-                  <Underline className="h-4 w-4" />
-                </Button>
-
-                <div className="w-px h-6 bg-gray-300 mx-1" />
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => executeCommand("list")}
-                  title="Bullet List"
-                >
-                  <List className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => executeCommand("orderedList")}
-                  title="Numbered List"
-                >
-                  <ListOrdered className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => executeCommand("quote")}
-                  title="Quote"
-                >
-                  <Quote className="h-4 w-4" />
-                </Button>
-
-                <div className="w-px h-6 bg-gray-300 mx-1" />
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => executeCommand("link")}
-                  title="Link"
-                >
-                  <Link className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => executeCommand("image")}
-                  title="Image"
-                >
-                  <Image className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Variables */}
           <Card>
             <CardContent className="p-3">

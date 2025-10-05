@@ -11,7 +11,6 @@ import com.outreachly.outreachly.entity.Lead;
 import com.outreachly.outreachly.entity.Campaign;
 import com.outreachly.outreachly.service.CampaignLeadService;
 import com.outreachly.outreachly.service.OrgLeadService;
-import com.outreachly.outreachly.service.CsvImportService;
 import com.outreachly.outreachly.service.EnrichmentService;
 import com.outreachly.outreachly.service.EnrichmentPreviewService;
 import com.outreachly.outreachly.service.UserService;
@@ -33,7 +32,6 @@ public class LeadEnrichmentController {
     private final EnrichmentPreviewService enrichmentPreviewService;
     private final EnrichmentJobRepository jobRepository;
     private final UserService userService;
-    private final CsvImportService csvImportService;
     private final LeadRepository leadRepository;
     private final CampaignLeadService campaignLeadService;
     private final CampaignRepository campaignRepository;

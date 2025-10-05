@@ -19,11 +19,8 @@ import java.util.UUID;
 @Slf4j
 public class MockEmailProvider extends AbstractEmailProvider {
 
-    private final EmailEventService emailEventService;
-
     public MockEmailProvider(EmailEventService emailEventService) {
         super(emailEventService);
-        this.emailEventService = emailEventService;
     }
 
     @Override

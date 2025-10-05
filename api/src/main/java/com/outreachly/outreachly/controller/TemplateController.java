@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.outreachly.outreachly.entity.Template;
 import com.outreachly.outreachly.entity.User;
 import com.outreachly.outreachly.service.TemplateService;
-import com.outreachly.outreachly.service.CsvImportService;
 import com.outreachly.outreachly.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,7 +25,7 @@ public class TemplateController {
 
     private final TemplateService templateService;
     private final UserService userService;
-    private final CsvImportService csvImportService;
+    // Removed unused CsvImportService field
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final Set<String> ALLOWED_VARS = Set.of("first_name", "last_name", "company", "title");

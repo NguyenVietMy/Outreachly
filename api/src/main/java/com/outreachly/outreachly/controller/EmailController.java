@@ -4,7 +4,6 @@ import com.outreachly.outreachly.dto.EmailRequest;
 import com.outreachly.outreachly.dto.EmailResponse;
 import com.outreachly.outreachly.entity.EmailEvent;
 import com.outreachly.outreachly.entity.User;
-import com.outreachly.outreachly.service.CsvImportService;
 import com.outreachly.outreachly.service.OrganizationEmailService;
 import com.outreachly.outreachly.service.UserService;
 import com.outreachly.outreachly.service.email.EmailProviderType;
@@ -28,7 +27,7 @@ public class EmailController {
 
     private final OrganizationEmailService emailService;
     private final UserService userService;
-    private final CsvImportService csvImportService;
+    // Removed unused CsvImportService field
 
     @PostMapping("/send")
     public ResponseEntity<EmailResponse> sendEmail(
