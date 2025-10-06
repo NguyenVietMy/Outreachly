@@ -127,6 +127,7 @@ export default function LeadsPage() {
     campaignImport: false,
     removeFromCampaign: false,
   });
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [selectedCampaignForImport, setSelectedCampaignForImport] =
     useState<string>("");
   const [filters, setFilters] = useState<FilterState>({
@@ -801,7 +802,7 @@ export default function LeadsPage() {
                       selectedLeads.length === 0 ||
                       buttonLoading.removeFromCampaign
                     }
-                    onClick={handleRemoveFromCampaign}
+                    onClick={() => setShowRemoveConfirm(true)}
                   >
                     {buttonLoading.removeFromCampaign ? (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1472,6 +1473,38 @@ export default function LeadsPage() {
                   Create Campaign
                 </Button>
               </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Remove from Campaign confirmation dialog */}
+        <Dialog open={showRemoveConfirm} onOpenChange={setShowRemoveConfirm}>
+          <DialogContent className="sm:max-w-[520px]">
+            <DialogHeader>
+              <DialogTitle>Remove from campaign</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              You will not be able to send email to this person through this
+              campaign, proceed?
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowRemoveConfirm(false)}
+                disabled={buttonLoading.removeFromCampaign}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  setShowRemoveConfirm(false);
+                  await handleRemoveFromCampaign();
+                }}
+                disabled={buttonLoading.removeFromCampaign}
+              >
+                {buttonLoading.removeFromCampaign ? "Removing..." : "Remove"}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>

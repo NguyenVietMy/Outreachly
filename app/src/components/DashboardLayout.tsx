@@ -15,6 +15,7 @@ import {
   Search,
 } from "lucide-react";
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 
 interface DashboardLayoutProps {
@@ -24,12 +25,13 @@ interface DashboardLayoutProps {
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user, logout, loading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const pathname = usePathname();
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
     { name: "Lead Discovery", href: "/lead-discovery", icon: Search },
     { name: "Send Gmail", href: "/send-gmail", icon: Mail },
-    { name: "Campaigns", href: "/dashboard/campaigns", icon: Mail },
+    { name: "Campaigns", href: "/campaigns", icon: Mail },
     { name: "Leads", href: "/leads", icon: Users },
     { name: "Import Leads", href: "/import", icon: Upload },
     { name: "Templates", href: "/templates", icon: FileText },
@@ -77,11 +79,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           <nav className="flex-1 px-4 py-6 space-y-2">
             {navigation.map((item) => {
               const Icon = item.icon;
+              const isActive =
+                pathname === item.href || pathname?.startsWith(`${item.href}/`);
               return (
                 <Link
                   key={item.name}
                   href={item.href}
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                  className={
+                    `flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ` +
+                    (isActive
+                      ? "bg-gray-100 text-gray-900"
+                      : "text-gray-700 hover:bg-gray-100 hover:text-gray-900")
+                  }
                 >
                   <Icon className="h-5 w-5" />
                   <span className="font-medium">{item.name}</span>
