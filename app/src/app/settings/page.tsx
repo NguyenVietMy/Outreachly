@@ -55,6 +55,9 @@ import { useToast } from "@/components/ui/use-toast";
 import DashboardLayout from "@/components/DashboardLayout";
 import AuthGuard from "@/components/AuthGuard";
 
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "https://api.outreach-ly.com";
+
 interface EmailProvider {
   id: string;
   name: string;
@@ -122,7 +125,7 @@ export default function SettingsPage() {
 
   const loadSettings = async () => {
     try {
-      const response = await fetch("http://localhost:8080/api/settings", {
+      const response = await fetch(API_URL + "/api/settings", {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -156,16 +159,13 @@ export default function SettingsPage() {
   const loadEmailProviders = async () => {
     try {
       setLoadingProviders(true);
-      const response = await fetch(
-        "http://localhost:8080/api/settings/email-providers",
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-        }
-      );
+      const response = await fetch(API_URL + "/api/settings/email-providers", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
 
       if (response.ok) {
         const providers = await response.json();
@@ -216,7 +216,7 @@ export default function SettingsPage() {
         marketingEmails: settings.marketingEmails,
       };
 
-      const response = await fetch("http://localhost:8080/api/settings", {
+      const response = await fetch(API_URL + "/api/settings", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -259,7 +259,7 @@ export default function SettingsPage() {
     try {
       setIsSaving(true);
       const response = await fetch(
-        `http://localhost:8080/api/settings/email-providers/${providerId}/switch`,
+        API_URL + "/api/settings/email-providers/" + providerId + "/switch",
         {
           method: "POST",
           headers: {
@@ -300,7 +300,7 @@ export default function SettingsPage() {
   ) => {
     try {
       const response = await fetch(
-        `http://localhost:8080/api/settings/email-providers/${providerId}/test`,
+        API_URL + "/api/settings/email-providers/" + providerId + "/test",
         {
           method: "POST",
           headers: {

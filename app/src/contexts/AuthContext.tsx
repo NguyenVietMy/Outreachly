@@ -32,7 +32,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+  const API_URL =
+    process.env.NEXT_PUBLIC_API_URL || "https://api.outreach-ly.com";
 
   const checkAuth = async () => {
     try {

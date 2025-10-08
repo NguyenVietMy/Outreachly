@@ -1,4 +1,5 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "https://api.outreach-ly.com";
 
 export interface GenerateTemplateRequest {
   prompt: string;

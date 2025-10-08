@@ -33,4 +33,5 @@ build/
 .vscode/
 
 
-.env.properties
+.env.local.properties
+.env.prod.properties

@@ -32,18 +32,55 @@ module "ecs_api" {
   env               = local.env
   vpc_id            = module.network.vpc_id
   public_subnet_ids = module.network.public_subnet_ids
-  container_image   = "158954238800.dkr.ecr.us-east-1.amazonaws.com/outreachly/api:dev"
+  container_image   = "158954238800.dkr.ecr.us-east-1.amazonaws.com/outreachly/api:latest-v2"
   container_port    = 8080
   domain_name       = "api.outreach-ly.com"
+  supabase_session_pooler_secret_arn = aws_secretsmanager_secret.supabase_session_pooler.arn
+  db_user_secret_arn                 = aws_secretsmanager_secret.db_user.arn
+  db_password_secret_arn             = aws_secretsmanager_secret.db_password.arn
+  openai_api_key_secret_arn          = aws_secretsmanager_secret.openai_api_key.arn
+  hunter_acc_1_secret_arn            = aws_secretsmanager_secret.hunter_acc_1.arn
+  hunter_acc_2_secret_arn            = aws_secretsmanager_secret.hunter_acc_2.arn
 }
 
-module "ses" {
-  source = "../../modules/ses"
-
-  domain_name = "outreach-ly.com"
-  route53_zone_id = "Z02495573ISDF5X4NF9YA"
-  region = "us-east-1"
+# Secrets Manager for database credentials
+resource "aws_secretsmanager_secret" "supabase_session_pooler" {
+  name                    = "outreachly/dev/SUPABASE_SESSION_POOLER"
+  recovery_window_in_days = 0
 }
+
+resource "aws_secretsmanager_secret" "db_user" {
+  name                    = "outreachly/dev/DB_USER"
+  recovery_window_in_days = 0
+}
+
+resource "aws_secretsmanager_secret" "db_password" {
+  name                    = "outreachly/dev/DB_PASSWORD"
+  recovery_window_in_days = 0
+}
+
+resource "aws_secretsmanager_secret" "openai_api_key" {
+  name                    = "outreachly/dev/OPENAI_API_KEY"
+  recovery_window_in_days = 0
+}
+
+resource "aws_secretsmanager_secret" "hunter_acc_1" {
+  name                    = "outreachly/dev/HUNTER_ACC_1"
+  recovery_window_in_days = 0
+}
+
+resource "aws_secretsmanager_secret" "hunter_acc_2" {
+  name                    = "outreachly/dev/HUNTER_ACC_2"
+  recovery_window_in_days = 0
+}
+
+# module "ses" {
+#   source = "../../modules/ses"
+
+#   domain_name = "outreach-ly.com"
+#   route53_zone_id = "Z02495573ISDF5X4NF9YA"
+#   region = "us-east-1"
+# }
 
 resource "aws_route53_record" "api_alias" {
   zone_id = "Z02495573ISDF5X4NF9YA"

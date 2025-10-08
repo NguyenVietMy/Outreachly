@@ -13,6 +13,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.io.IOException;
 import java.util.Map;
@@ -23,6 +24,9 @@ import java.util.Map;
 public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
         private final UserService userService;
+
+        @Value("${FRONTEND_URL}")
+        private String frontendUrl;
 
         @Override
         public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
@@ -60,9 +64,9 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
                         // Decide redirect based on org membership
                         String targetUrl;
                         if (user.getOrgId() == null) {
-                                targetUrl = "http://localhost:3000/onboarding/organization";
+                                targetUrl = frontendUrl + "/onboarding/organization";
                         } else {
-                                targetUrl = UriComponentsBuilder.fromUriString("http://localhost:3000/auth/callback")
+                                targetUrl = UriComponentsBuilder.fromUriString(frontendUrl + "/auth/callback")
                                                 .queryParam("success", "true")
                                                 .queryParam("email", email)
                                                 .build().toUriString();
@@ -73,8 +77,9 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
                 } catch (Exception e) {
                         log.error("Error in OAuth2 success handler", e);
+
                         // Redirect to frontend with error
-                        String targetUrl = UriComponentsBuilder.fromUriString("http://localhost:3000/auth/callback")
+                        String targetUrl = UriComponentsBuilder.fromUriString(frontendUrl + "/auth/callback")
                                         .queryParam("success", "false")
                                         .queryParam("error", "Authentication failed")
                                         .build().toUriString();

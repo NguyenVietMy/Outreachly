@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 
-export default function AuthCallback() {
+function AuthCallbackContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { checkAuth, user } = useAuth();
@@ -22,14 +22,11 @@ export default function AuthCallback() {
       setStatus("success");
       setMessage("Authentication successful! Redirecting...");
       // Check auth status and redirect
+      console.log("OAuth success, calling checkAuth()");
       checkAuth().then(() => {
-        setTimeout(() => {
-          if (!user?.orgId) {
-            router.push("/onboarding/organization");
-          } else {
-            router.push("/dashboard");
-          }
-        }, 1000);
+        console.log("checkAuth() completed");
+      }).catch((err) => {
+        console.error("checkAuth() failed:", err);
       });
     } else if (error) {
       setStatus("error");
@@ -38,7 +35,22 @@ export default function AuthCallback() {
       setStatus("error");
       setMessage("Invalid callback parameters");
     }
-  }, [searchParams, router, checkAuth, user]);
+  }, [searchParams, checkAuth]);
+
+  // Separate effect to handle redirect after user state is updated
+  useEffect(() => {
+    console.log("Redirect effect triggered:", { user, status, hasOrgId: user?.orgId });
+    if (user && status === "success") {
+      console.log("User authenticated, checking orgId:", user.orgId);
+      if (!user.orgId) {
+        console.log("No orgId, redirecting to onboarding");
+        router.push("/onboarding/organization");
+      } else {
+        console.log("Has orgId, redirecting to dashboard");
+        router.push("/dashboard");
+      }
+    }
+  }, [user, status, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -111,5 +123,19 @@ export default function AuthCallback() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AuthCallback() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      }
+    >
+      <AuthCallbackContent />
+    </Suspense>
   );
 }

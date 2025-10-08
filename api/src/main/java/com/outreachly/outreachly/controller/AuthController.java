@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -19,6 +20,9 @@ import java.util.Map;
 public class AuthController {
 
     private final UserService userService;
+
+    @Value("${FRONTEND_URL}")
+    private String frontendUrl;
 
     @GetMapping("/user")
     public ResponseEntity<Map<String, Object>> getCurrentUser(Authentication authentication) {
@@ -67,13 +71,13 @@ public class AuthController {
 
             Map<String, String> responseBody = new HashMap<>();
             responseBody.put("message", "Logged out successfully");
-            responseBody.put("redirectUrl", "http://localhost:3000/");
+            responseBody.put("redirectUrl", frontendUrl + "/");
 
             return ResponseEntity.ok(responseBody);
         } catch (Exception e) {
             Map<String, String> responseBody = new HashMap<>();
             responseBody.put("message", "Logout completed");
-            responseBody.put("redirectUrl", "http://localhost:3000/");
+            responseBody.put("redirectUrl", frontendUrl + "/");
             return ResponseEntity.ok(responseBody);
         }
     }

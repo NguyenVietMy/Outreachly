@@ -31,7 +31,7 @@ yarn-error.log*
 
 # local env files
 .env*.local
-.env
+.env.prod
 
 # vercel
 .vercel
@@ -50,3 +50,5 @@ node_modules/
 .git
 
 .github/
+
+.vercel

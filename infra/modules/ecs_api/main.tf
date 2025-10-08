@@ -66,9 +66,9 @@ resource "aws_lb_target_group" "api" {
   health_check {
     path                = "/health"
     healthy_threshold   = 2
-    unhealthy_threshold = 5
-    timeout             = 10
-    interval            = 30
+    unhealthy_threshold = 10
+    timeout             = 30
+    interval            = 60
     matcher             = "200-399"
   }
 }
@@ -143,6 +143,33 @@ resource "aws_iam_role_policy" "ses_policy" {
   })
 }
 
+# Secrets Manager permissions for the ECS task
+resource "aws_iam_role_policy" "secrets_access" {
+  name = "${local.name}-secrets-access"
+  role = aws_iam_role.task_exec.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = [
+          var.supabase_session_pooler_secret_arn,
+          var.db_user_secret_arn,
+          var.db_password_secret_arn,
+          var.openai_api_key_secret_arn,
+          var.hunter_acc_1_secret_arn,
+          var.hunter_acc_2_secret_arn
+        ]
+      }
+    ]
+  })
+}
+
 
 # ---------- Cluster, Task, Service ----------
 resource "aws_ecs_cluster" "this" {
@@ -191,7 +218,21 @@ resource "aws_ecs_task_definition" "api" {
         { name = "JAVA_OPTS", value = "-XX:+ExitOnOutOfMemoryError" },
         { name = "GOOGLE_CLIENT_ID", value = "11164249925-1d31lg1eibv43f910rs068aq4f3a30tu.apps.googleusercontent.com" },
         { name = "GOOGLE_CLIENT_SECRET", value = "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" },
-        { name = "FRONTEND_URL", value = "https://outreach-ly.com" }
+        { name = "GOOGLE_REDIRECT_URI", value = "https://api.outreach-ly.com/login/oauth2/code/google" },
+        { name = "FRONTEND_URL", value = "https://www.outreach-ly.com" },
+        { name = "AWS_FROM_EMAIL", value = "noreply@outreach-ly.com" },
+        { name = "AWS_FROM_NAME", value = "Outreachly" },
+        { name = "AWS_BOUNCE_EMAIL", value = "bounces@outreach-ly.com" },
+        { name = "AWS_COMPLAINT_EMAIL", value = "complaints@outreach-ly.com" }
+      ]
+
+      secrets = [
+        { name = "SUPABASE_SESSION_POOLER", valueFrom = var.supabase_session_pooler_secret_arn },
+        { name = "DB_USER", valueFrom = var.db_user_secret_arn },
+        { name = "DB_PASSWORD", valueFrom = var.db_password_secret_arn },
+        { name = "OPENAI_API_KEY", valueFrom = var.openai_api_key_secret_arn },
+        { name = "HUNTER_ACC_1", valueFrom = var.hunter_acc_1_secret_arn },
+        { name = "HUNTER_ACC_2", valueFrom = var.hunter_acc_2_secret_arn }
       ]
     }
   ])
@@ -204,7 +245,7 @@ resource "aws_ecs_service" "api" {
   desired_count   = 1
   launch_type     = "FARGATE"
 
-  health_check_grace_period_seconds = 30
+  health_check_grace_period_seconds = 180
 
   network_configuration {
     subnets          = var.public_subnet_ids
@@ -220,5 +261,3 @@ resource "aws_ecs_service" "api" {
 
   depends_on = [aws_lb_listener.http]
 }
-
-
