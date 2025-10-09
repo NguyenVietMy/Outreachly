@@ -118,6 +118,11 @@ export default function SendGmailPage() {
   const API_URL =
     process.env.NEXT_PUBLIC_API_URL || "https://api.outreach-ly.com";
 
+  const connectGmail = () => {
+    // Kick off incremental consent flow for Gmail send scope
+    window.location.href = `${API_URL}/oauth2/authorization/google-gmail`;
+  };
+
   // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
@@ -775,6 +780,37 @@ export default function SendGmailPage() {
                                 Gmail API access required. Click to grant
                                 permissions.
                               </span>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button type="button" size="sm">
+                                    Connect Gmail
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                      Connect your Gmail account
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      You'll be redirected to Google to grant
+                                      permission to send email from your Gmail
+                                      account. This consent screen is expected
+                                      for apps requesting Gmail send access. We
+                                      never see your password, and you can
+                                      revoke access anytime in your Google
+                                      Account settings.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>
+                                      Cancel
+                                    </AlertDialogCancel>
+                                    <AlertDialogAction onClick={connectGmail}>
+                                      Continue to Google
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                             </div>
                           </AlertDescription>
                         </Alert>
@@ -831,9 +867,37 @@ export default function SendGmailPage() {
                             </span>
                           </div>
                           <p className="text-xs text-orange-700 mb-3">
-                            Click below to grant Gmail permissions. This will
-                            open Google's consent screen.
+                            Clicking connect opens Google's consent screen to
+                            allow sending email via your Gmail account. This is
+                            a standard Google prompt.
                           </p>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button type="button" size="sm">
+                                Connect Gmail
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  About the Google consent screen
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Google will ask you to grant the{" "}
+                                  <code>gmail.send</code> permission so
+                                  Outreachly can send the messages you compose.
+                                  You can disconnect anytime in your Google
+                                  Account.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={connectGmail}>
+                                  Continue to Google
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       )}
                     </div>

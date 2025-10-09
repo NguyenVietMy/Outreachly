@@ -72,9 +72,17 @@ public class GmailService {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         if (authentication instanceof OAuth2AuthenticationToken oauth2Token) {
+            // Prefer token granted via the dedicated Gmail registration (incremental
+            // consent)
+            OAuth2AuthorizedClient gmailClient = authorizedClientService
+                    .loadAuthorizedClient("google-gmail", oauth2Token.getName());
+            if (gmailClient != null && gmailClient.getAccessToken() != null) {
+                return gmailClient.getAccessToken();
+            }
+
+            // Fallback to whatever registration the user logged in with
             OAuth2AuthorizedClient authorizedClient = authorizedClientService
                     .loadAuthorizedClient(oauth2Token.getAuthorizedClientRegistrationId(), oauth2Token.getName());
-
             if (authorizedClient != null) {
                 return authorizedClient.getAccessToken();
             }
@@ -186,10 +194,19 @@ public class GmailService {
      */
     public boolean hasGmailAccess() {
         try {
-            OAuth2AccessToken accessToken = getCurrentAccessToken();
-            if (accessToken == null) {
+            // Only consider a token issued for the dedicated google-gmail registration
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (!(authentication instanceof OAuth2AuthenticationToken oauth2Token)) {
                 return false;
             }
+
+            OAuth2AuthorizedClient gmailClient = authorizedClientService
+                    .loadAuthorizedClient("google-gmail", oauth2Token.getName());
+            if (gmailClient == null || gmailClient.getAccessToken() == null) {
+                return false;
+            }
+
+            OAuth2AccessToken accessToken = gmailClient.getAccessToken();
 
             // Check if token is expired by comparing with current time
             Instant now = Instant.now();
@@ -198,7 +215,7 @@ public class GmailService {
                 return false;
             }
 
-            // Actually test Gmail API access by trying to create the service
+            // Token exists and is not expired for the gmail client; treat as connected
             try {
                 createGmailService(accessToken.getTokenValue());
                 return true;

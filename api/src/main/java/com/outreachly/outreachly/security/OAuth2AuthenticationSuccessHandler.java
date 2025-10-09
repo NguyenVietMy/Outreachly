@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -60,6 +61,17 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
                         // Ensure the authentication is properly set in the security context
                         SecurityContextHolder.getContext().setAuthentication(authentication);
+
+                        // For incremental Gmail consent flow, redirect back to send-gmail
+                        if (authentication instanceof OAuth2AuthenticationToken oauth2Token) {
+                                String registrationId = oauth2Token.getAuthorizedClientRegistrationId();
+                                if ("google-gmail".equals(registrationId)) {
+                                        String targetUrl = frontendUrl + "/send-gmail?connected=true";
+                                        log.info("Redirecting to Gmail connect target: {}", targetUrl);
+                                        getRedirectStrategy().sendRedirect(request, response, targetUrl);
+                                        return;
+                                }
+                        }
 
                         // Decide redirect based on org membership
                         String targetUrl;
