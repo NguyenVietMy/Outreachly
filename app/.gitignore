@@ -52,3 +52,7 @@ node_modules/
 .github/
 
 .vercel
+
+# Public assets (Gmail connect screenshots) — keep folder, ignore images
+/public/connect-gmail/*
+!/public/connect-gmail/.gitkeep

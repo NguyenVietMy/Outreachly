@@ -20,8 +20,6 @@ interface RichTextEditorProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  isHtml?: boolean;
-  onHtmlChange?: (isHtml: boolean) => void;
   maxLength?: number;
   error?: string;
   onBrowseTemplates?: () => void;
@@ -31,8 +29,6 @@ export function RichTextEditor({
   value,
   onChange,
   placeholder = "Enter your email content...",
-  isHtml = false,
-  onHtmlChange,
   maxLength = 10000,
   error,
   onBrowseTemplates,
@@ -66,19 +62,16 @@ export function RichTextEditor({
   };
 
   const renderPreview = () => {
-    if (!isHtml) {
-      // Simple markdown-like rendering
-      return value
-        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-        .replace(/\*(.*?)\*/g, "<em>$1</em>")
-        .replace(/__(.*?)__/g, "<u>$1</u>")
-        .replace(/^• (.*$)/gm, "<li>$1</li>")
-        .replace(/^\d+\. (.*$)/gm, "<li>$1</li>")
-        .replace(/^> (.*$)/gm, "<blockquote>$1</blockquote>")
-        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
-        .replace(/\n/g, "<br>");
-    }
-    return value;
+    // Simple markdown-like rendering for preview
+    return value
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.*?)\*/g, "<em>$1</em>")
+      .replace(/__(.*?)__/g, "<u>$1</u>")
+      .replace(/^• (.*$)/gm, "<li>$1</li>")
+      .replace(/^\d+\. (.*$)/gm, "<li>$1</li>")
+      .replace(/^> (.*$)/gm, "<blockquote>$1</blockquote>")
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
+      .replace(/\n/g, "<br>");
   };
 
   const availableVariables = [
@@ -94,14 +87,7 @@ export function RichTextEditor({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <Label className="text-base font-medium">
-          Content{" "}
-          {isHtml && (
-            <Badge variant="secondary" className="ml-2">
-              HTML
-            </Badge>
-          )}
-        </Label>
+        <Label className="text-base font-medium">Content</Label>
         <div className="flex items-center gap-2">
           {onBrowseTemplates && (
             <Button

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -45,24 +46,49 @@ import {
   Zap,
   BookOpen,
   MailCheck,
+  XCircle,
+  Eye,
+  MousePointer,
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { RecipientManager } from "@/components/email/RecipientManager";
 import { RichTextEditor } from "@/components/email/RichTextEditor";
+import { convertToHtmlEmail, EmailTrackingData } from "@/lib/emailConverter";
+import { API_BASE_URL } from "@/lib/config";
 import DashboardLayout from "@/components/DashboardLayout";
 import AuthGuard from "@/components/AuthGuard";
 import { useLeads, Lead } from "@/hooks/useLeads";
 import TemplateBrowserModal from "@/components/templates/TemplateBrowserModal";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface GmailFormData {
   recipients: string[];
   subject: string;
   content: string;
-  isHtml: boolean;
   templateId?: string;
   campaignId?: string;
   scheduledAt?: string;
   priority: "low" | "normal" | "high";
+}
+
+interface BulkEmailResult {
+  success: boolean;
+  message: string;
+  totalRecipients: number;
+  successfulSends: number;
+  failedSends: number;
+  results?: Array<{
+    email: string;
+    success: boolean;
+    message: string;
+  }>;
 }
 
 interface GmailResponse {
@@ -108,15 +134,17 @@ export default function SendGmailPage() {
     recipients: [],
     subject: "",
     content: "",
-    isHtml: true,
     priority: "normal",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [lastResponse, setLastResponse] = useState<GmailResponse | null>(null);
+  const [lastBulkResponse, setLastBulkResponse] =
+    useState<BulkEmailResult | null>(null);
+  const [showGmailModal1, setShowGmailModal1] = useState(false);
+  const [showGmailModal2, setShowGmailModal2] = useState(false);
 
-  const API_URL =
-    process.env.NEXT_PUBLIC_API_URL || "https://api.outreach-ly.com";
+  const API_URL = API_BASE_URL;
 
   const connectGmail = () => {
     // Kick off incremental consent flow for Gmail send scope
@@ -306,44 +334,66 @@ export default function SendGmailPage() {
       return;
     }
 
+    const validRecipients = formData.recipients.filter(
+      (email) => email.trim() !== ""
+    );
+
+    // Automatically choose between single and bulk sending
+    if (validRecipients.length > 1) {
+      // Use bulk sending for multiple recipients
+      await sendBulkEmails();
+    } else {
+      // Use single sending for one recipient
+      await sendSingleEmail(validRecipients[0]);
+    }
+  };
+
+  const sendSingleEmail = async (recipient: string) => {
     setIsSending(true);
     setLastResponse(null);
+    setLastBulkResponse(null);
 
     try {
-      const validRecipients = formData.recipients.filter(
-        (email) => email.trim() !== ""
+      // Generate unique message ID for tracking
+      const messageId = `gmail_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Convert to HTML with tracking
+      const trackingData: EmailTrackingData = {
+        messageId,
+        recipientEmail: recipient,
+        campaignId: formData.campaignId,
+        userId: user?.id?.toString(),
+      };
+
+      const { htmlContent } = convertToHtmlEmail(
+        formData.content, // Send original content - backend will process variables
+        trackingData
       );
 
-      // Send each email individually via Gmail API
-      const emailPromises = validRecipients.map(async (recipient) => {
-        const gmailRequest = {
-          to: recipient,
-          subject: (formData.subject || "").trim(),
-          body: (formData.content || "").trim(),
-          html: formData.isHtml,
-          from: undefined,
-        };
+      const gmailRequest = {
+        to: recipient,
+        subject: (formData.subject || "").trim(),
+        body: htmlContent,
+        html: true, // Always send as HTML now
+        from: undefined,
+      };
 
-        const response = await fetch(`${API_URL}/api/gmail/send`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify(gmailRequest),
-        });
-
-        return response.json();
+      const response = await fetch(`${API_URL}/api/gmail/send`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(gmailRequest),
       });
 
-      const results = await Promise.all(emailPromises);
-      const successfulCount = results.filter((r) => r.success).length;
-      const failedCount = results.length - successfulCount;
+      const result: GmailResponse = await response.json();
+      setLastResponse(result);
 
-      if (successfulCount > 0) {
+      if (result.success) {
         toast({
-          title: "Emails Sent Successfully",
-          description: `Sent ${successfulCount} email(s) via Gmail API, ${failedCount} failed`,
+          title: "Email Sent Successfully",
+          description: `Email sent to ${recipient} via Gmail API`,
         });
 
         // Reset form
@@ -356,15 +406,10 @@ export default function SendGmailPage() {
         setSelectedLeads([]);
       } else {
         toast({
-          title: "Failed to Send Emails",
-          description: "All emails failed to send via Gmail API",
+          title: "Email Failed",
+          description: result.message || "Failed to send email",
           variant: "destructive",
         });
-      }
-
-      // Set last response for display
-      if (results.length > 0) {
-        setLastResponse(results[0]);
       }
     } catch (error) {
       console.error("Error sending email via Gmail API:", error);
@@ -404,6 +449,131 @@ export default function SendGmailPage() {
         description: "Failed to test Gmail API connection",
         variant: "destructive",
       });
+    }
+  };
+
+  const sendBulkEmails = async () => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to send emails.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!gmailStatus?.hasGmailAccess) {
+      toast({
+        title: "Gmail Access Required",
+        description: "Please connect your Gmail account first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const validRecipients = formData.recipients.filter(
+      (email) => email.trim() !== ""
+    );
+
+    if (validRecipients.length === 0) {
+      toast({
+        title: "No Recipients",
+        description: "Please add at least one recipient email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.subject?.trim()) {
+      toast({
+        title: "Subject Required",
+        description: "Please enter an email subject.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.content?.trim()) {
+      toast({
+        title: "Content Required",
+        description: "Please enter email content.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSending(true);
+    setLastBulkResponse(null);
+
+    try {
+      // Generate unique message ID for tracking
+      const messageId = `gmail_bulk_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Convert to HTML with tracking (we'll use a placeholder for bulk)
+      const trackingData: EmailTrackingData = {
+        messageId,
+        recipientEmail: "bulk_placeholder", // Will be replaced per recipient
+        campaignId: formData.campaignId,
+        userId: user?.id?.toString(),
+      };
+
+      const { htmlContent } = convertToHtmlEmail(
+        formData.content,
+        trackingData
+      );
+
+      const bulkRequest = {
+        recipients: validRecipients,
+        subject: formData.subject.trim(),
+        body: htmlContent,
+        html: true,
+        from: undefined,
+        campaignId: formData.campaignId,
+        userId: user?.id?.toString(),
+      };
+
+      const response = await fetch(`${API_URL}/api/gmail/send-bulk`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(bulkRequest),
+      });
+
+      const result: BulkEmailResult = await response.json();
+      setLastBulkResponse(result);
+
+      if (result.success) {
+        toast({
+          title: "Bulk Emails Sent",
+          description: `Successfully sent ${result.successfulSends} of ${result.totalRecipients} emails.`,
+        });
+
+        // Reset form on successful bulk send
+        setFormData((prev) => ({
+          ...prev,
+          subject: "",
+          content: "",
+          recipients: [],
+        }));
+        setSelectedLeads([]);
+      } else {
+        toast({
+          title: "Bulk Send Failed",
+          description: result.message || "Failed to send bulk emails.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Bulk email sending error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send bulk emails. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -681,14 +851,7 @@ export default function SendGmailPage() {
                             content,
                           }))
                         }
-                        placeholder="Enter your email content..."
-                        isHtml={formData.isHtml}
-                        onHtmlChange={(isHtml) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            isHtml,
-                          }))
-                        }
+                        placeholder="Enter your email content... Use **bold**, *italic*, • lists, and [links](url)"
                         maxLength={10000}
                         error={errors.content}
                         onBrowseTemplates={() =>
@@ -746,7 +909,7 @@ export default function SendGmailPage() {
                         </div>
                       </div>
 
-                      {/* Submit Button */}
+                      {/* Smart Send Button */}
                       <Button
                         type="submit"
                         disabled={isSending || !gmailStatus?.hasGmailAccess}
@@ -755,20 +918,53 @@ export default function SendGmailPage() {
                         {isSending ? (
                           <>
                             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                            Sending via Gmail...
+                            {formData.recipients.length > 1
+                              ? "Sending Bulk Emails..."
+                              : "Sending via Gmail..."}
                           </>
                         ) : (
                           <>
-                            <Mail className="mr-2 h-5 w-5" />
+                            {formData.recipients.length > 1 ? (
+                              <Zap className="mr-2 h-5 w-5" />
+                            ) : (
+                              <Mail className="mr-2 h-5 w-5" />
+                            )}
                             {selectedLeads.length > 0
                               ? formData.scheduledAt
                                 ? `Schedule ${selectedLeads.length} Emails via Gmail`
                                 : `Send ${selectedLeads.length} Emails via Gmail`
                               : formData.scheduledAt
                                 ? "Schedule Email via Gmail"
-                                : "Send Email via Gmail"}
+                                : formData.recipients.length > 1
+                                  ? `Send Bulk (${formData.recipients.length} emails)`
+                                  : "Send Email via Gmail"}
                           </>
                         )}
+                      </Button>
+
+                      {/* Sample Template Button */}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={isSending || !gmailStatus?.hasGmailAccess}
+                        className="w-full"
+                        onClick={() => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            content: `Hi {{firstName}},
+
+Thank you for choosing our Pickleball Vatic Pro! We appreciate your business and hope you enjoy using our product.
+
+If you have any questions or need assistance, feel free to reach out. We're here to help!
+
+Best regards,
+[Your Name]
+
+P.S. Don't forget to check out our latest accessories for an enhanced playing experience!`,
+                          }));
+                        }}
+                      >
+                        📧 Load Sample Template
                       </Button>
 
                       {!gmailStatus?.hasGmailAccess && (
@@ -780,37 +976,13 @@ export default function SendGmailPage() {
                                 Gmail API access required. Click to grant
                                 permissions.
                               </span>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button type="button" size="sm">
-                                    Connect Gmail
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                      Connect your Gmail account
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      You'll be redirected to Google to grant
-                                      permission to send email from your Gmail
-                                      account. This consent screen is expected
-                                      for apps requesting Gmail send access. We
-                                      never see your password, and you can
-                                      revoke access anytime in your Google
-                                      Account settings.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>
-                                      Cancel
-                                    </AlertDialogCancel>
-                                    <AlertDialogAction onClick={connectGmail}>
-                                      Continue to Google
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => setShowGmailModal1(true)}
+                              >
+                                Connect Gmail
+                              </Button>
                             </div>
                           </AlertDescription>
                         </Alert>
@@ -871,33 +1043,13 @@ export default function SendGmailPage() {
                             allow sending email via your Gmail account. This is
                             a standard Google prompt.
                           </p>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button type="button" size="sm">
-                                Connect Gmail
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                  About the Google consent screen
-                                </AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Google will ask you to grant the{" "}
-                                  <code>gmail.send</code> permission so
-                                  Outreachly can send the messages you compose.
-                                  You can disconnect anytime in your Google
-                                  Account.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={connectGmail}>
-                                  Continue to Google
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => setShowGmailModal2(true)}
+                          >
+                            Connect Gmail
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -1048,6 +1200,129 @@ export default function SendGmailPage() {
           </div>
         </div>
 
+        {/* Bulk Email Results */}
+        {lastBulkResponse && (
+          <div className="mt-6 p-6 bg-white rounded-lg shadow-sm border">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <MailCheck className="h-5 w-5 text-blue-600" />
+              Bulk Email Results
+            </h3>
+
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="text-center p-3 bg-blue-50 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600">
+                  {lastBulkResponse.totalRecipients || 0}
+                </div>
+                <div className="text-sm text-gray-600">Total Recipients</div>
+              </div>
+              <div className="text-center p-3 bg-green-50 rounded-lg">
+                <div className="text-2xl font-bold text-green-600">
+                  {lastBulkResponse.successfulSends || 0}
+                </div>
+                <div className="text-sm text-gray-600">Successful</div>
+              </div>
+              <div className="text-center p-3 bg-red-50 rounded-lg">
+                <div className="text-2xl font-bold text-red-600">
+                  {lastBulkResponse.failedSends || 0}
+                </div>
+                <div className="text-sm text-gray-600">Failed</div>
+              </div>
+            </div>
+
+            {lastBulkResponse.results &&
+              lastBulkResponse.results.length > 0 && (
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  <h4 className="font-medium text-gray-700">
+                    Individual Results:
+                  </h4>
+                  {lastBulkResponse.results.map((result, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-2 bg-gray-50 rounded"
+                    >
+                      <span className="text-sm font-medium">
+                        {result.email}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {result.success ? (
+                          <Badge
+                            variant="default"
+                            className="bg-green-100 text-green-800"
+                          >
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Success
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive">
+                            <XCircle className="h-3 w-3 mr-1" />
+                            Failed
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+          </div>
+        )}
+
+        {/* Email Tracking Test Section */}
+        {lastResponse && lastResponse.success && (
+          <div className="mt-6 p-6 bg-white rounded-lg shadow-sm border">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Eye className="h-5 w-5 text-blue-600" />
+              Email Tracking Test
+            </h3>
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Your email has been sent with a tracking pixel. When the
+                recipient opens the email, it will automatically track the open
+                event.
+              </p>
+
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h4 className="font-medium text-blue-900 mb-2">
+                  How to test tracking:
+                </h4>
+                <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+                  <li>Send the email to yourself or a test account</li>
+                  <li>Open the email in your email client</li>
+                  <li>Check the dashboard for tracking statistics</li>
+                  <li>
+                    The tracking pixel will load automatically when the email is
+                    opened
+                  </li>
+                </ol>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const trackingUrl = `${API_BASE_URL}/api/tracking/stats/user/${user?.id}`;
+                    window.open(trackingUrl, "_blank");
+                  }}
+                >
+                  <Eye className="h-4 w-4 mr-2" />
+                  View Tracking Stats
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const testUrl = `${API_BASE_URL}/api/tracking/open?msg=test_${Date.now()}&to=${lastResponse.to}&user=${user?.id}`;
+                    window.open(testUrl, "_blank");
+                  }}
+                >
+                  <MousePointer className="h-4 w-4 mr-2" />
+                  Test Tracking Pixel
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <TemplateBrowserModal
           open={showTemplates}
           onOpenChange={setShowTemplates}
@@ -1061,6 +1336,120 @@ export default function SendGmailPage() {
           }
           onUse={(t: any) => loadTemplate(t as unknown as EmailTemplate)}
         />
+
+        {/* Gmail Connect Modals - Using Dialog for better click-outside behavior */}
+        <Dialog open={showGmailModal1} onOpenChange={setShowGmailModal1}>
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto p-0">
+            <div className="p-6 space-y-4">
+              <DialogHeader>
+                <DialogTitle>Connect your Gmail account</DialogTitle>
+                <DialogDescription>
+                  You'll be redirected to Google to grant permission to send
+                  email from your Gmail account. This consent screen is expected
+                  for apps requesting Gmail send access. We never see your
+                  password, and you can revoke access anytime in your Google
+                  Account settings.
+                </DialogDescription>
+                <div className="bg-gray-100 border border-gray-300 rounded-lg p-3 mt-3">
+                  <p className="text-sm text-gray-700 italic">
+                    <strong>Note:</strong> Due to Google's strict verification
+                    requirements, I'm actively working on app verification. Any
+                    "unverified app" warnings can be safely ignored by following
+                    the step-by-step instructions below.
+                  </p>
+                </div>
+              </DialogHeader>
+              {/* Screenshots */}
+              <div className="space-y-3">
+                <Image
+                  src="/connect-gmail/Step1.png"
+                  alt="Step 1: Open Google consent"
+                  width={1200}
+                  height={800}
+                  className="rounded border"
+                />
+                <Image
+                  src="/connect-gmail/Step2.png"
+                  alt="Step 2: Grant gmail.send permission"
+                  width={1200}
+                  height={800}
+                  className="rounded border"
+                />
+                <Image
+                  src="/connect-gmail/Step3.png"
+                  alt="Step 3: Redirect back to Outreachly"
+                  width={1200}
+                  height={800}
+                  className="rounded border"
+                />
+              </div>
+              <DialogFooter className="p-6 pt-0">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowGmailModal1(false)}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={connectGmail}>Continue to Google</Button>
+              </DialogFooter>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showGmailModal2} onOpenChange={setShowGmailModal2}>
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto p-0">
+            <div className="p-6 space-y-4">
+              <DialogHeader>
+                <DialogTitle>About the Google consent screen</DialogTitle>
+                <DialogDescription>
+                  Google will ask you to grant the <code>gmail.send</code>{" "}
+                  permission so Outreachly can send the messages you compose.
+                  You can disconnect anytime in your Google Account.
+                </DialogDescription>
+                <div className="bg-gray-100 border border-gray-300 rounded-lg p-3 mt-3">
+                  <p className="text-sm text-gray-700 italic">
+                    <strong>Note:</strong> Due to Google's strict verification
+                    requirements, I am actively working on app verification. Any
+                    "unverified app" warnings can be safely ignored by following
+                    the step-by-step instructions below.
+                  </p>
+                </div>
+              </DialogHeader>
+              <div className="space-y-3">
+                <Image
+                  src="/connect-gmail/Step1.png"
+                  alt="Step 1: Open Google consent"
+                  width={1200}
+                  height={800}
+                  className="rounded border"
+                />
+                <Image
+                  src="/connect-gmail/Step2.png"
+                  alt="Step 2: Grant gmail.send permission"
+                  width={1200}
+                  height={800}
+                  className="rounded border"
+                />
+                <Image
+                  src="/connect-gmail/Step3.png"
+                  alt="Step 3: Redirect back to Outreachly"
+                  width={1200}
+                  height={800}
+                  className="rounded border"
+                />
+              </div>
+              <DialogFooter className="p-6 pt-0">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowGmailModal2(false)}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={connectGmail}>Continue to Google</Button>
+              </DialogFooter>
+            </div>
+          </DialogContent>
+        </Dialog>
       </DashboardLayout>
     </AuthGuard>
   );
