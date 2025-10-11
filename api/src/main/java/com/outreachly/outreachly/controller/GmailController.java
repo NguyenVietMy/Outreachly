@@ -169,28 +169,6 @@ public class GmailController {
         return str.substring(0, 1).toUpperCase() + str.substring(1).toLowerCase();
     }
 
-    /**
-     * Generate individual tracking pixel for a specific recipient
-     */
-    private String generateIndividualTrackingPixel(String recipientEmail, String campaignId, String userId) {
-        String baseUrl = System.getProperty("server.base.url", "http://localhost:8080");
-        String trackingUrl = baseUrl + "/api/tracking/open";
-
-        StringBuilder params = new StringBuilder();
-        params.append("msg=").append("gmail_individual_").append(System.currentTimeMillis()).append("_")
-                .append(recipientEmail.hashCode());
-        params.append("&to=").append(recipientEmail);
-        if (campaignId != null) {
-            params.append("&campaign=").append(campaignId);
-        }
-        if (userId != null) {
-            params.append("&user=").append(userId);
-        }
-
-        return String.format("<img src=\"%s?%s\" width=\"1\" height=\"1\" style=\"display:none;\" alt=\"\" />",
-                trackingUrl, params.toString());
-    }
-
     @PostMapping("/send-bulk")
     public ResponseEntity<Map<String, Object>> sendBulkEmails(
             @RequestBody BulkGmailRequest request,
@@ -273,15 +251,6 @@ public class GmailController {
 
                 // Process variables in email body
                 String processedBody = processEmailVariables(request.getBody(), leadData);
-
-                // Generate individual tracking pixel for this recipient
-                String individualTrackingPixel = generateIndividualTrackingPixel(
-                        recipient, request.getCampaignId(), request.getUserId());
-
-                // Replace the bulk tracking pixel with individual one
-                processedBody = processedBody.replaceAll(
-                        "<img src=\"[^\"]*bulk_placeholder[^\"]*\"[^>]*>",
-                        individualTrackingPixel);
 
                 // Send individual email
                 gmailService.sendEmail(recipient, request.getSubject(), processedBody,

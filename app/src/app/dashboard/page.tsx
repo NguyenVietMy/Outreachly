@@ -10,7 +10,6 @@ import LeadListOverview from "@/components/dashboard/LeadListOverview";
 import SendingProfileHealth from "@/components/dashboard/SendingProfileHealth";
 import RecentActivityFeed from "@/components/dashboard/RecentActivityFeed";
 import ComplianceTrustCues from "@/components/dashboard/ComplianceTrustCues";
-import EmailTrackingStats from "@/components/dashboard/EmailTrackingStats";
 import { useRouter } from "next/navigation";
 
 export default function Dashboard() {
@@ -98,9 +97,6 @@ export default function Dashboard() {
 
             {/* Right Column - Sidebar */}
             <div className="space-y-8">
-              {/* Email Tracking Stats */}
-              <EmailTrackingStats />
-
               {/* Recent Activity Feed */}
               <RecentActivityFeed onViewDetails={handleViewActivityDetails} />
             </div>

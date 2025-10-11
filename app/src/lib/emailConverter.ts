@@ -1,17 +1,9 @@
 /**
- * Converts plain text to HTML with proper formatting and tracking
+ * Converts plain text to HTML with proper formatting
  */
-
-export interface EmailTrackingData {
-  messageId: string;
-  recipientEmail: string;
-  campaignId?: string;
-  userId?: string;
-}
 
 export interface ConvertedEmail {
   htmlContent: string;
-  trackingPixel: string;
   plainText: string;
 }
 
@@ -70,29 +62,10 @@ export function convertTextToHtml(text: string): string {
 }
 
 /**
- * Generates tracking pixel HTML
+ * Converts plain text to full HTML email
  */
-export function generateTrackingPixel(trackingData: EmailTrackingData): string {
-  const trackingUrl = `${process.env.NEXT_PUBLIC_API_URL || "https://api.outreach-ly.com"}/api/tracking/open`;
-  const params = new URLSearchParams({
-    msg: trackingData.messageId,
-    to: trackingData.recipientEmail,
-    ...(trackingData.campaignId && { campaign: trackingData.campaignId }),
-    ...(trackingData.userId && { user: trackingData.userId }),
-  });
-
-  return `<img src="${trackingUrl}?${params.toString()}" width="1" height="1" style="display:none;" alt="" />`;
-}
-
-/**
- * Converts plain text to full HTML email with tracking
- */
-export function convertToHtmlEmail(
-  text: string,
-  trackingData: EmailTrackingData
-): ConvertedEmail {
+export function convertToHtmlEmail(text: string): ConvertedEmail {
   const htmlContent = convertTextToHtml(text);
-  const trackingPixel = generateTrackingPixel(trackingData);
 
   // Wrap in proper email HTML structure
   const fullHtml = `
@@ -135,13 +108,11 @@ export function convertToHtmlEmail(
 </head>
 <body>
   ${htmlContent}
-  ${trackingPixel}
 </body>
 </html>`;
 
   return {
     htmlContent: fullHtml,
-    trackingPixel,
     plainText: text,
   };
 }

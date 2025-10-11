@@ -13,7 +13,7 @@ import java.util.List;
 
 /**
  * Abstract base class for email providers that provides common functionality
- * like suppression checking and email event tracking
+ * like suppression checking and email event management
  */
 @RequiredArgsConstructor
 @Slf4j

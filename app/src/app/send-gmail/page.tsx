@@ -48,12 +48,11 @@ import {
   MailCheck,
   XCircle,
   Eye,
-  MousePointer,
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { RecipientManager } from "@/components/email/RecipientManager";
 import { RichTextEditor } from "@/components/email/RichTextEditor";
-import { convertToHtmlEmail, EmailTrackingData } from "@/lib/emailConverter";
+import { convertToHtmlEmail } from "@/lib/emailConverter";
 import { API_BASE_URL } from "@/lib/config";
 import DashboardLayout from "@/components/DashboardLayout";
 import AuthGuard from "@/components/AuthGuard";
@@ -354,21 +353,11 @@ export default function SendGmailPage() {
     setLastBulkResponse(null);
 
     try {
-      // Generate unique message ID for tracking
+      // Generate unique message ID
       const messageId = `gmail_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      // Convert to HTML with tracking
-      const trackingData: EmailTrackingData = {
-        messageId,
-        recipientEmail: recipient,
-        campaignId: formData.campaignId,
-        userId: user?.id?.toString(),
-      };
-
-      const { htmlContent } = convertToHtmlEmail(
-        formData.content, // Send original content - backend will process variables
-        trackingData
-      );
+      // Convert to HTML
+      const { htmlContent } = convertToHtmlEmail(formData.content);
 
       const gmailRequest = {
         to: recipient,
@@ -506,21 +495,11 @@ export default function SendGmailPage() {
     setLastBulkResponse(null);
 
     try {
-      // Generate unique message ID for tracking
+      // Generate unique message ID
       const messageId = `gmail_bulk_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      // Convert to HTML with tracking (we'll use a placeholder for bulk)
-      const trackingData: EmailTrackingData = {
-        messageId,
-        recipientEmail: "bulk_placeholder", // Will be replaced per recipient
-        campaignId: formData.campaignId,
-        userId: user?.id?.toString(),
-      };
-
-      const { htmlContent } = convertToHtmlEmail(
-        formData.content,
-        trackingData
-      );
+      // Convert to HTML
+      const { htmlContent } = convertToHtmlEmail(formData.content);
 
       const bulkRequest = {
         recipients: validRecipients,
@@ -1263,63 +1242,6 @@ P.S. Don't forget to check out our latest accessories for an enhanced playing ex
                   ))}
                 </div>
               )}
-          </div>
-        )}
-
-        {/* Email Tracking Test Section */}
-        {lastResponse && lastResponse.success && (
-          <div className="mt-6 p-6 bg-white rounded-lg shadow-sm border">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Eye className="h-5 w-5 text-blue-600" />
-              Email Tracking Test
-            </h3>
-            <div className="space-y-4">
-              <p className="text-sm text-gray-600">
-                Your email has been sent with a tracking pixel. When the
-                recipient opens the email, it will automatically track the open
-                event.
-              </p>
-
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h4 className="font-medium text-blue-900 mb-2">
-                  How to test tracking:
-                </h4>
-                <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-                  <li>Send the email to yourself or a test account</li>
-                  <li>Open the email in your email client</li>
-                  <li>Check the dashboard for tracking statistics</li>
-                  <li>
-                    The tracking pixel will load automatically when the email is
-                    opened
-                  </li>
-                </ol>
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const trackingUrl = `${API_BASE_URL}/api/tracking/stats/user/${user?.id}`;
-                    window.open(trackingUrl, "_blank");
-                  }}
-                >
-                  <Eye className="h-4 w-4 mr-2" />
-                  View Tracking Stats
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const testUrl = `${API_BASE_URL}/api/tracking/open?msg=test_${Date.now()}&to=${lastResponse.to}&user=${user?.id}`;
-                    window.open(testUrl, "_blank");
-                  }}
-                >
-                  <MousePointer className="h-4 w-4 mr-2" />
-                  Test Tracking Pixel
-                </Button>
-              </div>
-            </div>
           </div>
         )}
 
