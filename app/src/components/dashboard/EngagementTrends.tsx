@@ -4,16 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
-import { useState } from "react";
-
-interface TrendData {
-  date: string;
-  opens: number;
-  clicks: number;
-  replies: number;
-  bounces: number;
-  complaints: number;
-}
+import { useState, useEffect } from "react";
+import { useDeliveryMetrics, TrendData } from "@/hooks/useDeliveryMetrics";
 
 interface EngagementTrendsProps {
   data?: TrendData[];
@@ -27,268 +19,70 @@ export default function EngagementTrends({
   onPeriodChange,
 }: EngagementTrendsProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<"7d" | "30d">(period);
+  const {
+    trendData: apiTrendData,
+    fetchTrendData,
+    loading,
+    error,
+  } = useDeliveryMetrics();
 
-  // Mock data for demonstration
-  const mockData7d: TrendData[] = [
-    {
-      date: "2024-01-14",
-      opens: 245,
-      clicks: 32,
-      replies: 18,
-      bounces: 8,
-      complaints: 1,
-    },
-    {
-      date: "2024-01-15",
-      opens: 312,
-      clicks: 41,
-      replies: 22,
-      bounces: 12,
-      complaints: 0,
-    },
-    {
-      date: "2024-01-16",
-      opens: 289,
-      clicks: 38,
-      replies: 19,
-      bounces: 6,
-      complaints: 1,
-    },
-    {
-      date: "2024-01-17",
-      opens: 356,
-      clicks: 47,
-      replies: 25,
-      bounces: 9,
-      complaints: 0,
-    },
-    {
-      date: "2024-01-18",
-      opens: 298,
-      clicks: 39,
-      replies: 21,
-      bounces: 7,
-      complaints: 1,
-    },
-    {
-      date: "2024-01-19",
-      opens: 334,
-      clicks: 44,
-      replies: 23,
-      bounces: 11,
-      complaints: 0,
-    },
-    {
-      date: "2024-01-20",
-      opens: 267,
-      clicks: 35,
-      replies: 17,
-      bounces: 5,
-      complaints: 1,
-    },
-  ];
+  // Use provided data, API data, or fallback to empty array
+  const trendData = data || apiTrendData || [];
 
-  const mockData30d: TrendData[] = [
-    {
-      date: "2024-01-01",
-      opens: 1200,
-      clicks: 156,
-      replies: 89,
-      bounces: 45,
-      complaints: 3,
-    },
-    {
-      date: "2024-01-02",
-      opens: 1350,
-      clicks: 178,
-      replies: 102,
-      bounces: 52,
-      complaints: 2,
-    },
-    {
-      date: "2024-01-03",
-      opens: 1280,
-      clicks: 167,
-      replies: 95,
-      bounces: 48,
-      complaints: 4,
-    },
-    {
-      date: "2024-01-04",
-      opens: 1420,
-      clicks: 189,
-      replies: 108,
-      bounces: 55,
-      complaints: 1,
-    },
-    {
-      date: "2024-01-05",
-      opens: 1380,
-      clicks: 182,
-      replies: 104,
-      bounces: 51,
-      complaints: 3,
-    },
-    {
-      date: "2024-01-06",
-      opens: 1250,
-      clicks: 163,
-      replies: 92,
-      bounces: 47,
-      complaints: 2,
-    },
-    {
-      date: "2024-01-07",
-      opens: 1320,
-      clicks: 174,
-      replies: 98,
-      bounces: 49,
-      complaints: 1,
-    },
-    {
-      date: "2024-01-08",
-      opens: 1450,
-      clicks: 192,
-      replies: 110,
-      bounces: 58,
-      complaints: 4,
-    },
-    {
-      date: "2024-01-09",
-      opens: 1390,
-      clicks: 185,
-      replies: 106,
-      bounces: 53,
-      complaints: 2,
-    },
-    {
-      date: "2024-01-10",
-      opens: 1310,
-      clicks: 171,
-      replies: 97,
-      bounces: 46,
-      complaints: 3,
-    },
-    {
-      date: "2024-01-11",
-      opens: 1360,
-      clicks: 180,
-      replies: 103,
-      bounces: 50,
-      complaints: 1,
-    },
-    {
-      date: "2024-01-12",
-      opens: 1280,
-      clicks: 168,
-      replies: 96,
-      bounces: 48,
-      complaints: 2,
-    },
-    {
-      date: "2024-01-13",
-      opens: 1340,
-      clicks: 177,
-      replies: 101,
-      bounces: 49,
-      complaints: 1,
-    },
-    {
-      date: "2024-01-14",
-      opens: 1410,
-      clicks: 187,
-      replies: 107,
-      bounces: 54,
-      complaints: 3,
-    },
-    {
-      date: "2024-01-15",
-      opens: 1370,
-      clicks: 182,
-      replies: 104,
-      bounces: 51,
-      complaints: 2,
-    },
-    {
-      date: "2024-01-16",
-      opens: 1290,
-      clicks: 170,
-      replies: 97,
-      bounces: 47,
-      complaints: 1,
-    },
-    {
-      date: "2024-01-17",
-      opens: 1350,
-      clicks: 179,
-      replies: 102,
-      bounces: 50,
-      complaints: 4,
-    },
-    {
-      date: "2024-01-18",
-      opens: 1320,
-      clicks: 175,
-      replies: 100,
-      bounces: 48,
-      complaints: 2,
-    },
-    {
-      date: "2024-01-19",
-      opens: 1380,
-      clicks: 183,
-      replies: 105,
-      bounces: 52,
-      complaints: 1,
-    },
-    {
-      date: "2024-01-20",
-      opens: 1310,
-      clicks: 173,
-      replies: 99,
-      bounces: 46,
-      complaints: 3,
-    },
-  ];
-
-  const trendData =
-    data || (selectedPeriod === "7d" ? mockData7d : mockData30d);
+  // Fetch data when period changes
+  useEffect(() => {
+    if (!data) {
+      fetchTrendData(selectedPeriod);
+    }
+  }, [selectedPeriod, data]);
 
   const handlePeriodChange = (newPeriod: "7d" | "30d") => {
     setSelectedPeriod(newPeriod);
     onPeriodChange?.(newPeriod);
   };
 
-  // Calculate averages and trends
-  const avgOpens = Math.round(
-    trendData.reduce((sum, day) => sum + day.opens, 0) / trendData.length
+  // Calculate averages and trends from API data
+  const avgDelivered = Math.round(
+    trendData.reduce((sum, day) => sum + day.delivered, 0) /
+      Math.max(trendData.length, 1)
   );
-  const avgClicks = Math.round(
-    trendData.reduce((sum, day) => sum + day.clicks, 0) / trendData.length
+  const avgFailed = Math.round(
+    trendData.reduce((sum, day) => sum + day.failed, 0) /
+      Math.max(trendData.length, 1)
   );
-  const avgReplies = Math.round(
-    trendData.reduce((sum, day) => sum + day.replies, 0) / trendData.length
+  const avgTotalSent = Math.round(
+    trendData.reduce((sum, day) => sum + day.totalSent, 0) /
+      Math.max(trendData.length, 1)
   );
-  const avgBounces = Math.round(
-    trendData.reduce((sum, day) => sum + day.bounces, 0) / trendData.length
-  );
-  const avgComplaints = Math.round(
-    trendData.reduce((sum, day) => sum + day.complaints, 0) / trendData.length
-  );
+  // Filter out days with no email activity for accurate calculations
+  const daysWithActivity = trendData.filter((day) => day.totalSent > 0);
+
+  const avgDeliveryRate =
+    daysWithActivity.length > 0
+      ? daysWithActivity.reduce((sum, day) => sum + day.deliveryRate, 0) /
+        daysWithActivity.length
+      : 0;
 
   // Calculate trends (comparing first half vs second half)
-  const midPoint = Math.floor(trendData.length / 2);
-  const firstHalf = trendData.slice(0, midPoint);
-  const secondHalf = trendData.slice(midPoint);
+  const midPoint = Math.floor(daysWithActivity.length / 2);
+  const firstHalf = daysWithActivity.slice(0, midPoint);
+  const secondHalf = daysWithActivity.slice(midPoint);
 
   const firstHalfAvg =
-    firstHalf.reduce((sum, day) => sum + day.opens, 0) / firstHalf.length;
+    firstHalf.length > 0
+      ? firstHalf.reduce((sum, day) => sum + day.delivered, 0) /
+        firstHalf.length
+      : 0;
   const secondHalfAvg =
-    secondHalf.reduce((sum, day) => sum + day.opens, 0) / secondHalf.length;
-  const openTrend = secondHalfAvg > firstHalfAvg ? "up" : "down";
-  const openTrendPercent = Math.abs(
-    ((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100
-  );
+    secondHalf.length > 0
+      ? secondHalf.reduce((sum, day) => sum + day.delivered, 0) /
+        secondHalf.length
+      : 0;
+  const deliveryTrend = secondHalfAvg > firstHalfAvg ? "up" : "down";
+  const deliveryTrendPercent =
+    firstHalfAvg > 0
+      ? Math.abs(((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100)
+      : 0;
 
   const getTrendIcon = (trend: "up" | "down") => {
     return trend === "up" ? (
@@ -302,7 +96,7 @@ export default function EngagementTrends({
     return trend === "up" ? "text-green-600" : "text-red-600";
   };
 
-  const isDeliverabilityRisky = avgBounces > 50 || avgComplaints > 2;
+  const isDeliverabilityRisky = avgFailed > 50 || avgDeliveryRate < 90;
 
   return (
     <Card className="mb-8">
@@ -332,106 +126,145 @@ export default function EngagementTrends({
       <CardContent>
         <div className="space-y-6">
           {/* Summary Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{avgOpens}</div>
-              <div className="text-xs text-gray-500">Avg Opens</div>
+              <div className="text-2xl font-bold text-blue-600">
+                {avgDelivered}
+              </div>
+              <div className="text-xs text-gray-500">Avg Delivered</div>
               <div
-                className={`flex items-center justify-center space-x-1 mt-1 ${getTrendColor(openTrend)}`}
+                className={`flex items-center justify-center space-x-1 mt-1 ${getTrendColor(deliveryTrend)}`}
               >
-                {getTrendIcon(openTrend)}
-                <span className="text-xs">{openTrendPercent.toFixed(1)}%</span>
+                {getTrendIcon(deliveryTrend)}
+                <span className="text-xs">
+                  {deliveryTrendPercent.toFixed(1)}%
+                </span>
               </div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">
-                {avgClicks}
-              </div>
-              <div className="text-xs text-gray-500">Avg Clicks</div>
+              <div className="text-2xl font-bold text-red-600">{avgFailed}</div>
+              <div className="text-xs text-gray-500">Avg Failed</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">
-                {avgReplies}
+                {avgTotalSent}
               </div>
-              <div className="text-xs text-gray-500">Avg Replies</div>
+              <div className="text-xs text-gray-500">Avg Total Sent</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">
-                {avgBounces}
+              <div className="text-2xl font-bold text-purple-600">
+                {avgDeliveryRate.toFixed(1)}%
               </div>
-              <div className="text-xs text-gray-500">Avg Bounces</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-red-600">
-                {avgComplaints}
-              </div>
-              <div className="text-xs text-gray-500">Avg Complaints</div>
+              <div className="text-xs text-gray-500">Avg Delivery Rate</div>
             </div>
           </div>
 
           {/* Simple Bar Chart Visualization */}
           <div className="space-y-2">
             <h4 className="font-medium text-gray-900">
-              Daily Opens vs Clicks vs Replies
+              Daily Delivery Metrics (UTC)
             </h4>
-            <div className="space-y-1">
-              {trendData.slice(-7).map((day, index) => {
-                const maxValue = Math.max(day.opens, day.clicks, day.replies);
-                const openWidth = (day.opens / maxValue) * 100;
-                const clickWidth = (day.clicks / maxValue) * 100;
-                const replyWidth = (day.replies / maxValue) * 100;
+            {loading && (
+              <div className="text-center py-4 text-gray-500">
+                Loading delivery metrics...
+              </div>
+            )}
+            {error && (
+              <div className="text-center py-4 text-red-500">
+                Error loading metrics: {error}
+              </div>
+            )}
+            {!loading && !error && trendData.length === 0 && (
+              <div className="text-center py-4 text-gray-500">
+                No delivery data available for the selected period.
+              </div>
+            )}
+            {!loading && !error && trendData.length > 0 && (
+              <div className="space-y-4">
+                {trendData.slice(-7).map((day, index) => {
+                  const maxValue = Math.max(
+                    day.delivered,
+                    day.failed,
+                    day.totalSent
+                  );
+                  const deliveredWidth =
+                    maxValue > 0 ? (day.delivered / maxValue) * 100 : 0;
+                  const failedWidth =
+                    maxValue > 0 ? (day.failed / maxValue) * 100 : 0;
+                  const totalWidth =
+                    maxValue > 0 ? (day.totalSent / maxValue) * 100 : 0;
 
-                return (
-                  <div key={day.date} className="flex items-center space-x-2">
-                    <div className="w-16 text-xs text-gray-500">
-                      {new Date(day.date).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                      })}
+                  // Format date using UTC to ensure consistent display
+                  const dateObj = new Date(day.date + "T00:00:00.000Z");
+                  const formattedDate = dateObj.toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    timeZone: "UTC",
+                  });
+
+                  return (
+                    <div
+                      key={day.date}
+                      className="flex items-center space-x-2 p-3"
+                    >
+                      <div className="w-16 text-xs text-gray-500">
+                        {formattedDate}
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center space-x-1">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <div className="text-xs text-gray-600">Delivered</div>
+                          <div className="flex-1 bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-green-500 h-2 rounded-full"
+                              style={{ width: `${deliveredWidth}%` }}
+                            ></div>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {day.delivered}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                          <div className="text-xs text-gray-600">Failed</div>
+                          <div className="flex-1 bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-red-500 h-2 rounded-full"
+                              style={{ width: `${failedWidth}%` }}
+                            ></div>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {day.failed}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          <div className="text-xs text-gray-600">
+                            Total Sent
+                          </div>
+                          <div className="flex-1 bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-blue-500 h-2 rounded-full"
+                              style={{ width: `${totalWidth}%` }}
+                            ></div>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {day.totalSent}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                          <div className="text-xs text-gray-600">Rate</div>
+                          <div className="text-xs text-gray-500">
+                            {day.deliveryRate.toFixed(1)}%
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center space-x-1">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                        <div className="text-xs text-gray-600">Opens</div>
-                        <div className="flex-1 bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-blue-500 h-2 rounded-full"
-                            style={{ width: `${openWidth}%` }}
-                          ></div>
-                        </div>
-                        <div className="text-xs text-gray-500">{day.opens}</div>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                        <div className="text-xs text-gray-600">Clicks</div>
-                        <div className="flex-1 bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-purple-500 h-2 rounded-full"
-                            style={{ width: `${clickWidth}%` }}
-                          ></div>
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {day.clicks}
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <div className="text-xs text-gray-600">Replies</div>
-                        <div className="flex-1 bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-green-500 h-2 rounded-full"
-                            style={{ width: `${replyWidth}%` }}
-                          ></div>
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {day.replies}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Deliverability Warning */}
@@ -440,11 +273,12 @@ export default function EngagementTrends({
               <AlertTriangle className="h-5 w-5 text-yellow-600" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-yellow-800">
-                  Domain reputation risk detected
+                  Delivery performance risk detected
                 </p>
                 <p className="text-xs text-yellow-600">
-                  High bounce or complaint rates may affect deliverability.
-                  Consider reviewing your list quality.
+                  High failure rate or low delivery rate may affect email
+                  deliverability. Consider reviewing your email content and
+                  recipient list quality.
                 </p>
               </div>
             </div>
@@ -454,4 +288,3 @@ export default function EngagementTrends({
     </Card>
   );
 }
-

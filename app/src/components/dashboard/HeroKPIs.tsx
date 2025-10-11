@@ -11,62 +11,40 @@ import {
   AlertTriangle,
   CheckCircle,
 } from "lucide-react";
-
-interface KPIData {
-  leadsImported: {
-    thisWeek: number;
-    total: number;
-  };
-  activeCampaigns: {
-    running: number;
-    paused: number;
-  };
-  engagementRate: {
-    openRate: number;
-    replyRate: number;
-  };
-  deliverabilityHealth: {
-    bounceRate: number;
-    complaintRate: number;
-  };
-  quotaUsage: {
-    emailsSentToday: number;
-    dailyCap: number;
-    planUsagePercent: number;
-  };
-}
+import { useDeliveryMetrics, KPIData } from "@/hooks/useDeliveryMetrics";
 
 interface HeroKPIsProps {
   data?: KPIData;
 }
 
 export default function HeroKPIs({ data }: HeroKPIsProps) {
-  // Mock data for demonstration
-  const mockData: KPIData = {
-    leadsImported: {
-      thisWeek: 1247,
-      total: 15420,
-    },
-    activeCampaigns: {
-      running: 3,
-      paused: 1,
-    },
-    engagementRate: {
-      openRate: 24.3,
-      replyRate: 3.7,
-    },
-    deliverabilityHealth: {
-      bounceRate: 0.8,
-      complaintRate: 0.02,
-    },
-    quotaUsage: {
-      emailsSentToday: 1250,
-      dailyCap: 2000,
-      planUsagePercent: 62.5,
-    },
-  };
+  const { kpiData: realKpiData, loading, error } = useDeliveryMetrics();
 
-  const kpiData = data || mockData;
+  // Use real data if available, otherwise fall back to provided data or mock data
+  const kpiData = realKpiData ||
+    data || {
+      leadsImported: {
+        thisWeek: 0,
+        total: 0,
+      },
+      activeCampaigns: {
+        running: 0,
+        paused: 0,
+      },
+      engagementRate: {
+        deliveryRate: 0,
+        replyRate: 0,
+      },
+      deliverabilityHealth: {
+        bounceRate: 0,
+        complaintRate: 0,
+      },
+      quotaUsage: {
+        emailsSentToday: 0,
+        dailyCap: 2000,
+        planUsagePercent: 0,
+      },
+    };
 
   const getDeliverabilityStatus = (
     bounceRate: number,
@@ -135,10 +113,10 @@ export default function HeroKPIs({ data }: HeroKPIsProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-purple-600">
-            {kpiData.engagementRate.openRate}%
+            {kpiData.engagementRate.deliveryRate.toFixed(1)}%
           </div>
           <p className="text-xs text-muted-foreground">
-            Opens / {kpiData.engagementRate.replyRate}% replies
+            Delivered / {kpiData.engagementRate.replyRate}% replies
           </p>
         </CardContent>
       </Card>
@@ -191,4 +169,3 @@ export default function HeroKPIs({ data }: HeroKPIsProps) {
     </div>
   );
 }
-

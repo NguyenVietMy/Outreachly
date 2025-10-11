@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "email_events")
@@ -51,6 +52,15 @@ public class EmailEvent {
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "campaign_id")
+    private UUID campaignId;
+
+    @Column(name = "user_id")
+    private String userId;
+
+    @Column(name = "org_id")
+    private UUID orgId;
 
     @PrePersist
     protected void onCreate() {

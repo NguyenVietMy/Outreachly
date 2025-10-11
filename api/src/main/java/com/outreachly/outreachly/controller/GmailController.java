@@ -2,6 +2,7 @@ package com.outreachly.outreachly.controller;
 
 import com.outreachly.outreachly.service.GmailService;
 import com.outreachly.outreachly.service.LeadDataService;
+import com.outreachly.outreachly.service.DeliveryTrackingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +20,7 @@ public class GmailController {
 
     private final GmailService gmailService;
     private final LeadDataService leadDataService;
+    private final DeliveryTrackingService deliveryTrackingService;
 
     @PostMapping("/send")
     public ResponseEntity<Map<String, Object>> sendEmail(
@@ -70,18 +72,45 @@ public class GmailController {
             // Process variables in email body if it contains variables
             String processedBody = processEmailVariables(request.getBody(), leadData);
 
+            // Generate unique message ID for tracking
+            String messageId = "gmail_" + System.currentTimeMillis() + "_" +
+                    java.util.UUID.randomUUID().toString().substring(0, 8);
+
             // Send email via Gmail API
-            gmailService.sendEmail(request.getTo(), request.getSubject(), processedBody,
-                    request.isHtml(), request.getFrom());
+            try {
+                gmailService.sendEmail(request.getTo(), request.getSubject(), processedBody,
+                        request.isHtml(), request.getFrom());
 
-            response.put("success", true);
-            response.put("message", "Email sent successfully via Gmail API");
-            response.put("to", request.getTo());
-            response.put("subject", request.getSubject());
-            response.put("provider", "Gmail API");
+                // Record successful delivery
+                deliveryTrackingService.recordEmailDelivered(
+                        messageId,
+                        request.getTo(),
+                        request.getCampaignId(),
+                        getUserId(authentication),
+                        getOrgId(authentication));
 
-            log.info("Gmail API email sent successfully to: {} by user: {}",
-                    request.getTo(), authentication.getName());
+                response.put("success", true);
+                response.put("message", "Email sent successfully via Gmail API");
+                response.put("to", request.getTo());
+                response.put("subject", request.getSubject());
+                response.put("provider", "Gmail API");
+                response.put("messageId", messageId);
+
+                log.info("Gmail API email sent successfully to: {} by user: {}",
+                        request.getTo(), authentication.getName());
+
+            } catch (Exception gmailException) {
+                // Record failed delivery
+                deliveryTrackingService.recordEmailRejected(
+                        messageId,
+                        request.getTo(),
+                        request.getCampaignId(),
+                        getUserId(authentication),
+                        getOrgId(authentication),
+                        gmailException.getMessage());
+
+                throw gmailException; // Re-throw to be caught by outer catch block
+            }
 
             return ResponseEntity.ok(response);
 
@@ -252,12 +281,38 @@ public class GmailController {
                 // Process variables in email body
                 String processedBody = processEmailVariables(request.getBody(), leadData);
 
-                // Send individual email
-                gmailService.sendEmail(recipient, request.getSubject(), processedBody,
-                        request.isHtml(), request.getFrom());
+                // Generate unique message ID for tracking
+                String messageId = "gmail_bulk_" + System.currentTimeMillis() + "_" +
+                        java.util.UUID.randomUUID().toString().substring(0, 8);
 
-                // Record success
-                result.addSuccess(recipient, "Email sent successfully");
+                // Send individual email
+                try {
+                    gmailService.sendEmail(recipient, request.getSubject(), processedBody,
+                            request.isHtml(), request.getFrom());
+
+                    // Record successful delivery
+                    deliveryTrackingService.recordEmailDelivered(
+                            messageId,
+                            recipient,
+                            request.getCampaignId(),
+                            request.getUserId(),
+                            request.getOrgId());
+
+                    // Record success
+                    result.addSuccess(recipient, "Email sent successfully");
+
+                } catch (Exception gmailException) {
+                    // Record failed delivery
+                    deliveryTrackingService.recordEmailRejected(
+                            messageId,
+                            recipient,
+                            request.getCampaignId(),
+                            request.getUserId(),
+                            request.getOrgId(),
+                            gmailException.getMessage());
+
+                    throw gmailException; // Re-throw to be caught by outer catch block
+                }
 
             } catch (Exception e) {
                 log.error("Failed to send email to: {}", recipient, e);
@@ -358,6 +413,9 @@ public class GmailController {
         private String body;
         private boolean html = false;
         private String from;
+        private String campaignId;
+        private String userId;
+        private String orgId;
 
         // Constructors
         public GmailRequest() {
@@ -409,6 +467,30 @@ public class GmailController {
         public void setFrom(String from) {
             this.from = from;
         }
+
+        public String getCampaignId() {
+            return campaignId;
+        }
+
+        public void setCampaignId(String campaignId) {
+            this.campaignId = campaignId;
+        }
+
+        public String getUserId() {
+            return userId;
+        }
+
+        public void setUserId(String userId) {
+            this.userId = userId;
+        }
+
+        public String getOrgId() {
+            return orgId;
+        }
+
+        public void setOrgId(String orgId) {
+            this.orgId = orgId;
+        }
     }
 
     // Inner class for bulk Gmail API request body
@@ -420,6 +502,7 @@ public class GmailController {
         private String from;
         private String campaignId;
         private String userId;
+        private String orgId;
 
         // Constructors
         public BulkGmailRequest() {
@@ -487,6 +570,14 @@ public class GmailController {
         public void setUserId(String userId) {
             this.userId = userId;
         }
+
+        public String getOrgId() {
+            return orgId;
+        }
+
+        public void setOrgId(String orgId) {
+            this.orgId = orgId;
+        }
     }
 
     // Inner class for bulk email result
@@ -550,5 +641,51 @@ public class GmailController {
         public String getMessage() {
             return message;
         }
+    }
+
+    /**
+     * Extract user ID from authentication
+     */
+    private String getUserId(Authentication authentication) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return null;
+        }
+
+        // Try to extract user ID from authentication principal
+        // This might need adjustment based on your authentication setup
+        try {
+            if (authentication.getPrincipal() instanceof org.springframework.security.oauth2.core.user.OAuth2User) {
+                org.springframework.security.oauth2.core.user.OAuth2User oauth2User = (org.springframework.security.oauth2.core.user.OAuth2User) authentication
+                        .getPrincipal();
+                return oauth2User.getAttribute("sub"); // Google user ID
+            }
+        } catch (Exception e) {
+            log.warn("Failed to extract user ID from authentication", e);
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract organization ID from authentication
+     */
+    private String getOrgId(Authentication authentication) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return null;
+        }
+
+        // Try to extract org ID from authentication principal
+        // This might need adjustment based on your authentication setup
+        try {
+            if (authentication.getPrincipal() instanceof org.springframework.security.oauth2.core.user.OAuth2User) {
+                org.springframework.security.oauth2.core.user.OAuth2User oauth2User = (org.springframework.security.oauth2.core.user.OAuth2User) authentication
+                        .getPrincipal();
+                return oauth2User.getAttribute("org_id"); // Organization ID if available
+            }
+        } catch (Exception e) {
+            log.warn("Failed to extract org ID from authentication", e);
+        }
+
+        return null;
     }
 }
