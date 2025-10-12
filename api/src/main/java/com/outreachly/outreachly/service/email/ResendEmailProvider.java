@@ -2,7 +2,9 @@ package com.outreachly.outreachly.service.email;
 
 import com.outreachly.outreachly.dto.EmailRequest;
 import com.outreachly.outreachly.dto.EmailResponse;
+import com.outreachly.outreachly.entity.UserResendConfig;
 import com.outreachly.outreachly.service.EmailEventService;
+import com.outreachly.outreachly.service.UserResendConfigService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -18,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Resend email provider implementation
@@ -28,10 +31,13 @@ import java.util.Map;
 public class ResendEmailProvider extends AbstractEmailProvider {
 
     private final WebClient webClient;
+    private final UserResendConfigService userResendConfigService;
 
-    public ResendEmailProvider(EmailEventService emailEventService, WebClient webClient) {
+    public ResendEmailProvider(EmailEventService emailEventService, WebClient webClient,
+            UserResendConfigService userResendConfigService) {
         super(emailEventService);
         this.webClient = webClient;
+        this.userResendConfigService = userResendConfigService;
     }
 
     @Value("${resend.api-key:}")
@@ -55,12 +61,24 @@ public class ResendEmailProvider extends AbstractEmailProvider {
     @Override
     protected EmailResponse doSendEmail(EmailRequest emailRequest) {
         try {
+            // Try to get user-specific configuration first
+            String userApiKey = apiKey;
+            String userFromEmail = fromEmail;
+            String userFromName = null;
+
+            // Check if emailRequest has userId (for user-specific config)
+            if (emailRequest.getCampaignId() != null) {
+                // Try to get user config from campaign or other context
+                // For now, use global config as fallback
+                log.info("Using global Resend configuration");
+            }
+
             // Check if API key is set
-            if (apiKey == null || apiKey.isEmpty()) {
+            if (userApiKey == null || userApiKey.isEmpty()) {
                 log.error("Resend API key is not set!");
                 return EmailResponse.builder()
                         .success(false)
-                        .message("Resend API key is not configured")
+                        .message("Resend API key is not configured. Please configure in Settings.")
                         .timestamp(LocalDateTime.now())
                         .totalRecipients(emailRequest.getRecipients().size())
                         .successfulRecipients(0)
@@ -69,11 +87,11 @@ public class ResendEmailProvider extends AbstractEmailProvider {
             }
 
             // Check if from email is set
-            if (fromEmail == null || fromEmail.isEmpty()) {
+            if (userFromEmail == null || userFromEmail.isEmpty()) {
                 log.error("Resend from email is not set!");
                 return EmailResponse.builder()
                         .success(false)
-                        .message("Resend from email is not configured")
+                        .message("Resend from email is not configured. Please configure in Settings.")
                         .timestamp(LocalDateTime.now())
                         .totalRecipients(emailRequest.getRecipients().size())
                         .successfulRecipients(0)
@@ -81,9 +99,72 @@ public class ResendEmailProvider extends AbstractEmailProvider {
                         .build();
             }
 
+            return sendEmailWithConfig(emailRequest, userApiKey, userFromEmail, userFromName);
+
+        } catch (Exception e) {
+            log.error("Resend failed to send email: {}", e.getMessage(), e);
+
+            return EmailResponse.builder()
+                    .success(false)
+                    .message("Failed to send email via Resend: " + e.getMessage())
+                    .timestamp(LocalDateTime.now())
+                    .totalRecipients(emailRequest.getRecipients().size())
+                    .successfulRecipients(0)
+                    .failedRecipients(emailRequest.getRecipients())
+                    .build();
+        }
+    }
+
+    /**
+     * Send email with user-specific configuration
+     */
+    public EmailResponse sendEmailWithUserConfig(EmailRequest emailRequest, Long userId) {
+        try {
+            // Get user's Resend configuration
+            Optional<UserResendConfig> userConfig = userResendConfigService.getActiveConfig(userId);
+
+            if (userConfig.isEmpty()) {
+                log.warn("No Resend configuration found for user: {}, using global config", userId);
+                return doSendEmail(emailRequest);
+            }
+
+            UserResendConfig config = userConfig.get();
+            log.info("Using user-specific Resend configuration for user: {}", userId);
+
+            return sendEmailWithConfig(
+                    emailRequest,
+                    config.getApiKey(),
+                    config.getFromEmail(),
+                    config.getFromName());
+
+        } catch (Exception e) {
+            log.error("Failed to send email with user config for user: {}", userId, e);
+            return EmailResponse.builder()
+                    .success(false)
+                    .message("Failed to send email: " + e.getMessage())
+                    .timestamp(LocalDateTime.now())
+                    .totalRecipients(emailRequest.getRecipients().size())
+                    .successfulRecipients(0)
+                    .failedRecipients(emailRequest.getRecipients())
+                    .build();
+        }
+    }
+
+    /**
+     * Core email sending logic with specific configuration
+     */
+    private EmailResponse sendEmailWithConfig(EmailRequest emailRequest, String userApiKey, String userFromEmail,
+            String userFromName) {
+        try {
             // Build Resend API request
             Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("from", fromEmail);
+
+            // Set from address with optional name
+            String fromAddress = userFromName != null && !userFromName.isEmpty()
+                    ? userFromName + " <" + userFromEmail + ">"
+                    : userFromEmail;
+
+            requestBody.put("from", fromAddress);
             requestBody.put("to", emailRequest.getRecipients());
             requestBody.put("subject", emailRequest.getSubject());
 
@@ -97,16 +178,13 @@ public class ResendEmailProvider extends AbstractEmailProvider {
                 requestBody.put("reply_to", emailRequest.getReplyTo());
             }
 
-            log.info("Sending email via Resend to: {}, from: {}", emailRequest.getRecipients(), fromEmail);
+            log.info("Sending email via Resend to: {}, from: {}", emailRequest.getRecipients(), fromAddress);
 
             // Send email via Resend API
-            log.info("Request body: {}", requestBody);
-            log.info("Authorization header: Bearer {}", apiKey.substring(0, 8) + "...");
-
             @SuppressWarnings("unchecked")
             Map<String, Object> response = webClient.post()
                     .uri("https://api.resend.com/emails")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + userApiKey)
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                     .bodyValue(requestBody)
                     .retrieve()
@@ -140,15 +218,7 @@ public class ResendEmailProvider extends AbstractEmailProvider {
 
         } catch (Exception e) {
             log.error("Resend failed to send email: {}", e.getMessage(), e);
-
-            return EmailResponse.builder()
-                    .success(false)
-                    .message("Failed to send email via Resend: " + e.getMessage())
-                    .timestamp(LocalDateTime.now())
-                    .totalRecipients(emailRequest.getRecipients().size())
-                    .successfulRecipients(0)
-                    .failedRecipients(emailRequest.getRecipients())
-                    .build();
+            throw new RuntimeException("Failed to send email via Resend", e);
         }
     }
 

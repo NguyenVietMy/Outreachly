@@ -158,8 +158,24 @@ public class SettingsController {
             Authentication authentication) {
 
         UUID orgId = getOrgIdFromAuthentication(authentication);
+
+        // Get current settings
         OrganizationSettingsDto currentSettings = settingsService.getOrganizationSettings(orgId);
+
+        // Only update notification settings, preserve other settings
         currentSettings.setNotificationSettings(notificationSettings);
+
+        // Only set emailProviderConfig if it's actually null (don't create empty
+        // object)
+        if (currentSettings.getEmailProviderConfig() == null) {
+            // Don't create empty config - let the service handle it
+            log.debug("Email provider config is null, will be handled by service");
+        }
+
+        // Ensure emailProvider is not null
+        if (currentSettings.getEmailProvider() == null || currentSettings.getEmailProvider().isEmpty()) {
+            currentSettings.setEmailProvider("resend");
+        }
 
         OrganizationSettingsDto updatedSettings = settingsService.updateOrganizationSettings(orgId, currentSettings);
 

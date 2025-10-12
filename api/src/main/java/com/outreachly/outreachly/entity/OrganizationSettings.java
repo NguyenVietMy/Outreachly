@@ -27,12 +27,15 @@ public class OrganizationSettings {
     private String emailProvider;
 
     @Column(name = "email_provider_config", columnDefinition = "jsonb")
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     private String emailProviderConfig;
 
     @Column(name = "notification_settings", columnDefinition = "jsonb")
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     private String notificationSettings;
 
     @Column(name = "feature_flags", columnDefinition = "jsonb")
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     private String featureFlags;
 
     @CreationTimestamp
@@ -48,4 +51,3 @@ public class OrganizationSettings {
     @JoinColumn(name = "org_id", insertable = false, updatable = false)
     private Organization organization;
 }
-

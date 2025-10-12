@@ -197,36 +197,82 @@ public class SettingsService {
 
     private void updateSettingsFromDto(OrganizationSettings settings, OrganizationSettingsDto dto) {
         settings.setEmailProvider(dto.getEmailProvider());
-        settings.setEmailProviderConfig(convertConfigToJson(dto.getEmailProviderConfig()));
-        settings.setNotificationSettings(convertToJson(dto.getNotificationSettings()));
-        settings.setFeatureFlags(convertToJson(dto.getFeatureFlags()));
+        String configJson = convertConfigToJson(dto.getEmailProviderConfig());
+        if (configJson != null) {
+            settings.setEmailProviderConfig(configJson);
+        }
+        // Don't update if null - let database use default
+        String notificationJson = convertToJson(dto.getNotificationSettings());
+        if (notificationJson != null) {
+            settings.setNotificationSettings(notificationJson);
+        }
+        String featureFlagsJson = convertToJson(dto.getFeatureFlags());
+        if (featureFlagsJson != null) {
+            settings.setFeatureFlags(featureFlagsJson);
+        }
     }
 
     private OrganizationSettings createSettingsFromDto(UUID orgId, OrganizationSettingsDto dto) {
-        return OrganizationSettings.builder()
+        OrganizationSettings.OrganizationSettingsBuilder builder = OrganizationSettings.builder()
                 .orgId(orgId)
-                .emailProvider(dto.getEmailProvider())
-                .emailProviderConfig(convertConfigToJson(dto.getEmailProviderConfig()))
-                .notificationSettings(convertToJson(dto.getNotificationSettings()))
-                .featureFlags(convertToJson(dto.getFeatureFlags()))
-                .build();
+                .emailProvider(dto.getEmailProvider());
+
+        String configJson = convertConfigToJson(dto.getEmailProviderConfig());
+        if (configJson != null) {
+            builder.emailProviderConfig(configJson);
+        }
+
+        String notificationJson = convertToJson(dto.getNotificationSettings());
+        if (notificationJson != null) {
+            builder.notificationSettings(notificationJson);
+        }
+
+        String featureFlagsJson = convertToJson(dto.getFeatureFlags());
+        if (featureFlagsJson != null) {
+            builder.featureFlags(featureFlagsJson);
+        }
+
+        return builder.build();
     }
 
     private String convertConfigToJson(EmailProviderConfigDto config) {
+        if (config == null) {
+            return null; // Don't create empty JSON, return null
+        }
+
+        // Check if config has any meaningful values
+        if (isEmptyConfig(config)) {
+            return null; // Don't save empty configs
+        }
+
         try {
             return objectMapper.writeValueAsString(config);
         } catch (JsonProcessingException e) {
             log.error("Error converting config to JSON: {}", e.getMessage());
-            return "{}";
+            return null; // Return null instead of empty JSON
         }
     }
 
+    private boolean isEmptyConfig(EmailProviderConfigDto config) {
+        return (config.getApiKey() == null || config.getApiKey().isEmpty()) &&
+                (config.getFromEmail() == null || config.getFromEmail().isEmpty()) &&
+                (config.getFromName() == null || config.getFromName().isEmpty()) &&
+                (config.getHost() == null || config.getHost().isEmpty()) &&
+                (config.getUsername() == null || config.getUsername().isEmpty()) &&
+                (config.getPassword() == null || config.getPassword().isEmpty()) &&
+                config.getPort() == null &&
+                (config.getRegion() == null || config.getRegion().isEmpty());
+    }
+
     private String convertToJson(Map<String, Object> data) {
+        if (data == null) {
+            return null; // Return null instead of empty JSON
+        }
         try {
             return objectMapper.writeValueAsString(data);
         } catch (JsonProcessingException e) {
             log.error("Error converting data to JSON: {}", e.getMessage());
-            return "{}";
+            return null; // Return null instead of empty JSON
         }
     }
 

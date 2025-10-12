@@ -6,7 +6,6 @@ import com.outreachly.outreachly.service.email.AbstractEmailProvider;
 import com.outreachly.outreachly.service.email.EmailProviderType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.ses.SesClient;
 import software.amazon.awssdk.services.ses.model.*;
 
@@ -14,7 +13,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-@Service
 @Slf4j
 public class SesEmailService extends AbstractEmailProvider {
 
