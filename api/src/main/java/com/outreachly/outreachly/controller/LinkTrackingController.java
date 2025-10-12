@@ -24,11 +24,19 @@ public class LinkTrackingController {
     /**
      * Track link clicks and redirect to original URL
      * URL format:
-     * /track/click?url={encodedUrl}&msg={messageId}&user={userId}&campaign={campaignId}&org={orgId}
+     * /track/click?url={encodedShortUrl}&msg={messageId}&user={userId}&campaign={campaignId}&org={orgId}
+     * 
+     * Double masking flow:
+     * 1. User clicks TinyURL: https://tiny.ly/abc123
+     * 2. TinyURL redirects to:
+     * http://localhost:3000/track/click?url=https%3A//youtube.com&msg=...
+     * 3. We decode the URL parameter: https://youtube.com
+     * 4. Record the click with original URL
+     * 5. Redirect to original URL
      */
     @GetMapping("/click")
     public RedirectView trackClick(
-            @RequestParam("url") String encodedUrl,
+            @RequestParam("url") String encodedShortUrl,
             @RequestParam("msg") String messageId,
             @RequestParam(value = "user", required = false) String userId,
             @RequestParam(value = "campaign", required = false) String campaignId,
@@ -36,10 +44,10 @@ public class LinkTrackingController {
             @RequestParam(value = "email", required = false) String recipientEmail) {
 
         try {
-            // Decode the original URL
-            String originalUrl = URLDecoder.decode(encodedUrl, StandardCharsets.UTF_8);
+            // Decode the original URL (not a short URL)
+            String originalUrl = URLDecoder.decode(encodedShortUrl, StandardCharsets.UTF_8);
 
-            // Record the click
+            // Record the click with the original URL
             deliveryTrackingService.recordLinkClick(
                     messageId,
                     recipientEmail,
@@ -48,19 +56,20 @@ public class LinkTrackingController {
                     userId,
                     orgId);
 
-            log.info("Tracked click for URL: {} from message: {}", originalUrl, messageId);
+            log.info("Tracked click for original URL: {} from message: {}",
+                    originalUrl, messageId);
 
             // Redirect to the original URL
             return new RedirectView(originalUrl);
 
         } catch (Exception e) {
-            log.error("Error tracking click for URL: {}, message: {}", encodedUrl, messageId, e);
+            log.error("Error tracking click for URL: {}, message: {}", encodedShortUrl, messageId, e);
             // Still redirect even if tracking fails
             try {
-                String originalUrl = URLDecoder.decode(encodedUrl, StandardCharsets.UTF_8);
+                String originalUrl = URLDecoder.decode(encodedShortUrl, StandardCharsets.UTF_8);
                 return new RedirectView(originalUrl);
             } catch (Exception decodeError) {
-                log.error("Failed to decode URL: {}", encodedUrl, decodeError);
+                log.error("Failed to decode URL: {}", encodedShortUrl, decodeError);
                 return new RedirectView("https://outreachly.com"); // Fallback
             }
         }
@@ -92,5 +101,3 @@ public class LinkTrackingController {
         }
     }
 }
-
-

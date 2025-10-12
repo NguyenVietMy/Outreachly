@@ -36,18 +36,27 @@ export function useClickTracking({
 
   // Update processed content when dependencies change
   useEffect(() => {
-    if (memoizedDetectedUrls.length > 0 && isTrackingEnabled) {
-      const trackedContent = replaceUrlsWithTracking(
-        emailContent,
-        messageId,
-        userId,
-        campaignId,
-        orgId
-      );
-      setProcessedContent(trackedContent);
-    } else {
-      setProcessedContent(emailContent);
-    }
+    const updateProcessedContent = async () => {
+      if (memoizedDetectedUrls.length > 0 && isTrackingEnabled) {
+        try {
+          const trackedContent = await replaceUrlsWithTracking(
+            emailContent,
+            messageId,
+            userId,
+            campaignId,
+            orgId
+          );
+          setProcessedContent(trackedContent);
+        } catch (error) {
+          console.error("Error processing URLs with tracking:", error);
+          setProcessedContent(emailContent);
+        }
+      } else {
+        setProcessedContent(emailContent);
+      }
+    };
+
+    updateProcessedContent();
   }, [
     emailContent,
     messageId,
@@ -60,19 +69,24 @@ export function useClickTracking({
 
   // Toggle tracking on/off
   const toggleTracking = useCallback(
-    (enabled: boolean) => {
+    async (enabled: boolean) => {
       setIsTrackingEnabled(enabled);
 
       if (enabled && memoizedDetectedUrls.length > 0) {
-        // Apply tracking to URLs
-        const trackedContent = replaceUrlsWithTracking(
-          emailContent,
-          messageId,
-          userId,
-          campaignId,
-          orgId
-        );
-        setProcessedContent(trackedContent);
+        try {
+          // Apply tracking to URLs
+          const trackedContent = await replaceUrlsWithTracking(
+            emailContent,
+            messageId,
+            userId,
+            campaignId,
+            orgId
+          );
+          setProcessedContent(trackedContent);
+        } catch (error) {
+          console.error("Error applying tracking:", error);
+          setProcessedContent(emailContent);
+        }
       } else {
         // Remove tracking from URLs
         const originalContent = restoreOriginalUrls(emailContent);

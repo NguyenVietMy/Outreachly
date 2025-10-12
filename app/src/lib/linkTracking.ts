@@ -1,6 +1,8 @@
 /**
- * Utility functions for link detection and URL wrapping
+ * Utility functions for link detection and URL wrapping with double masking
  */
+
+import { shortenUrl } from "./linkShortener";
 
 // URL regex that handles common patterns including punctuation
 const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/gi;
@@ -44,53 +46,49 @@ export function hasUrls(text: string): boolean {
 }
 
 /**
- * Wrap URLs with tracking parameters
- * @param originalUrl - The original URL to wrap
- * @param messageId - The message ID for tracking
- * @param userId - The user ID for tracking
- * @param campaignId - Optional campaign ID
- * @param orgId - Optional organization ID
- * @returns Wrapped tracking URL
- */
-export function wrapUrlWithTracking(
-  originalUrl: string,
-  messageId: string,
-  userId: string,
-  campaignId?: string,
-  orgId?: string
-): string {
-  const baseUrl = `${window.location.origin}/track/click`;
-  const params = new URLSearchParams({
-    url: originalUrl,
-    msg: messageId,
-    user: userId,
-  });
-
-  if (campaignId) params.append("campaign", campaignId);
-  if (orgId) params.append("org", orgId);
-
-  return `${baseUrl}?${params.toString()}`;
-}
-
-/**
- * Replace URLs in text with tracked versions
+ * Replace URLs in text with double-masked tracked versions (async)
  * @param text - The original text
  * @param messageId - The message ID for tracking
  * @param userId - The user ID for tracking
  * @param campaignId - Optional campaign ID
  * @param orgId - Optional organization ID
- * @returns Text with URLs replaced with tracked versions
+ * @returns Promise that resolves to text with URLs replaced with double-masked tracked versions
  */
-export function replaceUrlsWithTracking(
+export async function replaceUrlsWithTracking(
   text: string,
   messageId: string,
   userId: string,
   campaignId?: string,
   orgId?: string
-): string {
-  return text.replace(URL_REGEX, (url) => {
-    return wrapUrlWithTracking(url, messageId, userId, campaignId, orgId);
-  });
+): Promise<string> {
+  const urlMatches = text.match(URL_REGEX);
+  if (!urlMatches) return text;
+
+  let processedText = text;
+
+  for (const url of urlMatches) {
+    // Clean the URL before wrapping (remove trailing punctuation)
+    const cleanUrl = url.replace(/[.,;:!?]+$/, "").trim();
+
+    // Validate the URL before wrapping
+    try {
+      new URL(cleanUrl);
+      // Use double masking: original URL -> short URL -> tracking URL
+      const trackingUrl = await shortenUrl(
+        cleanUrl,
+        messageId,
+        userId,
+        campaignId,
+        orgId
+      );
+      processedText = processedText.replace(url, trackingUrl);
+    } catch {
+      // If URL is invalid, keep original
+      continue;
+    }
+  }
+
+  return processedText;
 }
 
 /**
