@@ -1006,13 +1006,6 @@ export default function SendEmailPage() {
                               }))
                             }
                             placeholder="Enter your email content..."
-                            isHtml={formData.isHtml}
-                            onHtmlChange={(isHtml) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                isHtml,
-                              }))
-                            }
                             maxLength={10000}
                             error={errors.content}
                           />

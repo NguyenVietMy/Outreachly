@@ -44,6 +44,7 @@ import {
   Database,
   Zap,
   AlertTriangle,
+  AlertCircle,
   CheckCircle,
   Loader2,
   Save,
@@ -108,6 +109,17 @@ export default function SettingsPage() {
     showPreview: true,
   });
 
+  // Resend configuration state
+  const [resendConfig, setResendConfig] = useState({
+    apiKey: "",
+    fromEmail: "",
+    fromName: "",
+    domain: "",
+  });
+  const [loadingResendConfig, setLoadingResendConfig] = useState(false);
+  const [hasResendConfig, setHasResendConfig] = useState(false);
+  const [resendConfigModified, setResendConfigModified] = useState(false);
+
   // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
@@ -120,8 +132,16 @@ export default function SettingsPage() {
     if (user && !authLoading) {
       loadSettings();
       loadEmailProviders();
+      loadResendConfig();
     }
   }, [user, authLoading]);
+
+  // Monitor Resend configuration changes
+  useEffect(() => {
+    if (resendConfigModified) {
+      setHasUnsavedChanges(true);
+    }
+  }, [resendConfigModified]);
 
   const loadSettings = async () => {
     try {
@@ -170,15 +190,26 @@ export default function SettingsPage() {
       if (response.ok) {
         const providers = await response.json();
 
+        // Filter out Mock and SES providers
+        const filteredProviders = providers.filter(
+          (provider: any) =>
+            provider.id !== "mock" &&
+            provider.id !== "aws-ses" &&
+            provider.name !== "Mock" &&
+            provider.name !== "AWS SES"
+        );
+
         // Ensure each provider has a config object with default values
-        const providersWithDefaults = providers.map((provider: any) => ({
-          ...provider,
-          config: provider.config || {
-            apiKey: "",
-            fromEmail: "",
-            fromName: "",
-          },
-        }));
+        const providersWithDefaults = filteredProviders.map(
+          (provider: any) => ({
+            ...provider,
+            config: provider.config || {
+              apiKey: "",
+              fromEmail: "",
+              fromName: "",
+            },
+          })
+        );
 
         setEmailProviders(providersWithDefaults);
       } else {
@@ -216,19 +247,22 @@ export default function SettingsPage() {
         marketingEmails: settings.marketingEmails,
       };
 
-      const response = await fetch(API_URL + "/api/settings", {
+      const response = await fetch(API_URL + "/api/settings/notifications", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify({
-          notificationSettings: notificationSettings,
-        }),
+        body: JSON.stringify(notificationSettings),
       });
 
       if (!response.ok) {
         throw new Error("Failed to save settings");
+      }
+
+      // Also save Resend configuration if it has been modified
+      if (resendConfig.apiKey && resendConfig.fromEmail) {
+        await saveResendConfig();
       }
 
       setHasUnsavedChanges(false);
@@ -376,6 +410,166 @@ export default function SettingsPage() {
           : provider
       )
     );
+  };
+
+  // Resend configuration functions
+  const loadResendConfig = async () => {
+    try {
+      setLoadingResendConfig(true);
+      const response = await fetch(API_URL + "/api/user/resend/config", {
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        const config = await response.json();
+        setResendConfig({
+          apiKey: "", // Don't load API key for security
+          fromEmail: config.fromEmail || "",
+          fromName: config.fromName || "",
+          domain: config.domain || "",
+        });
+        setHasResendConfig(true);
+      } else if (response.status === 404) {
+        setHasResendConfig(false);
+      }
+    } catch (error) {
+      console.error("Failed to load Resend config:", error);
+    } finally {
+      setLoadingResendConfig(false);
+    }
+  };
+
+  const saveResendConfig = async () => {
+    try {
+      setIsSaving(true);
+
+      // Validate inputs
+      if (!resendConfig.apiKey || !resendConfig.fromEmail) {
+        toast({
+          title: "Validation Error",
+          description: "API Key and From Email are required",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await fetch(API_URL + "/api/user/resend/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(resendConfig),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Resend configuration saved successfully",
+        });
+        setHasResendConfig(true);
+        setResendConfigModified(false);
+        // Reload config
+        await loadResendConfig();
+      } else {
+        const error = await response.text();
+        toast({
+          title: "Error",
+          description: `Failed to save Resend configuration: ${error}`,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save Resend configuration",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const testResendConfig = async () => {
+    try {
+      setIsLoading(true);
+
+      if (!resendConfig.apiKey || !resendConfig.fromEmail) {
+        toast({
+          title: "Validation Error",
+          description: "API Key and From Email are required to test",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await fetch(API_URL + "/api/user/resend/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(resendConfig),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: result.message || "Configuration is valid!",
+        });
+      } else {
+        toast({
+          title: "Configuration Invalid",
+          description: result.message || "Please check your configuration",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Test Failed",
+        description: "Failed to test Resend configuration",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteResendConfig = async () => {
+    try {
+      setIsLoading(true);
+
+      const response = await fetch(API_URL + "/api/user/resend/config", {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Resend configuration deleted successfully",
+        });
+        setResendConfig({
+          apiKey: "",
+          fromEmail: "",
+          fromName: "",
+          domain: "",
+        });
+        setHasResendConfig(false);
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to delete Resend configuration",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete Resend configuration",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (authLoading) {
@@ -550,24 +744,42 @@ export default function SettingsPage() {
 
                           {provider.isActive && (
                             <div className="space-y-4">
-                              {provider.type === "api" && (
+                              {provider.id === "resend" ? (
+                                // Enhanced Resend Configuration
                                 <>
+                                  {hasResendConfig && (
+                                    <Alert className="border-green-200 bg-green-50">
+                                      <CheckCircle className="h-4 w-4 text-green-600" />
+                                      <AlertDescription className="text-green-800">
+                                        <div className="font-medium mb-1">
+                                          Resend account connected
+                                        </div>
+                                        <p className="text-sm">
+                                          You're using your own Resend account
+                                          to send emails
+                                        </p>
+                                      </AlertDescription>
+                                    </Alert>
+                                  )}
+
                                   <div className="space-y-2">
-                                    <Label>API Key</Label>
+                                    <Label htmlFor="resend-api-key">
+                                      API Key{" "}
+                                      <span className="text-red-500">*</span>
+                                    </Label>
                                     <div className="flex gap-2">
                                       <Input
+                                        id="resend-api-key"
                                         type={showApiKey ? "text" : "password"}
-                                        value={provider.config?.apiKey || ""}
+                                        value={resendConfig.apiKey}
                                         onChange={(e) => {
-                                          updateEmailProvider(provider.id, {
-                                            config: {
-                                              ...provider.config,
-                                              apiKey: e.target.value,
-                                            },
-                                          });
-                                          markAsChanged();
+                                          setResendConfig((prev) => ({
+                                            ...prev,
+                                            apiKey: e.target.value,
+                                          }));
+                                          setResendConfigModified(true);
                                         }}
-                                        placeholder="Enter your API key"
+                                        placeholder="re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                                       />
                                       <Button
                                         type="button"
@@ -584,44 +796,255 @@ export default function SettingsPage() {
                                         )}
                                       </Button>
                                     </div>
+                                    <p className="text-xs text-gray-500">
+                                      Get your API key from{" "}
+                                      <a
+                                        href="https://resend.com/api-keys"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:underline"
+                                      >
+                                        Resend Dashboard
+                                      </a>
+                                    </p>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                      <Label htmlFor="resend-from-email">
+                                        From Email{" "}
+                                        <span className="text-red-500">*</span>
+                                      </Label>
+                                      <Input
+                                        id="resend-from-email"
+                                        type="email"
+                                        value={resendConfig.fromEmail}
+                                        onChange={(e) => {
+                                          setResendConfig((prev) => ({
+                                            ...prev,
+                                            fromEmail: e.target.value,
+                                          }));
+                                          setResendConfigModified(true);
+                                        }}
+                                        placeholder="noreply@yourdomain.com"
+                                      />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                      <Label htmlFor="resend-from-name">
+                                        From Name
+                                      </Label>
+                                      <Input
+                                        id="resend-from-name"
+                                        value={resendConfig.fromName}
+                                        onChange={(e) => {
+                                          setResendConfig((prev) => ({
+                                            ...prev,
+                                            fromName: e.target.value,
+                                          }));
+                                          setResendConfigModified(true);
+                                        }}
+                                        placeholder="Your Company"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <Label htmlFor="resend-domain">
+                                      Domain
+                                    </Label>
+                                    <Input
+                                      id="resend-domain"
+                                      value={resendConfig.domain}
+                                      onChange={(e) => {
+                                        setResendConfig((prev) => ({
+                                          ...prev,
+                                          domain: e.target.value,
+                                        }));
+                                        setResendConfigModified(true);
+                                      }}
+                                      placeholder="yourdomain.com"
+                                    />
+                                    <p className="text-xs text-gray-500">
+                                      Make sure to verify your domain in Resend
+                                      first
+                                    </p>
+                                  </div>
+
+                                  <div className="flex gap-2 pt-4">
+                                    <Button
+                                      onClick={saveResendConfig}
+                                      disabled={isSaving || isLoading}
+                                    >
+                                      {isSaving ? (
+                                        <>
+                                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                          Saving...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Save className="mr-2 h-4 w-4" />
+                                          Save Configuration
+                                        </>
+                                      )}
+                                    </Button>
+
+                                    <Button
+                                      variant="outline"
+                                      onClick={testResendConfig}
+                                      disabled={isLoading || isSaving}
+                                    >
+                                      {isLoading ? (
+                                        <>
+                                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                          Testing...
+                                        </>
+                                      ) : (
+                                        "Test Configuration"
+                                      )}
+                                    </Button>
+
+                                    {hasResendConfig && (
+                                      <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                          <Button
+                                            variant="destructive"
+                                            disabled={isLoading || isSaving}
+                                          >
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            Delete
+                                          </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                          <AlertDialogHeader>
+                                            <AlertDialogTitle>
+                                              Delete Resend Configuration
+                                            </AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                              Are you sure you want to delete
+                                              your Resend configuration? You
+                                              will no longer be able to send
+                                              emails using your own Resend
+                                              account.
+                                            </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter>
+                                            <AlertDialogCancel>
+                                              Cancel
+                                            </AlertDialogCancel>
+                                            <AlertDialogAction
+                                              onClick={deleteResendConfig}
+                                              className="bg-red-600 hover:bg-red-700"
+                                            >
+                                              Yes, Delete Configuration
+                                            </AlertDialogAction>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      </AlertDialog>
+                                    )}
+                                  </div>
+
+                                  <Alert className="border-blue-200 bg-blue-50">
+                                    <AlertCircle className="h-4 w-4 text-blue-600" />
+                                    <AlertDescription className="text-blue-800">
+                                      <div className="font-medium mb-2">
+                                        How to set up your Resend account:
+                                      </div>
+                                      <ol className="text-sm space-y-1 list-decimal list-inside">
+                                        <li>Create an account at resend.com</li>
+                                        <li>
+                                          Verify your domain with DNS records
+                                        </li>
+                                        <li>Generate an API key</li>
+                                        <li>
+                                          Enter your details above and click
+                                          Save
+                                        </li>
+                                      </ol>
+                                    </AlertDescription>
+                                  </Alert>
+                                </>
+                              ) : (
+                                // Default provider configuration for non-Resend providers
+                                <>
+                                  {provider.type === "api" && (
+                                    <>
+                                      <div className="space-y-2">
+                                        <Label>API Key</Label>
+                                        <div className="flex gap-2">
+                                          <Input
+                                            type={
+                                              showApiKey ? "text" : "password"
+                                            }
+                                            value={
+                                              provider.config?.apiKey || ""
+                                            }
+                                            onChange={(e) => {
+                                              updateEmailProvider(provider.id, {
+                                                config: {
+                                                  ...provider.config,
+                                                  apiKey: e.target.value,
+                                                },
+                                              });
+                                              markAsChanged();
+                                            }}
+                                            placeholder="Enter your API key"
+                                          />
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                              setShowApiKey(!showApiKey)
+                                            }
+                                          >
+                                            {showApiKey ? (
+                                              <EyeOff className="h-4 w-4" />
+                                            ) : (
+                                              <Eye className="h-4 w-4" />
+                                            )}
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </>
+                                  )}
+
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                      <Label>From Email</Label>
+                                      <Input
+                                        value={provider.config?.fromEmail || ""}
+                                        onChange={(e) => {
+                                          updateEmailProvider(provider.id, {
+                                            config: {
+                                              ...provider.config,
+                                              fromEmail: e.target.value,
+                                            },
+                                          });
+                                          markAsChanged();
+                                        }}
+                                        placeholder="noreply@yourdomain.com"
+                                      />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label>From Name</Label>
+                                      <Input
+                                        value={provider.config?.fromName || ""}
+                                        onChange={(e) => {
+                                          updateEmailProvider(provider.id, {
+                                            config: {
+                                              ...provider.config,
+                                              fromName: e.target.value,
+                                            },
+                                          });
+                                          markAsChanged();
+                                        }}
+                                        placeholder="Your Company"
+                                      />
+                                    </div>
                                   </div>
                                 </>
                               )}
-
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                  <Label>From Email</Label>
-                                  <Input
-                                    value={provider.config?.fromEmail || ""}
-                                    onChange={(e) => {
-                                      updateEmailProvider(provider.id, {
-                                        config: {
-                                          ...provider.config,
-                                          fromEmail: e.target.value,
-                                        },
-                                      });
-                                      markAsChanged();
-                                    }}
-                                    placeholder="noreply@yourdomain.com"
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>From Name</Label>
-                                  <Input
-                                    value={provider.config?.fromName || ""}
-                                    onChange={(e) => {
-                                      updateEmailProvider(provider.id, {
-                                        config: {
-                                          ...provider.config,
-                                          fromName: e.target.value,
-                                        },
-                                      });
-                                      markAsChanged();
-                                    }}
-                                    placeholder="Your Company"
-                                  />
-                                </div>
-                              </div>
                             </div>
                           )}
                         </div>
