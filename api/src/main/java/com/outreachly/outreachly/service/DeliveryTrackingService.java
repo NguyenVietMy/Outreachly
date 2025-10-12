@@ -81,9 +81,12 @@ public class DeliveryTrackingService {
     public void recordLinkClick(String messageId, String recipientEmail, String clickedUrl, String campaignId,
             String userId, String orgId) {
         try {
+            // Use a default email if recipient email is null (for link tracking)
+            String emailAddress = recipientEmail != null ? recipientEmail : "tracked@outreachly.com";
+
             EmailEvent clickEvent = EmailEvent.builder()
                     .messageId(messageId)
-                    .emailAddress(recipientEmail)
+                    .emailAddress(emailAddress)
                     .eventType(EmailEvent.EmailEventType.CLICK)
                     .timestamp(LocalDateTime.now())
                     .clickedUrl(clickedUrl)

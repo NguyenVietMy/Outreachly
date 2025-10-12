@@ -11,6 +11,7 @@ interface UseClickTrackingProps {
   userId: string;
   campaignId?: string;
   orgId?: string;
+  recipients?: string[];
 }
 
 export function useClickTracking({
@@ -19,6 +20,7 @@ export function useClickTracking({
   userId,
   campaignId,
   orgId,
+  recipients,
 }: UseClickTrackingProps) {
   const [isTrackingEnabled, setIsTrackingEnabled] = useState(false);
   const [detectedUrls, setDetectedUrls] = useState<string[]>([]);
@@ -44,7 +46,8 @@ export function useClickTracking({
             messageId,
             userId,
             campaignId,
-            orgId
+            orgId,
+            recipients?.[0] // Use first recipient email
           );
           setProcessedContent(trackedContent);
         } catch (error) {
@@ -80,7 +83,8 @@ export function useClickTracking({
             messageId,
             userId,
             campaignId,
-            orgId
+            orgId,
+            recipients?.[0] // Use first recipient email
           );
           setProcessedContent(trackedContent);
         } catch (error) {

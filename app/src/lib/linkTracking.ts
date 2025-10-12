@@ -59,7 +59,8 @@ export async function replaceUrlsWithTracking(
   messageId: string,
   userId: string,
   campaignId?: string,
-  orgId?: string
+  orgId?: string,
+  recipientEmail?: string
 ): Promise<string> {
   const urlMatches = text.match(URL_REGEX);
   if (!urlMatches) return text;
@@ -79,7 +80,8 @@ export async function replaceUrlsWithTracking(
         messageId,
         userId,
         campaignId,
-        orgId
+        orgId,
+        recipientEmail
       );
       processedText = processedText.replace(url, trackingUrl);
     } catch {

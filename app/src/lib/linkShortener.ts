@@ -17,7 +17,8 @@ export async function shortenUrl(
   messageId: string,
   userId: string,
   campaignId?: string,
-  orgId?: string
+  orgId?: string,
+  recipientEmail?: string
 ): Promise<string> {
   try {
     // First create the tracking URL
@@ -26,7 +27,8 @@ export async function shortenUrl(
       messageId,
       userId,
       campaignId,
-      orgId
+      orgId,
+      recipientEmail
     );
 
     // Then shorten the tracking URL using TinyURL API
@@ -49,7 +51,14 @@ export async function shortenUrl(
   } catch (error) {
     console.error("Error creating TinyURL:", error);
     // Fallback to direct tracking without shortening
-    return createTrackingUrl(originalUrl, messageId, userId, campaignId, orgId);
+    return createTrackingUrl(
+      originalUrl,
+      messageId,
+      userId,
+      campaignId,
+      orgId,
+      recipientEmail
+    );
   }
 }
 
@@ -61,9 +70,16 @@ function createTrackingUrl(
   messageId: string,
   userId: string,
   campaignId?: string,
-  orgId?: string
+  orgId?: string,
+  recipientEmail?: string
 ): string {
-  const baseUrl = `${window.location.origin}/track/click`;
+  // Use backend URL (port 8080) instead of frontend URL (port 3000)
+  const isLocalhost = window.location.hostname === "localhost";
+  const backendUrl = isLocalhost
+    ? "http://localhost:8080"
+    : "https://outreach-ly.com";
+
+  const baseUrl = `${backendUrl}/track/click`;
   const params = new URLSearchParams({
     url: originalUrl,
     msg: messageId,
@@ -72,6 +88,7 @@ function createTrackingUrl(
 
   if (campaignId) params.append("campaign", campaignId);
   if (orgId) params.append("org", orgId);
+  if (recipientEmail) params.append("email", recipientEmail);
 
   return `${baseUrl}?${params.toString()}`;
 }

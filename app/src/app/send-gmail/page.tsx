@@ -165,6 +165,7 @@ export default function SendGmailPage() {
     userId,
     campaignId,
     orgId,
+    recipients: formData.recipients,
   });
 
   const API_URL = API_BASE_URL;
