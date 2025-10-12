@@ -40,6 +40,9 @@ public class EmailEvent {
     @Column(name = "complaint_feedback_type")
     private String complaintFeedbackType;
 
+    @Column(name = "clicked_url", columnDefinition = "TEXT")
+    private String clickedUrl;
+
     @Column(name = "timestamp", nullable = false)
     private LocalDateTime timestamp;
 

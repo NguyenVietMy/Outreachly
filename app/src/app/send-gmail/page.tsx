@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
@@ -58,6 +58,8 @@ import DashboardLayout from "@/components/DashboardLayout";
 import AuthGuard from "@/components/AuthGuard";
 import { useLeads, Lead } from "@/hooks/useLeads";
 import TemplateBrowserModal from "@/components/templates/TemplateBrowserModal";
+import ClickTrackerToggle from "@/components/email/ClickTrackerToggle";
+import { useClickTracking } from "@/hooks/useClickTracking";
 import {
   Dialog,
   DialogContent,
@@ -142,6 +144,28 @@ export default function SendGmailPage() {
     useState<BulkEmailResult | null>(null);
   const [showGmailModal1, setShowGmailModal1] = useState(false);
   const [showGmailModal2, setShowGmailModal2] = useState(false);
+
+  const messageId = useMemo(
+    () => `gmail_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    []
+  );
+  const userId = user?.id?.toString() || "user_123";
+  const campaignId = formData.campaignId;
+  const orgId = user?.orgId?.toString();
+
+  const {
+    isTrackingEnabled,
+    detectedUrls,
+    processedContent,
+    toggleTracking,
+    hasUrls,
+  } = useClickTracking({
+    emailContent: formData.content,
+    messageId,
+    userId,
+    campaignId,
+    orgId,
+  });
 
   const API_URL = API_BASE_URL;
 
@@ -353,11 +377,11 @@ export default function SendGmailPage() {
     setLastBulkResponse(null);
 
     try {
-      // Generate unique message ID
-      const messageId = `gmail_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const contentToSend = isTrackingEnabled
+        ? processedContent
+        : formData.content;
 
-      // Convert to HTML
-      const { htmlContent } = convertToHtmlEmail(formData.content);
+      const { htmlContent } = convertToHtmlEmail(contentToSend);
 
       const gmailRequest = {
         to: recipient,
@@ -495,11 +519,11 @@ export default function SendGmailPage() {
     setLastBulkResponse(null);
 
     try {
-      // Generate unique message ID
-      const messageId = `gmail_bulk_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const contentToSend = isTrackingEnabled
+        ? processedContent
+        : formData.content;
 
-      // Convert to HTML
-      const { htmlContent } = convertToHtmlEmail(formData.content);
+      const { htmlContent } = convertToHtmlEmail(contentToSend);
 
       const bulkRequest = {
         recipients: validRecipients,
@@ -836,6 +860,13 @@ export default function SendGmailPage() {
                         onBrowseTemplates={() =>
                           setShowTemplates(!showTemplates)
                         }
+                      />
+
+                      {/* Click Tracking Toggle */}
+                      <ClickTrackerToggle
+                        isEnabled={isTrackingEnabled}
+                        onToggle={toggleTracking}
+                        detectedUrls={detectedUrls}
                       />
 
                       {/* Advanced Options */}

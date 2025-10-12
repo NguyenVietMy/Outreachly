@@ -76,6 +76,34 @@ public class DeliveryTrackingService {
     }
 
     /**
+     * Record a link click in an email
+     */
+    public void recordLinkClick(String messageId, String recipientEmail, String clickedUrl, String campaignId,
+            String userId, String orgId) {
+        try {
+            EmailEvent clickEvent = EmailEvent.builder()
+                    .messageId(messageId)
+                    .emailAddress(recipientEmail)
+                    .eventType(EmailEvent.EmailEventType.CLICK)
+                    .timestamp(LocalDateTime.now())
+                    .clickedUrl(clickedUrl)
+                    .rawMessage("Link clicked: " + clickedUrl)
+                    .processed(true)
+                    .campaignId(campaignId != null ? UUID.fromString(campaignId) : null)
+                    .userId(userId)
+                    .orgId(orgId != null ? UUID.fromString(orgId) : null)
+                    .build();
+
+            emailEventRepository.save(clickEvent);
+            log.info("Recorded link click - MessageId: {}, Recipient: {}, URL: {}, Campaign: {}",
+                    messageId, recipientEmail, clickedUrl, campaignId);
+
+        } catch (Exception e) {
+            log.error("Failed to record link click for message: {}", messageId, e);
+        }
+    }
+
+    /**
      * Get delivery statistics for a campaign
      */
     public DeliveryStats getCampaignDeliveryStats(String campaignId) {
@@ -196,27 +224,35 @@ public class DeliveryTrackingService {
 
                 long delivered = 0;
                 long failed = 0;
+                long clicks = 0;
 
                 if (userId != null) {
                     delivered = emailEventRepository.countByEventTypeAndUserIdAndTimestampBetween(
                             EmailEvent.EmailEventType.DELIVERY, userId, startOfDay, endOfDay);
                     failed = emailEventRepository.countByEventTypeAndUserIdAndTimestampBetween(
                             EmailEvent.EmailEventType.REJECT, userId, startOfDay, endOfDay);
+                    clicks = emailEventRepository.countByEventTypeAndUserIdAndTimestampBetween(
+                            EmailEvent.EmailEventType.CLICK, userId, startOfDay, endOfDay);
                 } else if (campaignId != null) {
                     UUID campaignUuid = UUID.fromString(campaignId);
                     delivered = emailEventRepository.countByEventTypeAndCampaignIdAndTimestampBetween(
                             EmailEvent.EmailEventType.DELIVERY, campaignUuid, startOfDay, endOfDay);
                     failed = emailEventRepository.countByEventTypeAndCampaignIdAndTimestampBetween(
                             EmailEvent.EmailEventType.REJECT, campaignUuid, startOfDay, endOfDay);
+                    clicks = emailEventRepository.countByEventTypeAndCampaignIdAndTimestampBetween(
+                            EmailEvent.EmailEventType.CLICK, campaignUuid, startOfDay, endOfDay);
                 } else {
                     delivered = emailEventRepository.countByEventTypeAndTimestampBetween(
                             EmailEvent.EmailEventType.DELIVERY, startOfDay, endOfDay);
                     failed = emailEventRepository.countByEventTypeAndTimestampBetween(
                             EmailEvent.EmailEventType.REJECT, startOfDay, endOfDay);
+                    clicks = emailEventRepository.countByEventTypeAndTimestampBetween(
+                            EmailEvent.EmailEventType.CLICK, startOfDay, endOfDay);
                 }
 
                 long totalSent = delivered + failed;
                 double deliveryRate = totalSent > 0 ? (double) delivered / totalSent * 100 : 0;
+                double clickRate = delivered > 0 ? (double) clicks / delivered * 100 : 0;
 
                 trends.add(TrendData.builder()
                         .date(currentDate.toString())
@@ -224,6 +260,8 @@ public class DeliveryTrackingService {
                         .failed(failed)
                         .totalSent(totalSent)
                         .deliveryRate(deliveryRate)
+                        .clicks(clicks)
+                        .clickRate(clickRate)
                         .build());
 
                 // Move to next day
@@ -335,5 +373,7 @@ public class DeliveryTrackingService {
         private long failed;
         private long totalSent;
         private double deliveryRate;
+        private long clicks;
+        private double clickRate;
     }
 }

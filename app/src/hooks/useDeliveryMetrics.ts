@@ -14,6 +14,8 @@ export interface TrendData {
   failed: number;
   totalSent: number;
   deliveryRate: number;
+  clicks: number;
+  clickRate: number;
 }
 
 export interface KPIData {
