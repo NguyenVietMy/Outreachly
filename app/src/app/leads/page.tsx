@@ -47,32 +47,6 @@ import Link from "next/link";
 import { listTemplates, parseContent, TemplateModel } from "@/lib/templates";
 import TemplateBrowserModal from "@/components/templates/TemplateBrowserModal";
 
-// Activity mock stays for now; templates will be fetched live
-
-const mockActivities = [
-  {
-    id: "1",
-    email: "john.doe@techcorp.com",
-    operationStatus: "sent",
-    emailStatus: "delivered",
-    timestamp: "2024-01-15 10:30 AM",
-  },
-  {
-    id: "2",
-    email: "jane@designstudio.com",
-    operationStatus: "sending",
-    emailStatus: "pending",
-    timestamp: "2024-01-15 11:15 AM",
-  },
-  {
-    id: "3",
-    email: "bob.wilson@marketinginc.com",
-    operationStatus: "sent",
-    emailStatus: "bounced",
-    timestamp: "2024-01-15 09:45 AM",
-  },
-];
-
 interface FilterState {
   verifiedStatus: string;
   position: string;
@@ -398,17 +372,6 @@ export default function LeadsPage() {
     } finally {
       setButtonLoading((prev) => ({ ...prev, removeFromCampaign: false }));
     }
-  };
-
-  const getStatusBadge = (status: string) => {
-    const variants: any = {
-      sent: "default",
-      sending: "secondary",
-      delivered: "default",
-      bounced: "destructive",
-      pending: "secondary",
-    };
-    return <Badge variant={variants[status] || "secondary"}>{status}</Badge>;
   };
 
   return (
@@ -1008,61 +971,8 @@ export default function LeadsPage() {
                       </TableBody>
                     </Table>
                   </div>
-
-                  {/* Pagination Placeholder */}
-                  <div className="flex justify-between items-center mt-4">
-                    <div className="text-sm text-muted-foreground">
-                      Showing {filteredLeads.length} of {leads.length} leads
-                      {getActiveFiltersCount() > 0 && (
-                        <span className="ml-2 text-blue-600">(filtered)</span>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" disabled>
-                        Previous
-                      </Button>
-                      <Button variant="outline" disabled>
-                        Next
-                      </Button>
-                    </div>
-                  </div>
                 </>
               )}
-            </CardContent>
-          </Card>
-
-          <hr className="my-8" />
-
-          {/* Activity Tracker Section */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Activity Tracker</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Email Address</TableHead>
-                    <TableHead>Operation Status</TableHead>
-                    <TableHead>Email Status</TableHead>
-                    <TableHead>Timestamp</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mockActivities.map((activity) => (
-                    <TableRow key={activity.id}>
-                      <TableCell>{activity.email}</TableCell>
-                      <TableCell>
-                        {getStatusBadge(activity.operationStatus)}
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(activity.emailStatus)}
-                      </TableCell>
-                      <TableCell>{activity.timestamp}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
             </CardContent>
           </Card>
 
@@ -1120,55 +1030,6 @@ export default function LeadsPage() {
                   })}
                 </div>
               )}
-            </CardContent>
-          </Card>
-
-          <hr className="my-8" />
-
-          {/* Health & Metrics Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Health & Metrics</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="text-center p-4 border rounded-lg">
-                  <div className="text-2xl font-bold text-blue-600">1,234</div>
-                  <div className="text-sm text-muted-foreground">
-                    Total Leads
-                  </div>
-                  {/* Placeholder graph */}
-                  <div className="mt-2 h-8 bg-gray-100 rounded flex items-end justify-center">
-                    <div className="w-2 h-6 bg-blue-600 rounded"></div>
-                    <div className="w-2 h-4 bg-blue-600 rounded ml-1"></div>
-                    <div className="w-2 h-5 bg-blue-600 rounded ml-1"></div>
-                  </div>
-                </div>
-                <div className="text-center p-4 border rounded-lg">
-                  <div className="text-2xl font-bold text-green-600">85%</div>
-                  <div className="text-sm text-muted-foreground">
-                    Verified %
-                  </div>
-                  {/* Placeholder graph */}
-                  <div className="mt-2 h-8 bg-gray-100 rounded flex items-end justify-center">
-                    <div className="w-2 h-7 bg-green-600 rounded"></div>
-                    <div className="w-2 h-5 bg-green-600 rounded ml-1"></div>
-                    <div className="w-2 h-6 bg-green-600 rounded ml-1"></div>
-                  </div>
-                </div>
-                <div className="text-center p-4 border rounded-lg">
-                  <div className="text-2xl font-bold text-red-600">23</div>
-                  <div className="text-sm text-muted-foreground">
-                    Suppressed Count
-                  </div>
-                  {/* Placeholder graph */}
-                  <div className="mt-2 h-8 bg-gray-100 rounded flex items-end justify-center">
-                    <div className="w-2 h-3 bg-red-600 rounded"></div>
-                    <div className="w-2 h-2 bg-red-600 rounded ml-1"></div>
-                    <div className="w-2 h-4 bg-red-600 rounded ml-1"></div>
-                  </div>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </div>

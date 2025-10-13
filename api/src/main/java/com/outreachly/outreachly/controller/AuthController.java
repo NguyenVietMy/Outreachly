@@ -42,6 +42,7 @@ public class AuthController {
                 userMap.put("profilePictureUrl", user.getProfilePictureUrl());
                 userMap.put("role", user.getRole() != null ? user.getRole().name() : null);
                 userMap.put("orgId", user.getOrgId());
+                userMap.put("createdAt", user.getCreatedAt());
                 response.put("user", userMap);
             } else {
                 response.put("authenticated", false);

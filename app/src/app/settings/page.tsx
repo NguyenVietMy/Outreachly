@@ -39,11 +39,7 @@ import {
   Settings,
   Mail,
   Shield,
-  Bell,
-  Palette,
-  Database,
   Zap,
-  AlertTriangle,
   AlertCircle,
   CheckCircle,
   Loader2,
@@ -76,13 +72,7 @@ interface EmailProvider {
 }
 
 interface UserSettings {
-  emailNotifications: boolean;
-  marketingEmails: boolean;
-  theme: "light" | "dark" | "system";
-  timezone: string;
-  language: string;
-  autoSave: boolean;
-  showPreview: boolean;
+  // No settings needed for MVP
 }
 
 export default function SettingsPage() {
@@ -98,16 +88,8 @@ export default function SettingsPage() {
   const [emailProviders, setEmailProviders] = useState<EmailProvider[]>([]);
   const [loadingProviders, setLoadingProviders] = useState(true);
 
-  // User settings state
-  const [settings, setSettings] = useState<UserSettings>({
-    emailNotifications: true,
-    marketingEmails: false,
-    theme: "system",
-    timezone: "UTC",
-    language: "en",
-    autoSave: true,
-    showPreview: true,
-  });
+  // User settings state - not needed for MVP
+  const [settings, setSettings] = useState<UserSettings>({});
 
   // Resend configuration state
   const [resendConfig, setResendConfig] = useState({
@@ -155,16 +137,7 @@ export default function SettingsPage() {
       if (response.ok) {
         const data = await response.json();
         // Update settings based on API response
-        if (data.notificationSettings) {
-          setSettings((prev) => ({
-            ...prev,
-            emailNotifications:
-              data.notificationSettings.emailNotifications ??
-              prev.emailNotifications,
-            marketingEmails:
-              data.notificationSettings.marketingEmails ?? prev.marketingEmails,
-          }));
-        }
+        // No notification settings to load anymore
       }
     } catch (error) {
       console.error("Failed to load settings:", error);
@@ -241,26 +214,7 @@ export default function SettingsPage() {
   const handleSaveSettings = async () => {
     setIsSaving(true);
     try {
-      // Save notification settings
-      const notificationSettings = {
-        emailNotifications: settings.emailNotifications,
-        marketingEmails: settings.marketingEmails,
-      };
-
-      const response = await fetch(API_URL + "/api/settings/notifications", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(notificationSettings),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to save settings");
-      }
-
-      // Also save Resend configuration if it has been modified
+      // Save Resend configuration if it has been modified
       if (resendConfig.apiKey && resendConfig.fromEmail) {
         await saveResendConfig();
       }
@@ -366,30 +320,6 @@ export default function SettingsPage() {
         description: "Failed to test email provider configuration.",
         variant: "destructive",
       });
-    }
-  };
-
-  const handleDeactivateAccount = async () => {
-    setIsLoading(true);
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      toast({
-        title: "Account Deactivated",
-        description: "Your account has been deactivated successfully.",
-      });
-
-      // Redirect to login
-      router.push("/auth");
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to deactivate account. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -625,24 +555,10 @@ export default function SettingsPage() {
             </div>
 
             <Tabs defaultValue="email" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="email" className="flex items-center gap-2">
                   <Mail className="h-4 w-4" />
                   Email
-                </TabsTrigger>
-                <TabsTrigger
-                  value="notifications"
-                  className="flex items-center gap-2"
-                >
-                  <Bell className="h-4 w-4" />
-                  Notifications
-                </TabsTrigger>
-                <TabsTrigger
-                  value="appearance"
-                  className="flex items-center gap-2"
-                >
-                  <Palette className="h-4 w-4" />
-                  Appearance
                 </TabsTrigger>
                 <TabsTrigger
                   value="account"
@@ -1054,176 +970,6 @@ export default function SettingsPage() {
                 </Card>
               </TabsContent>
 
-              {/* Notifications Settings */}
-              <TabsContent value="notifications" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Bell className="h-5 w-5" />
-                      Notification Preferences
-                    </CardTitle>
-                    <CardDescription>
-                      Choose what notifications you want to receive
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-base">
-                            Email Notifications
-                          </Label>
-                          <p className="text-sm text-gray-500">
-                            Receive notifications about email campaigns and
-                            system updates
-                          </p>
-                        </div>
-                        <Switch
-                          checked={settings.emailNotifications}
-                          onCheckedChange={(checked) => {
-                            setSettings((prev) => ({
-                              ...prev,
-                              emailNotifications: checked,
-                            }));
-                            markAsChanged();
-                          }}
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-base">Marketing Emails</Label>
-                          <p className="text-sm text-gray-500">
-                            Receive tips, updates, and promotional content
-                          </p>
-                        </div>
-                        <Switch
-                          checked={settings.marketingEmails}
-                          onCheckedChange={(checked) => {
-                            setSettings((prev) => ({
-                              ...prev,
-                              marketingEmails: checked,
-                            }));
-                            markAsChanged();
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Appearance Settings */}
-              <TabsContent value="appearance" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Palette className="h-5 w-5" />
-                      Appearance & Preferences
-                    </CardTitle>
-                    <CardDescription>Customize your experience</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <Label>Theme</Label>
-                        <Select
-                          value={settings.theme}
-                          onValueChange={(
-                            value: "light" | "dark" | "system"
-                          ) => {
-                            setSettings((prev) => ({ ...prev, theme: value }));
-                            markAsChanged();
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="light">Light</SelectItem>
-                            <SelectItem value="dark">Dark</SelectItem>
-                            <SelectItem value="system">System</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Timezone</Label>
-                        <Select
-                          value={settings.timezone}
-                          onValueChange={(value) => {
-                            setSettings((prev) => ({
-                              ...prev,
-                              timezone: value,
-                            }));
-                            markAsChanged();
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="UTC">UTC</SelectItem>
-                            <SelectItem value="America/New_York">
-                              Eastern Time
-                            </SelectItem>
-                            <SelectItem value="America/Chicago">
-                              Central Time
-                            </SelectItem>
-                            <SelectItem value="America/Denver">
-                              Mountain Time
-                            </SelectItem>
-                            <SelectItem value="America/Los_Angeles">
-                              Pacific Time
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-base">Auto-save</Label>
-                          <p className="text-sm text-gray-500">
-                            Automatically save your work as you type
-                          </p>
-                        </div>
-                        <Switch
-                          checked={settings.autoSave}
-                          onCheckedChange={(checked) => {
-                            setSettings((prev) => ({
-                              ...prev,
-                              autoSave: checked,
-                            }));
-                            markAsChanged();
-                          }}
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-base">Show Preview</Label>
-                          <p className="text-sm text-gray-500">
-                            Show email preview by default
-                          </p>
-                        </div>
-                        <Switch
-                          checked={settings.showPreview}
-                          onCheckedChange={(checked) => {
-                            setSettings((prev) => ({
-                              ...prev,
-                              showPreview: checked,
-                            }));
-                            markAsChanged();
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
               {/* Account Settings */}
               <TabsContent value="account" className="space-y-6">
                 <Card>
@@ -1249,96 +995,20 @@ export default function SettingsPage() {
                           </p>
                           <p>
                             <span className="font-medium">Member since:</span>{" "}
-                            {new Date().toLocaleDateString()}
+                            {user.createdAt
+                              ? new Date(user.createdAt).toLocaleDateString()
+                              : "Unknown"}
+                            <span className="text-xs text-gray-400 ml-1">
+                              (MM/DD/YY)
+                            </span>
                           </p>
                         </div>
                       </div>
-
-                      <Alert className="border-red-200 bg-red-50">
-                        <AlertTriangle className="h-4 w-4 text-red-600" />
-                        <AlertDescription className="text-red-800">
-                          <div className="font-medium mb-2">Danger Zone</div>
-                          <p className="text-sm">
-                            Deactivating your account will permanently disable
-                            access to all features and data. This action cannot
-                            be undone.
-                          </p>
-                        </AlertDescription>
-                      </Alert>
-
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="destructive"
-                            className="w-full md:w-auto"
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Deactivate Account
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>
-                              Deactivate Account
-                            </AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to deactivate your account?
-                              This will:
-                              <ul className="list-disc list-inside mt-2 space-y-1">
-                                <li>Permanently disable your account</li>
-                                <li>Stop all email campaigns</li>
-                                <li>Delete all your data</li>
-                                <li>Remove access to all features</li>
-                              </ul>
-                              <p className="mt-2 font-medium text-red-600">
-                                This action cannot be undone.
-                              </p>
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={handleDeactivateAccount}
-                              disabled={isLoading}
-                              className="bg-red-600 hover:bg-red-700"
-                            >
-                              {isLoading ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Deactivating...
-                                </>
-                              ) : (
-                                "Yes, Deactivate Account"
-                              )}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
                     </div>
                   </CardContent>
                 </Card>
 
                 {/* Placeholder sections for future features */}
-                <Card className="opacity-60">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Database className="h-5 w-5" />
-                      Data Management
-                    </CardTitle>
-                    <CardDescription>
-                      Coming soon - Manage your data and exports
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-8 text-gray-500">
-                      <Database className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                      <p>
-                        Data export, import, and management features coming soon
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-
                 <Card className="opacity-60">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">

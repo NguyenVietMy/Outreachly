@@ -953,31 +953,6 @@ export default function SendGmailPage() {
                         )}
                       </Button>
 
-                      {/* Sample Template Button */}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={isSending || !gmailStatus?.hasGmailAccess}
-                        className="w-full"
-                        onClick={() => {
-                          setFormData((prev) => ({
-                            ...prev,
-                            content: `Hi {{firstName}},
-
-Thank you for choosing our Pickleball Vatic Pro! We appreciate your business and hope you enjoy using our product.
-
-If you have any questions or need assistance, feel free to reach out. We're here to help!
-
-Best regards,
-[Your Name]
-
-P.S. Don't forget to check out our latest accessories for an enhanced playing experience!`,
-                          }));
-                        }}
-                      >
-                        📧 Load Sample Template
-                      </Button>
-
                       {!gmailStatus?.hasGmailAccess && (
                         <Alert className="border-orange-200 bg-orange-50">
                           <AlertCircle className="h-4 w-4 text-orange-600" />
