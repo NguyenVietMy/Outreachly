@@ -74,6 +74,10 @@ public class User implements UserDetails {
     @Column(name = "org_id")
     private UUID orgId;
 
+    @Column(name = "timezone")
+    @Builder.Default
+    private String timezone = "UTC";
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

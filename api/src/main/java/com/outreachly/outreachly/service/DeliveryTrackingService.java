@@ -204,26 +204,27 @@ public class DeliveryTrackingService {
     /**
      * Get delivery trend data for a specific period with enhanced time calculations
      */
-    public List<TrendData> getDeliveryTrends(int days, String userId, String campaignId) {
+    public List<TrendData> getDeliveryTrends(int days, String userId, String campaignId, String userTimezone) {
         try {
             List<TrendData> trends = new ArrayList<>();
-            // Use UTC timezone for consistent date calculations
-            LocalDate today = LocalDate.now(ZoneOffset.UTC);
+
+            // Parse user timezone to get the appropriate ZoneOffset
+            ZoneOffset userOffset = parseUtcOffset(userTimezone);
+
+            // Use user's timezone for date calculations
+            LocalDate today = LocalDate.now(userOffset);
 
             // Calculate the start date based on the requested period
             // For 7 days: today + past 6 days = 7 total days
             // For 30 days: today + past 29 days = 30 total days
             LocalDate startDate = today.minusDays(days - 1);
 
-            log.info("Calculating trends from {} to {} ({} days total) - UTC timezone",
-                    startDate, today, days);
-
             // Generate data for each day in the range
             LocalDate currentDate = startDate;
             while (!currentDate.isAfter(today)) {
-                // Use UTC timezone for consistent time boundaries
-                LocalDateTime startOfDay = currentDate.atStartOfDay().atOffset(ZoneOffset.UTC).toLocalDateTime();
-                LocalDateTime endOfDay = currentDate.atTime(23, 59, 59).atOffset(ZoneOffset.UTC).toLocalDateTime();
+                // Use user's timezone for time boundaries
+                LocalDateTime startOfDay = currentDate.atStartOfDay().atOffset(userOffset).toLocalDateTime();
+                LocalDateTime endOfDay = currentDate.atTime(23, 59, 59).atOffset(userOffset).toLocalDateTime();
 
                 long delivered = 0;
                 long failed = 0;
@@ -291,7 +292,7 @@ public class DeliveryTrackingService {
         log.info("Getting current month trends from {} to {} ({} days) - UTC timezone",
                 firstDayOfMonth, today, daysInMonth);
 
-        return getDeliveryTrends((int) daysInMonth, userId, campaignId);
+        return getDeliveryTrends((int) daysInMonth, userId, campaignId, "UTC±0");
     }
 
     /**
@@ -378,5 +379,43 @@ public class DeliveryTrackingService {
         private double deliveryRate;
         private long clicks;
         private double clickRate;
+    }
+
+    /**
+     * Parse UTC offset string (e.g., "UTC+5", "UTC−8", "UTC±0") to ZoneOffset
+     */
+    private ZoneOffset parseUtcOffset(String timezone) {
+        if (timezone == null || timezone.trim().isEmpty()) {
+            return ZoneOffset.UTC;
+        }
+
+        String trimmed = timezone.trim();
+
+        // Handle UTC±0 case
+        if ("UTC±0".equals(trimmed)) {
+            return ZoneOffset.UTC;
+        }
+
+        // Handle UTC+0 case
+        if ("UTC+0".equals(trimmed)) {
+            return ZoneOffset.UTC;
+        }
+
+        // Parse UTC±X format
+        if (trimmed.startsWith("UTC")) {
+            String offsetPart = trimmed.substring(3);
+
+            if (offsetPart.startsWith("+")) {
+                int hours = Integer.parseInt(offsetPart.substring(1));
+                return ZoneOffset.ofHours(hours);
+            } else if (offsetPart.startsWith("−") || offsetPart.startsWith("-") || offsetPart.startsWith("?")) {
+                // Handle Unicode minus (U+2212), regular minus, and corrupted minus
+                String hoursStr = offsetPart.substring(1);
+                int hours = Integer.parseInt(hoursStr);
+                return ZoneOffset.ofHours(-hours);
+            }
+        }
+
+        return ZoneOffset.UTC; // Fallback
     }
 }

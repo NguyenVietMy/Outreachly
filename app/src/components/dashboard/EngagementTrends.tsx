@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useDeliveryMetrics, TrendData } from "@/hooks/useDeliveryMetrics";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface EngagementTrendsProps {
   data?: TrendData[];
@@ -19,6 +20,7 @@ export default function EngagementTrends({
   onPeriodChange,
 }: EngagementTrendsProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<"7d" | "30d">(period);
+  const { user } = useAuth();
   const {
     trendData: apiTrendData,
     fetchTrendData,
@@ -98,6 +100,31 @@ export default function EngagementTrends({
 
   const isDeliverabilityRisky = avgFailed > 50 || avgDeliveryRate < 90;
 
+  // Helper function to convert UTC offset to timezone string for date formatting
+  const getTimezoneString = (timezone: string): string => {
+    if (!timezone || timezone === "UTC±0" || timezone === "UTC+0") {
+      return "UTC";
+    }
+
+    if (timezone.startsWith("UTC")) {
+      const offsetPart = timezone.substring(3);
+      if (offsetPart.startsWith("+")) {
+        const hours = parseInt(offsetPart.substring(1));
+        return `Etc/GMT-${hours}`; // Note: GMT offsets are inverted
+      } else if (
+        offsetPart.startsWith("−") ||
+        offsetPart.startsWith("-") ||
+        offsetPart.startsWith("?")
+      ) {
+        // Handle Unicode minus (U+2212), regular minus, and corrupted minus
+        const hours = parseInt(offsetPart.substring(1));
+        return `Etc/GMT+${hours}`; // Note: GMT offsets are inverted
+      }
+    }
+
+    return "UTC"; // Fallback
+  };
+
   return (
     <Card className="mb-8">
       <CardHeader>
@@ -162,7 +189,7 @@ export default function EngagementTrends({
           {/* Simple Bar Chart Visualization */}
           <div className="space-y-2">
             <h4 className="font-medium text-gray-900">
-              Daily Delivery Metrics (UTC)
+              Daily Delivery Metrics ({user?.timezone || "UTC±0"})
             </h4>
             {loading && (
               <div className="text-center py-4 text-gray-500">
@@ -194,12 +221,11 @@ export default function EngagementTrends({
                   const totalWidth =
                     maxValue > 0 ? (day.totalSent / maxValue) * 100 : 0;
 
-                  // Format date using UTC to ensure consistent display
-                  const dateObj = new Date(day.date + "T00:00:00.000Z");
+                  // Format date - backend already provides dates in user's timezone
+                  const dateObj = new Date(day.date + "T00:00:00");
                   const formattedDate = dateObj.toLocaleDateString("en-US", {
                     month: "short",
                     day: "numeric",
-                    timeZone: "UTC",
                   });
 
                   return (

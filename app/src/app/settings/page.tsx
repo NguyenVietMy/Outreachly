@@ -47,6 +47,7 @@ import {
   Trash2,
   Eye,
   EyeOff,
+  Clock,
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -99,6 +100,14 @@ export default function SettingsPage() {
     domain: "",
   });
   const [loadingResendConfig, setLoadingResendConfig] = useState(false);
+
+  // Timezone state
+  const [availableTimezones, setAvailableTimezones] = useState<string[]>([]);
+  const [selectedTimezone, setSelectedTimezone] = useState<string>("");
+  const [timezoneOffset, setTimezoneOffset] = useState<string>("");
+  const [isUpdatingTimezone, setIsUpdatingTimezone] = useState(false);
+  const [timezoneError, setTimezoneError] = useState<string>("");
+  const [timezoneSuccess, setTimezoneSuccess] = useState(false);
   const [hasResendConfig, setHasResendConfig] = useState(false);
   const [resendConfigModified, setResendConfigModified] = useState(false);
 
@@ -124,6 +133,14 @@ export default function SettingsPage() {
       setHasUnsavedChanges(true);
     }
   }, [resendConfigModified]);
+
+  // Load timezone data on component mount
+  useEffect(() => {
+    if (user) {
+      loadAvailableTimezones();
+      loadCurrentTimezone();
+    }
+  }, [user]);
 
   const loadSettings = async () => {
     try {
@@ -510,6 +527,97 @@ export default function SettingsPage() {
     );
   }
 
+  // Timezone functions
+  const loadAvailableTimezones = () => {
+    // Standard UTC offsets
+    const timezones = [
+      "UTC−12",
+      "UTC−11",
+      "UTC−10",
+      "UTC−9",
+      "UTC−8",
+      "UTC−7",
+      "UTC−6",
+      "UTC−5",
+      "UTC−4",
+      "UTC−3",
+      "UTC−2",
+      "UTC−1",
+      "UTC±0",
+      "UTC+1",
+      "UTC+2",
+      "UTC+3",
+      "UTC+4",
+      "UTC+5",
+      "UTC+6",
+      "UTC+7",
+      "UTC+8",
+      "UTC+9",
+      "UTC+10",
+      "UTC+11",
+      "UTC+12",
+      "UTC+13",
+      "UTC+14",
+    ];
+    setAvailableTimezones(timezones);
+  };
+
+  const loadCurrentTimezone = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/settings/timezone`, {
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSelectedTimezone(data.timezone);
+        setTimezoneOffset(data.timezoneOffset);
+      }
+    } catch (error) {
+      console.error("Failed to load current timezone:", error);
+    }
+  };
+
+  const handleTimezoneUpdate = async () => {
+    if (!selectedTimezone) return;
+
+    setIsUpdatingTimezone(true);
+    setTimezoneError("");
+    setTimezoneSuccess(false);
+
+    try {
+      const response = await fetch(`${API_URL}/api/settings/timezone`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ timezone: selectedTimezone }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setTimezoneOffset(data.timezoneOffset);
+        setTimezoneSuccess(true);
+        toast({
+          title: "Timezone Updated",
+          description: `Timezone updated to ${selectedTimezone}`,
+        });
+
+        // Clear success message after 3 seconds
+        setTimeout(() => setTimezoneSuccess(false), 3000);
+      } else {
+        const error = await response.json();
+        setTimezoneError(error.error || "Failed to update timezone");
+      }
+    } catch (error) {
+      console.error("Failed to update timezone:", error);
+      setTimezoneError("Failed to update timezone");
+    } finally {
+      setIsUpdatingTimezone(false);
+    }
+  };
+
   if (!user) {
     return null;
   }
@@ -555,10 +663,17 @@ export default function SettingsPage() {
             </div>
 
             <Tabs defaultValue="email" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="email" className="flex items-center gap-2">
                   <Mail className="h-4 w-4" />
                   Email
+                </TabsTrigger>
+                <TabsTrigger
+                  value="timezone"
+                  className="flex items-center gap-2"
+                >
+                  <Clock className="h-4 w-4" />
+                  Timezone
                 </TabsTrigger>
                 <TabsTrigger
                   value="account"
@@ -965,6 +1080,78 @@ export default function SettingsPage() {
                           )}
                         </div>
                       ))
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Timezone Settings */}
+              <TabsContent value="timezone" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Clock className="h-5 w-5" />
+                      Timezone Settings
+                    </CardTitle>
+                    <CardDescription>
+                      Set your timezone preference for displaying times
+                      throughout the application. All times are stored in UTC
+                      and converted for display.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="timezone">Current Timezone</Label>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={selectedTimezone || user?.timezone || "UTC±0"}
+                          onValueChange={setSelectedTimezone}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select timezone" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[200px] overflow-y-auto">
+                            {availableTimezones.map((tz) => (
+                              <SelectItem key={tz} value={tz}>
+                                {tz}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          onClick={handleTimezoneUpdate}
+                          disabled={isUpdatingTimezone || !selectedTimezone}
+                          size="sm"
+                        >
+                          {isUpdatingTimezone ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Save className="h-4 w-4" />
+                          )}
+                          Save
+                        </Button>
+                      </div>
+                      {timezoneOffset && (
+                        <p className="text-sm text-muted-foreground">
+                          Offset: {timezoneOffset}
+                        </p>
+                      )}
+                    </div>
+
+                    {timezoneError && (
+                      <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>{timezoneError}</AlertDescription>
+                      </Alert>
+                    )}
+
+                    {timezoneSuccess && (
+                      <Alert>
+                        <CheckCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          Timezone updated successfully!
+                        </AlertDescription>
+                      </Alert>
                     )}
                   </CardContent>
                 </Card>

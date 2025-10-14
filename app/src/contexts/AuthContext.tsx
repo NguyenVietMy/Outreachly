@@ -16,6 +16,7 @@ interface User {
   profilePictureUrl: string;
   role: string;
   orgId?: string;
+  timezone: string;
   createdAt: string;
 }
 

@@ -3,6 +3,7 @@ package com.outreachly.outreachly.controller;
 import com.outreachly.outreachly.dto.EmailProviderConfigDto;
 import com.outreachly.outreachly.dto.EmailProviderInfoDto;
 import com.outreachly.outreachly.dto.OrganizationSettingsDto;
+import com.outreachly.outreachly.service.TimeService;
 import com.outreachly.outreachly.entity.User;
 import com.outreachly.outreachly.service.SettingsService;
 import com.outreachly.outreachly.service.UserService;
@@ -31,6 +32,7 @@ public class SettingsController {
     private final SettingsService settingsService;
     private final UserService userService;
     private final EmailProviderFactory emailProviderFactory;
+    private final TimeService timeService;
 
     /**
      * Get organization settings
@@ -222,5 +224,72 @@ public class SettingsController {
             return null;
         }
         return userService.findByEmail(authentication.getName());
+    }
+
+    /**
+     * Get available timezones
+     */
+    @GetMapping("/timezones")
+    public ResponseEntity<List<String>> getAvailableTimezones() {
+        List<String> timezones = timeService.getCommonTimezones();
+        return ResponseEntity.ok(timezones);
+    }
+
+    /**
+     * Update user timezone
+     */
+    @PutMapping("/timezone")
+    public ResponseEntity<Map<String, Object>> updateTimezone(
+            @RequestBody Map<String, String> request,
+            Authentication authentication) {
+
+        String timezone = request.get("timezone");
+        if (timezone == null || timezone.trim().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Timezone is required"));
+        }
+
+        // Validate timezone
+        if (!timeService.isValidTimezone(timezone)) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Invalid timezone: " + timezone));
+        }
+
+        User user = getUser(authentication);
+        if (user == null) {
+            return ResponseEntity.status(401)
+                    .body(Map.of("error", "User not authenticated"));
+        }
+
+        // Update user timezone
+        user.setTimezone(timezone);
+        userService.save(user);
+
+        log.info("Updated timezone for user: {} to: {}", user.getEmail(), timezone);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("timezone", timezone);
+        response.put("timezoneOffset", timeService.getTimezoneOffset(timezone));
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Get current user timezone
+     */
+    @GetMapping("/timezone")
+    public ResponseEntity<Map<String, Object>> getCurrentTimezone(Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null) {
+            return ResponseEntity.status(401)
+                    .body(Map.of("error", "User not authenticated"));
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("timezone", user.getTimezone());
+        response.put("timezoneOffset", timeService.getTimezoneOffset(user.getTimezone()));
+
+        return ResponseEntity.ok(response);
     }
 }

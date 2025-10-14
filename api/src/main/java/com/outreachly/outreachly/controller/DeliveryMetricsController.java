@@ -1,6 +1,8 @@
 package com.outreachly.outreachly.controller;
 
 import com.outreachly.outreachly.service.DeliveryTrackingService;
+import com.outreachly.outreachly.service.UserService;
+import com.outreachly.outreachly.entity.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +20,7 @@ import java.util.HashMap;
 public class DeliveryMetricsController {
 
     private final DeliveryTrackingService deliveryTrackingService;
+    private final UserService userService;
 
     /**
      * Get delivery rate statistics for a specific campaign
@@ -70,11 +73,17 @@ public class DeliveryMetricsController {
             // Extract user ID from authentication
             String userId = getUserIdFromAuth(authentication);
 
-            log.info("Getting delivery trend data for {} days, user: {}, campaign: {}",
-                    days, userId, campaignId);
+            // Get user's timezone
+            String userTimezone = "UTC±0"; // Default
+            if (userId != null) {
+                User user = userService.findByEmail(authentication.getName());
+                if (user != null && user.getTimezone() != null) {
+                    userTimezone = user.getTimezone();
+                }
+            }
 
             List<DeliveryTrackingService.TrendData> trends = deliveryTrackingService.getDeliveryTrends(days, userId,
-                    campaignId);
+                    campaignId, userTimezone);
             return ResponseEntity.ok(trends);
         } catch (Exception e) {
             log.error("Error getting delivery trends", e);
@@ -132,7 +141,8 @@ public class DeliveryMetricsController {
             response.put("overallStats", stats);
 
             // Get 7-day trends
-            List<DeliveryTrackingService.TrendData> trends = deliveryTrackingService.getDeliveryTrends(7, null, null);
+            List<DeliveryTrackingService.TrendData> trends = deliveryTrackingService.getDeliveryTrends(7, null, null,
+                    "UTC±0");
             response.put("trends", trends);
 
             // Get date info

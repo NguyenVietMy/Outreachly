@@ -8,6 +8,7 @@ import EngagementTrends from "@/components/dashboard/EngagementTrends";
 import SendingProfileHealth from "@/components/dashboard/SendingProfileHealth";
 import RecentActivityFeed from "@/components/dashboard/RecentActivityFeed";
 import ComplianceTrustCues from "@/components/dashboard/ComplianceTrustCues";
+import TimeDisplay from "@/components/dashboard/TimeDisplay";
 import { useRouter } from "next/navigation";
 
 export default function Dashboard() {
@@ -46,10 +47,19 @@ export default function Dashboard() {
         <div className="p-6">
           {/* Header */}
           <div className="mb-8 mt-[100px]">
-            <h1 className="text-3xl font-bold text-gray-900">Welcome back!</h1>
-            <p className="text-gray-600 mt-2">
-              Here's what's happening with your outreach campaigns.
-            </p>
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">
+                  Welcome back!
+                </h1>
+                <p className="text-gray-600 mt-2">
+                  Here's what's happening with your outreach campaigns.
+                </p>
+              </div>
+              <div className="w-full lg:w-auto lg:min-w-[300px]">
+                <TimeDisplay />
+              </div>
+            </div>
           </div>
 
           {/* Hero KPIs */}

@@ -62,7 +62,10 @@ export function useDeliveryMetrics() {
   const fetchUserStats = useCallback(async () => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/metrics/delivery-rate/user`
+        `${API_BASE_URL}/api/metrics/delivery-rate/user`,
+        {
+          credentials: "include",
+        }
       );
       if (!response.ok) throw new Error("Failed to fetch user stats");
       const data = await response.json();
@@ -76,7 +79,10 @@ export function useDeliveryMetrics() {
   const fetchCampaignStats = useCallback(async (campaignId: string) => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/metrics/delivery-rate/campaign/${campaignId}`
+        `${API_BASE_URL}/api/metrics/delivery-rate/campaign/${campaignId}`,
+        {
+          credentials: "include",
+        }
       );
       if (!response.ok) throw new Error("Failed to fetch campaign stats");
       const data = await response.json();
@@ -100,7 +106,9 @@ export function useDeliveryMetrics() {
         url += `?days=${days}`;
       }
 
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        credentials: "include",
+      });
       if (!response.ok) throw new Error("Failed to fetch trend data");
       const data = await response.json();
       setTrendData(data);
@@ -132,7 +140,10 @@ export function useDeliveryMetrics() {
   const fetchDateInfo = useCallback(async () => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/metrics/delivery-rate/date-info`
+        `${API_BASE_URL}/api/metrics/delivery-rate/date-info`,
+        {
+          credentials: "include",
+        }
       );
       if (!response.ok) throw new Error("Failed to fetch date info");
       const data = await response.text();
