@@ -65,4 +65,13 @@ public interface CampaignLeadRepository extends JpaRepository<CampaignLead, UUID
 
     @Query("SELECT COUNT(cl) FROM CampaignLead cl JOIN cl.lead l WHERE cl.leadId = :leadId AND cl.status = 'active' AND l.orgId = :orgId")
     long countActiveCampaignsByLeadIdAndOrgId(@Param("leadId") UUID leadId, @Param("orgId") UUID orgId);
+
+    // Additional methods needed by CampaignService
+    @Query("SELECT cl FROM CampaignLead cl WHERE cl.campaignId = :campaignId AND cl.leadId IN :leadIds")
+    List<CampaignLead> findByCampaignIdAndLeadIdIn(@Param("campaignId") UUID campaignId,
+            @Param("leadIds") List<UUID> leadIds);
+
+    @Query("SELECT COUNT(cl) FROM CampaignLead cl WHERE cl.campaignId = :campaignId AND cl.status = :status")
+    long countByCampaignIdAndStatus(@Param("campaignId") UUID campaignId,
+            @Param("status") CampaignLead.CampaignLeadStatus status);
 }

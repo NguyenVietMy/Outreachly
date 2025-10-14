@@ -33,4 +33,7 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
 
     @Query("SELECT l FROM Lead l WHERE LOWER(l.email) = LOWER(:email)")
     Optional<Lead> findByEmailIgnoreCase(@Param("email") String email);
+
+    @Query("SELECT l FROM Lead l WHERE l.id IN :ids AND l.orgId = :orgId")
+    List<Lead> findByIdInAndOrgId(@Param("ids") List<UUID> ids, @Param("orgId") UUID orgId);
 }

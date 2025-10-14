@@ -35,10 +35,12 @@ import {
   Trash2,
   Filter,
   Search,
+  Calendar,
 } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
 import AuthGuard from "@/components/AuthGuard";
 import { useCampaigns, Campaign as CampaignModel } from "@/hooks/useCampaigns";
+import CampaignCheckpointsCard from "@/components/campaigns/CampaignCheckpointsCard";
 
 type CampaignStatus = CampaignModel["status"];
 
@@ -84,6 +86,9 @@ export default function CampaignsPage() {
     status: "active",
   });
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(
+    null
+  );
 
   const filtered = useMemo(() => {
     return (campaigns || [])
@@ -295,6 +300,14 @@ export default function CampaignsPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
+                                onClick={() => setSelectedCampaignId(c.id)}
+                              >
+                                <Calendar className="mr-2 h-4 w-4" />{" "}
+                                Checkpoints
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
                                 onClick={() => openEdit(c.id)}
                               >
                                 <Pencil className="mr-2 h-4 w-4" /> Edit
@@ -327,6 +340,17 @@ export default function CampaignsPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Campaign Checkpoints Card */}
+          {selectedCampaignId && (
+            <CampaignCheckpointsCard
+              campaignId={selectedCampaignId}
+              campaignName={
+                campaigns?.find((c) => c.id === selectedCampaignId)?.name ||
+                "Campaign"
+              }
+            />
+          )}
 
           {/* Create dialog */}
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
