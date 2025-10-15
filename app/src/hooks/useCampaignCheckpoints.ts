@@ -6,17 +6,10 @@ export interface CampaignCheckpoint {
   campaignId: string;
   orgId: string;
   name: string;
-  dayOfWeek:
-    | "MONDAY"
-    | "TUESDAY"
-    | "WEDNESDAY"
-    | "THURSDAY"
-    | "FRIDAY"
-    | "SATURDAY"
-    | "SUNDAY";
+  scheduledDate: string; // YYYY-MM-DD format
   timeOfDay: string; // HH:mm:ss format
   emailTemplateId?: string;
-  status: "pending" | "active" | "paused" | "completed";
+  status: "pending" | "active" | "paused" | "completed" | "partially_completed";
   createdAt: string;
   updatedAt: string;
 }
@@ -103,7 +96,6 @@ export function useCampaignCheckpoints(campaignId?: string) {
       const data = await response.json();
       setCheckpoints(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error("Error fetching checkpoints:", err);
       setError(
         err instanceof Error ? err.message : "Failed to fetch checkpoints"
       );
@@ -128,13 +120,13 @@ export function useCampaignCheckpoints(campaignId?: string) {
         setTemplates(Array.isArray(data) ? data : []);
       }
     } catch (err) {
-      console.error("Error fetching templates:", err);
+      // Silently fail for templates
     }
   };
 
   const createCheckpoint = async (checkpoint: {
     name: string;
-    dayOfWeek: CampaignCheckpoint["dayOfWeek"];
+    scheduledDate: string;
     timeOfDay: string;
     emailTemplateId?: string;
     leadIds?: string[];
@@ -162,7 +154,6 @@ export function useCampaignCheckpoints(campaignId?: string) {
       setCheckpoints((prev) => [newCheckpoint, ...prev]);
       return newCheckpoint;
     } catch (err) {
-      console.error("Error creating checkpoint:", err);
       throw err;
     }
   };
@@ -198,7 +189,6 @@ export function useCampaignCheckpoints(campaignId?: string) {
       );
       return updatedCheckpoint;
     } catch (err) {
-      console.error("Error updating checkpoint:", err);
       throw err;
     }
   };
@@ -223,7 +213,6 @@ export function useCampaignCheckpoints(campaignId?: string) {
         prev.filter((checkpoint) => checkpoint.id !== checkpointId)
       );
     } catch (err) {
-      console.error("Error deleting checkpoint:", err);
       throw err;
     }
   };
@@ -254,7 +243,6 @@ export function useCampaignCheckpoints(campaignId?: string) {
       );
       return activatedCheckpoint;
     } catch (err) {
-      console.error("Error activating checkpoint:", err);
       throw err;
     }
   };
@@ -283,7 +271,6 @@ export function useCampaignCheckpoints(campaignId?: string) {
       );
       return pausedCheckpoint;
     } catch (err) {
-      console.error("Error pausing checkpoint:", err);
       throw err;
     }
   };

@@ -3,6 +3,8 @@ package com.outreachly.outreachly.controller;
 import com.outreachly.outreachly.service.GmailService;
 import com.outreachly.outreachly.service.LeadDataService;
 import com.outreachly.outreachly.service.DeliveryTrackingService;
+import com.outreachly.outreachly.service.UserService;
+import com.outreachly.outreachly.entity.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +23,7 @@ public class GmailController {
     private final GmailService gmailService;
     private final LeadDataService leadDataService;
     private final DeliveryTrackingService deliveryTrackingService;
+    private final UserService userService;
 
     @PostMapping("/send")
     public ResponseEntity<Map<String, Object>> sendEmail(
@@ -670,17 +673,18 @@ public class GmailController {
      * Extract organization ID from authentication
      */
     private String getOrgId(Authentication authentication) {
-        if (authentication == null || authentication.getPrincipal() == null) {
+        if (authentication == null || !authentication.isAuthenticated()) {
             return null;
         }
 
-        // Try to extract org ID from authentication principal
-        // This might need adjustment based on your authentication setup
         try {
-            if (authentication.getPrincipal() instanceof org.springframework.security.oauth2.core.user.OAuth2User) {
-                org.springframework.security.oauth2.core.user.OAuth2User oauth2User = (org.springframework.security.oauth2.core.user.OAuth2User) authentication
-                        .getPrincipal();
-                return oauth2User.getAttribute("org_id"); // Organization ID if available
+            // Get user from database to access org_id
+            String email = authentication.getName();
+            if (email != null) {
+                User user = userService.findByEmail(email);
+                if (user != null && user.getOrgId() != null) {
+                    return user.getOrgId().toString();
+                }
             }
         } catch (Exception e) {
             log.warn("Failed to extract org ID from authentication", e);

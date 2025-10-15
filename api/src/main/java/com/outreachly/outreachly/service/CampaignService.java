@@ -30,11 +30,12 @@ public class CampaignService {
     /**
      * Create a new campaign
      */
-    public Campaign createCampaign(UUID orgId, String name, String description) {
-        log.info("Creating campaign '{}' for organization {}", name, orgId);
+    public Campaign createCampaign(UUID orgId, Long createdBy, String name, String description) {
+        log.info("Creating campaign '{}' for organization {} by user {}", name, orgId, createdBy);
 
         Campaign campaign = Campaign.builder()
                 .orgId(orgId)
+                .createdBy(createdBy)
                 .name(name)
                 .description(description)
                 .status(Campaign.CampaignStatus.active)

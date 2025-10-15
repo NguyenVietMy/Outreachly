@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -36,9 +36,8 @@ public class CampaignCheckpoint {
     @Column(name = "name", nullable = false)
     private String name;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "day_of_week", nullable = false)
-    private DayOfWeek dayOfWeek;
+    @Column(name = "scheduled_date", nullable = false)
+    private LocalDate scheduledDate;
 
     @Column(name = "time_of_day", nullable = false)
     private LocalTime timeOfDay;
@@ -112,6 +111,7 @@ public class CampaignCheckpoint {
         pending, // Not yet started
         active, // Currently running/scheduled
         paused, // Temporarily stopped
-        completed // All emails sent
+        completed, // All emails sent successfully
+        partially_completed // Some emails sent, some failed
     }
 }

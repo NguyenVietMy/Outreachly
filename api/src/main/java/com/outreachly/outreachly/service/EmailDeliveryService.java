@@ -5,15 +5,20 @@ import com.outreachly.outreachly.entity.CampaignCheckpointLead;
 import com.outreachly.outreachly.entity.Lead;
 import com.outreachly.outreachly.entity.Template;
 import com.outreachly.outreachly.repository.CampaignCheckpointLeadRepository;
+import com.outreachly.outreachly.repository.CampaignRepository;
 import com.outreachly.outreachly.repository.LeadRepository;
 import com.outreachly.outreachly.repository.TemplateRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -28,15 +33,16 @@ public class EmailDeliveryService {
     private final CampaignCheckpointLeadRepository checkpointLeadRepository;
     private final LeadRepository leadRepository;
     private final TemplateRepository templateRepository;
+    private final GmailService gmailService;
+    private final DeliveryTrackingService deliveryTrackingService;
+    private final ObjectMapper objectMapper;
+    private final CampaignRepository campaignRepository;
 
     /**
      * Send emails for a specific checkpoint
      */
     @Transactional
     public void sendCheckpointEmails(CampaignCheckpoint checkpoint) {
-        log.info("Starting email delivery for checkpoint: {} (ID: {})",
-                checkpoint.getName(), checkpoint.getId());
-
         // Get all leads for this checkpoint
         List<CampaignCheckpointLead> checkpointLeads = checkpointLeadRepository.findByCheckpointId(checkpoint.getId());
 
@@ -45,7 +51,7 @@ public class EmailDeliveryService {
             return;
         }
 
-        log.info("Found {} leads for checkpoint: {}", checkpointLeads.size(), checkpoint.getName());
+        log.info("Sending emails to {} leads for checkpoint: {}", checkpointLeads.size(), checkpoint.getName());
 
         // Get email template if specified
         Template emailTemplate = null;
@@ -92,43 +98,110 @@ public class EmailDeliveryService {
             }
         }
 
-        log.info("Email delivery completed for checkpoint: {}. Success: {}, Failures: {}",
-                checkpoint.getName(), successCount, failureCount);
+        if (successCount > 0 || failureCount > 0) {
+            log.info("Email delivery completed for checkpoint: {}. Success: {}, Failures: {}",
+                    checkpoint.getName(), successCount, failureCount);
+        }
     }
 
     /**
-     * Send email to a specific lead
+     * Send email to a specific lead using Gmail API
      */
-    private void sendEmailToLead(Lead lead, Template template, CampaignCheckpoint checkpoint) {
-        // TODO: Implement actual email sending logic
-        // This is where you would integrate with your email provider (SendGrid, SES,
-        // etc.)
-
-        log.info("Sending email to: {} using template: {}",
-                lead.getEmail(),
-                template != null ? template.getName() : "No template");
-
-        // For now, simulate email sending
-        simulateEmailSending(lead, template, checkpoint);
-    }
-
-    /**
-     * Simulate email sending (replace with real implementation)
-     */
-    private void simulateEmailSending(Lead lead, Template template, CampaignCheckpoint checkpoint) {
-        // Simulate API call delay
+    public void sendEmailToLead(Lead lead, Template template, CampaignCheckpoint checkpoint) {
         try {
-            Thread.sleep(100); // 100ms delay
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            // Parse template JSON to get subject and body
+            String subject = "No Subject";
+            String body = "No content";
+            boolean isHtml = false;
+
+            if (template != null && template.getContentJson() != null) {
+                JsonNode templateJson = objectMapper.readTree(template.getContentJson());
+                subject = templateJson.has("subject") ? templateJson.get("subject").asText() : "No Subject";
+                body = templateJson.has("body") ? templateJson.get("body").asText() : "No content";
+                isHtml = templateJson.has("isHtml") ? templateJson.get("isHtml").asBoolean() : false;
+            }
+
+            // Create lead data map for personalization
+            Map<String, String> leadData = createLeadDataMap(lead);
+
+            // Personalize subject and body
+            String personalizedSubject = personalizeContent(subject, leadData);
+            String personalizedBody = personalizeContent(body, leadData);
+
+            // Generate unique message ID for tracking
+            String messageId = "campaign_" + checkpoint.getId().toString().substring(0, 8) +
+                    "_" + System.currentTimeMillis() + "_" +
+                    java.util.UUID.randomUUID().toString().substring(0, 8);
+
+            // Get campaign creator for tracking
+            String campaignCreatorId = null;
+            try {
+                campaignCreatorId = campaignRepository.findById(checkpoint.getCampaignId())
+                        .map(campaign -> campaign.getCreatedBy().toString())
+                        .orElse(null);
+            } catch (Exception e) {
+                log.warn("Failed to get campaign creator for tracking: {}", e.getMessage());
+            }
+
+            // Record SENT event before API call
+            deliveryTrackingService.recordEmailDelivered(
+                    messageId,
+                    lead.getEmail(),
+                    checkpoint.getCampaignId().toString(),
+                    campaignCreatorId,
+                    checkpoint.getOrgId().toString());
+
+            // Send email via Gmail API
+            gmailService.sendEmail(lead.getEmail(), personalizedSubject, personalizedBody, isHtml, null);
+
+            log.debug("Email sent successfully to: {} with messageId: {}", lead.getEmail(), messageId);
+
+        } catch (Exception e) {
+            log.error("Failed to send email to: {}", lead.getEmail(), e);
+            throw new RuntimeException("Failed to send email: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Create lead data map for personalization
+     */
+    private Map<String, String> createLeadDataMap(Lead lead) {
+        Map<String, String> leadData = new HashMap<>();
+        leadData.put("email", lead.getEmail() != null ? lead.getEmail() : "");
+        leadData.put("firstName", lead.getFirstName() != null ? lead.getFirstName() : "");
+        leadData.put("lastName", lead.getLastName() != null ? lead.getLastName() : "");
+        leadData.put("position", lead.getPosition() != null ? lead.getPosition() : "");
+        leadData.put("phone", lead.getPhone() != null ? lead.getPhone() : "");
+        leadData.put("domain", lead.getDomain() != null ? lead.getDomain() : "");
+        leadData.put("linkedinUrl", lead.getLinkedinUrl() != null ? lead.getLinkedinUrl() : "");
+        leadData.put("twitter", lead.getTwitter() != null ? lead.getTwitter() : "");
+        leadData.put("department", lead.getDepartment() != null ? lead.getDepartment() : "");
+        leadData.put("seniority", lead.getSeniority() != null ? lead.getSeniority() : "");
+
+        // Add computed fields
+        leadData.put("fullName", (lead.getFirstName() + " " + lead.getLastName()).trim());
+        leadData.put("first_name", lead.getFirstName() != null ? lead.getFirstName() : "");
+        leadData.put("last_name", lead.getLastName() != null ? lead.getLastName() : "");
+
+        return leadData;
+    }
+
+    /**
+     * Personalize content by replacing variables like {{firstName}} with actual
+     * values
+     */
+    private String personalizeContent(String content, Map<String, String> leadData) {
+        if (content == null) {
+            return "";
         }
 
-        // Simulate occasional failures (5% failure rate)
-        if (Math.random() < 0.05) {
-            throw new RuntimeException("Simulated email sending failure");
+        String result = content;
+        for (Map.Entry<String, String> entry : leadData.entrySet()) {
+            String placeholder = "{{" + entry.getKey() + "}}";
+            result = result.replace(placeholder, entry.getValue() != null ? entry.getValue() : "");
         }
 
-        log.debug("Simulated email sent to: {}", lead.getEmail());
+        return result;
     }
 
     /**

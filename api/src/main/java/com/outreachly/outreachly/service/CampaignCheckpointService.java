@@ -13,10 +13,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.LocalDateTime;
-import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -38,9 +37,9 @@ public class CampaignCheckpointService {
      * Create a new campaign checkpoint
      */
     public CampaignCheckpoint createCheckpoint(UUID campaignId, UUID orgId, String name,
-            DayOfWeek dayOfWeek, LocalTime timeOfDay,
+            LocalDate scheduledDate, LocalTime timeOfDay,
             UUID emailTemplateId, List<UUID> leadIds) {
-        log.info("Creating checkpoint '{}' for campaign {} on {} at {}", name, campaignId, dayOfWeek, timeOfDay);
+        log.info("Creating checkpoint '{}' for campaign {} on {} at {}", name, campaignId, scheduledDate, timeOfDay);
 
         // Verify campaign belongs to organization
         campaignRepository.findByIdAndOrgId(campaignId, orgId)
@@ -62,7 +61,7 @@ public class CampaignCheckpointService {
                 .campaignId(campaignId)
                 .orgId(orgId)
                 .name(name)
-                .dayOfWeek(dayOfWeek)
+                .scheduledDate(scheduledDate)
                 .timeOfDay(timeOfDay)
                 .emailTemplateId(emailTemplateId)
                 .status(CampaignCheckpoint.CheckpointStatus.pending)
@@ -101,7 +100,7 @@ public class CampaignCheckpointService {
      * Update checkpoint details
      */
     public CampaignCheckpoint updateCheckpoint(UUID checkpointId, UUID orgId, String name,
-            DayOfWeek dayOfWeek, LocalTime timeOfDay,
+            LocalDate scheduledDate, LocalTime timeOfDay,
             UUID emailTemplateId, CampaignCheckpoint.CheckpointStatus status) {
         log.info("Updating checkpoint {} for organization {}", checkpointId, orgId);
 
@@ -122,8 +121,8 @@ public class CampaignCheckpointService {
         if (name != null) {
             checkpoint.setName(name);
         }
-        if (dayOfWeek != null) {
-            checkpoint.setDayOfWeek(dayOfWeek);
+        if (scheduledDate != null) {
+            checkpoint.setScheduledDate(scheduledDate);
         }
         if (timeOfDay != null) {
             checkpoint.setTimeOfDay(timeOfDay);
@@ -179,7 +178,7 @@ public class CampaignCheckpointService {
         List<CampaignCheckpointLead> newAssociations = leads.stream()
                 .filter(lead -> !existingLeadIds.contains(lead.getId()))
                 .map(lead -> {
-                    LocalDateTime scheduledAt = calculateNextScheduledTime(checkpoint.getDayOfWeek(),
+                    LocalDateTime scheduledAt = calculateScheduledTime(checkpoint.getScheduledDate(),
                             checkpoint.getTimeOfDay());
                     return CampaignCheckpointLead.builder()
                             .checkpointId(checkpointId)
@@ -346,20 +345,10 @@ public class CampaignCheckpointService {
     }
 
     /**
-     * Calculate the next scheduled time for a given day and time
+     * Calculate the scheduled time for a given date and time
      */
-    private LocalDateTime calculateNextScheduledTime(DayOfWeek dayOfWeek, LocalTime timeOfDay) {
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime nextScheduled = now.with(TemporalAdjusters.nextOrSame(dayOfWeek))
-                .with(timeOfDay);
-
-        // If the calculated time is in the past (same day but earlier time), move to
-        // next week
-        if (nextScheduled.isBefore(now) || nextScheduled.isEqual(now)) {
-            nextScheduled = nextScheduled.with(TemporalAdjusters.next(dayOfWeek));
-        }
-
-        return nextScheduled;
+    private LocalDateTime calculateScheduledTime(LocalDate scheduledDate, LocalTime timeOfDay) {
+        return scheduledDate.atTime(timeOfDay);
     }
 
     /**

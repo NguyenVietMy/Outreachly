@@ -36,6 +36,7 @@ import {
   Calendar,
   Mail,
   BarChart3,
+  RotateCcw,
 } from "lucide-react";
 import {
   useCampaignCheckpoints,
@@ -48,17 +49,6 @@ interface CampaignCheckpointsCardProps {
 }
 
 type CheckpointStatus = CampaignCheckpoint["status"];
-type DayOfWeek = CampaignCheckpoint["dayOfWeek"];
-
-const DAYS_OF_WEEK: { value: DayOfWeek; label: string }[] = [
-  { value: "MONDAY", label: "Monday" },
-  { value: "TUESDAY", label: "Tuesday" },
-  { value: "WEDNESDAY", label: "Wednesday" },
-  { value: "THURSDAY", label: "Thursday" },
-  { value: "FRIDAY", label: "Friday" },
-  { value: "SATURDAY", label: "Saturday" },
-  { value: "SUNDAY", label: "Sunday" },
-];
 
 function StatusBadge({ status }: { status: CheckpointStatus }) {
   const style = {
@@ -66,8 +56,18 @@ function StatusBadge({ status }: { status: CheckpointStatus }) {
     active: "bg-green-100 text-green-800",
     paused: "bg-yellow-100 text-yellow-800",
     completed: "bg-blue-100 text-blue-800",
+    partially_completed: "bg-orange-100 text-orange-800",
   }[status];
-  return <Badge className={style}>{status}</Badge>;
+
+  const displayText = {
+    pending: "Pending",
+    active: "Active",
+    paused: "Paused",
+    completed: "Completed",
+    partially_completed: "Partial",
+  }[status];
+
+  return <Badge className={style}>{displayText}</Badge>;
 }
 
 function formatTime(timeString: string): string {
@@ -82,8 +82,17 @@ function formatTime(timeString: string): string {
   }
 }
 
-function formatDay(day: DayOfWeek): string {
-  return DAYS_OF_WEEK.find((d) => d.value === day)?.label || day;
+function formatDate(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return dateString;
+  }
 }
 
 export default function CampaignCheckpointsCard({
@@ -105,15 +114,16 @@ export default function CampaignCheckpointsCard({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isActivating, setIsActivating] = useState<string | null>(null);
+  const [isRetrying, setIsRetrying] = useState<string | null>(null);
 
   const [draft, setDraft] = useState<{
     name: string;
-    dayOfWeek: DayOfWeek;
+    scheduledDate: string;
     timeOfDay: string;
     emailTemplateId: string | null;
   }>({
     name: "",
-    dayOfWeek: "MONDAY",
+    scheduledDate: new Date().toISOString().split("T")[0], // Today's date in YYYY-MM-DD format
     timeOfDay: "09:00",
     emailTemplateId: null,
   });
@@ -122,19 +132,19 @@ export default function CampaignCheckpointsCard({
     try {
       await createCheckpoint({
         name: draft.name,
-        dayOfWeek: draft.dayOfWeek,
+        scheduledDate: draft.scheduledDate,
         timeOfDay: draft.timeOfDay + ":00", // Add seconds
         emailTemplateId: draft.emailTemplateId || undefined,
       });
       setIsCreateOpen(false);
       setDraft({
         name: "",
-        dayOfWeek: "MONDAY",
+        scheduledDate: new Date().toISOString().split("T")[0],
         timeOfDay: "09:00",
         emailTemplateId: null,
       });
     } catch (err) {
-      console.error("Failed to create checkpoint:", err);
+      // Error handling is done by the hook
     }
   };
 
@@ -143,7 +153,7 @@ export default function CampaignCheckpointsCard({
       setIsDeleting(checkpointId);
       await deleteCheckpoint(checkpointId);
     } catch (err) {
-      console.error("Failed to delete checkpoint:", err);
+      // Error handling is done by the hook
     } finally {
       setIsDeleting(null);
     }
@@ -154,7 +164,7 @@ export default function CampaignCheckpointsCard({
       setIsActivating(checkpointId);
       await activateCheckpoint(checkpointId);
     } catch (err) {
-      console.error("Failed to activate checkpoint:", err);
+      // Error handling is done by the hook
     } finally {
       setIsActivating(null);
     }
@@ -165,7 +175,7 @@ export default function CampaignCheckpointsCard({
       setIsActivating(checkpointId);
       await pauseCheckpoint(checkpointId);
     } catch (err) {
-      console.error("Failed to pause checkpoint:", err);
+      // Error handling is done by the hook
     } finally {
       setIsActivating(null);
     }
@@ -176,9 +186,39 @@ export default function CampaignCheckpointsCard({
       setIsActivating(checkpointId);
       await activateCheckpoint(checkpointId);
     } catch (err) {
-      console.error("Failed to resume checkpoint:", err);
+      // Error handling is done by the hook
     } finally {
       setIsActivating(null);
+    }
+  };
+
+  const handleRetry = async (checkpointId: string) => {
+    try {
+      setIsRetrying(checkpointId);
+
+      const response = await fetch(
+        `/api/campaigns/${campaignId}/checkpoints/${checkpointId}/retry`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to retry failed leads");
+      }
+
+      await response.json();
+
+      // Refresh checkpoints to show updated status
+      window.location.reload();
+    } catch (err) {
+      alert("Failed to retry failed leads. Please try again.");
+    } finally {
+      setIsRetrying(null);
     }
   };
 
@@ -252,7 +292,7 @@ export default function CampaignCheckpointsCard({
                         <TableCell>
                           <div className="flex items-center gap-2 text-sm">
                             <Calendar className="h-4 w-4 text-muted-foreground" />
-                            {formatDay(checkpoint.dayOfWeek)}
+                            {formatDate(checkpoint.scheduledDate)}
                             <Clock className="h-4 w-4 text-muted-foreground ml-2" />
                             {formatTime(checkpoint.timeOfDay)}
                           </div>
@@ -313,6 +353,20 @@ export default function CampaignCheckpointsCard({
                                   : "Resume"}
                               </Button>
                             )}
+                            {checkpoint.status === "partially_completed" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleRetry(checkpoint.id)}
+                                disabled={isRetrying === checkpoint.id}
+                                className="bg-orange-50 hover:bg-orange-100 border-orange-200"
+                              >
+                                <RotateCcw className="mr-2 h-4 w-4" />
+                                {isRetrying === checkpoint.id
+                                  ? "Retrying..."
+                                  : "Retry Failed"}
+                              </Button>
+                            )}
                             <Button
                               variant="outline"
                               size="sm"
@@ -357,24 +411,19 @@ export default function CampaignCheckpointsCard({
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="day-of-week">Day of Week</Label>
-                <Select
-                  value={draft.dayOfWeek}
-                  onValueChange={(v) =>
-                    setDraft((d) => ({ ...d, dayOfWeek: v as DayOfWeek }))
+                <Label htmlFor="scheduled-date">Date</Label>
+                <Input
+                  id="scheduled-date"
+                  type="date"
+                  value={draft.scheduledDate}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, scheduledDate: e.target.value }))
                   }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DAYS_OF_WEEK.map((day) => (
-                      <SelectItem key={day.value} value={day.value}>
-                        {day.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  min={new Date().toISOString().split("T")[0]} // Prevent past dates
+                />
+                <p className="text-xs text-muted-foreground">
+                  Select the date when this checkpoint should execute
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -387,6 +436,9 @@ export default function CampaignCheckpointsCard({
                     setDraft((d) => ({ ...d, timeOfDay: e.target.value }))
                   }
                 />
+                <p className="text-xs text-muted-foreground">
+                  Time shown in your timezone
+                </p>
               </div>
             </div>
 

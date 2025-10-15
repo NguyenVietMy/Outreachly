@@ -2,10 +2,16 @@ package com.outreachly.outreachly.controller;
 
 import com.outreachly.outreachly.entity.Campaign;
 import com.outreachly.outreachly.entity.CampaignCheckpoint;
+import com.outreachly.outreachly.entity.CampaignCheckpointLead;
+import com.outreachly.outreachly.entity.Lead;
 import com.outreachly.outreachly.entity.Template;
 import com.outreachly.outreachly.entity.User;
+import com.outreachly.outreachly.repository.CampaignCheckpointLeadRepository;
+import com.outreachly.outreachly.repository.LeadRepository;
+import com.outreachly.outreachly.repository.TemplateRepository;
 import com.outreachly.outreachly.service.CampaignService;
 import com.outreachly.outreachly.service.CampaignCheckpointService;
+import com.outreachly.outreachly.service.EmailDeliveryService;
 import com.outreachly.outreachly.service.TemplateService;
 import com.outreachly.outreachly.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -28,6 +35,10 @@ public class CampaignController {
     private final CampaignCheckpointService checkpointService;
     private final TemplateService templateService;
     private final UserService userService;
+    private final CampaignCheckpointLeadRepository checkpointLeadRepository;
+    private final LeadRepository leadRepository;
+    private final TemplateRepository templateRepository;
+    private final EmailDeliveryService emailDeliveryService;
 
     @GetMapping
     public ResponseEntity<?> getAllCampaigns(Authentication authentication) {
@@ -55,7 +66,8 @@ public class CampaignController {
         UUID orgId = getOrgIdOrForbidden(user);
 
         try {
-            Campaign savedCampaign = campaignService.createCampaign(orgId, request.getName(), request.getDescription());
+            Campaign savedCampaign = campaignService.createCampaign(orgId, user.getId(), request.getName(),
+                    request.getDescription());
             return ResponseEntity.ok(savedCampaign);
         } catch (Exception e) {
             log.error("Error creating campaign: {}", e.getMessage());
@@ -301,7 +313,7 @@ public class CampaignController {
         try {
             CampaignCheckpoint checkpoint = checkpointService.createCheckpoint(
                     campaignId, orgId, request.getName(),
-                    request.getDayOfWeek(), request.getTimeOfDay(),
+                    request.getScheduledDate(), request.getTimeOfDay(),
                     request.getEmailTemplateId(), request.getLeadIds());
             return ResponseEntity.ok(checkpoint);
         } catch (IllegalArgumentException e) {
@@ -343,7 +355,7 @@ public class CampaignController {
         try {
             CampaignCheckpoint updatedCheckpoint = checkpointService.updateCheckpoint(
                     checkpointId, orgId, request.getName(),
-                    request.getDayOfWeek(), request.getTimeOfDay(),
+                    request.getScheduledDate(), request.getTimeOfDay(),
                     request.getEmailTemplateId(), request.getStatus());
             return ResponseEntity.ok(updatedCheckpoint);
         } catch (IllegalArgumentException e) {
@@ -495,8 +507,8 @@ public class CampaignController {
         }
     }
 
-    @PostMapping("/{campaignId}/checkpoints/{checkpointId}/complete")
-    public ResponseEntity<?> completeCheckpoint(@PathVariable UUID campaignId, @PathVariable UUID checkpointId,
+    @PostMapping("/{campaignId}/checkpoints/{checkpointId}/retry")
+    public ResponseEntity<?> retryFailedLeads(@PathVariable UUID campaignId, @PathVariable UUID checkpointId,
             Authentication authentication) {
         User user = getUser(authentication);
         if (user == null)
@@ -505,14 +517,120 @@ public class CampaignController {
         UUID orgId = getOrgIdOrForbidden(user);
 
         try {
-            CampaignCheckpoint checkpoint = checkpointService.completeCheckpoint(checkpointId, orgId);
-            return ResponseEntity.ok(checkpoint);
+            // Verify checkpoint belongs to campaign and organization
+            CampaignCheckpoint checkpoint = checkpointService.getCheckpoint(checkpointId, orgId)
+                    .orElseThrow(() -> new IllegalArgumentException("Checkpoint not found"));
+
+            if (!checkpoint.getCampaignId().equals(campaignId)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Checkpoint does not belong to campaign"));
+            }
+
+            // Get failed leads for this checkpoint
+            List<CampaignCheckpointLead> failedLeads = checkpoint.getFailedLeads();
+
+            if (failedLeads.isEmpty()) {
+                return ResponseEntity.ok(Map.of(
+                        "message", "No failed leads to retry",
+                        "retriedCount", 0,
+                        "successCount", 0,
+                        "failureCount", 0));
+            }
+
+            log.info("Retrying {} failed leads for checkpoint: {}", failedLeads.size(), checkpoint.getName());
+
+            // Retry sending emails to failed leads
+            int successCount = 0;
+            int failureCount = 0;
+
+            for (CampaignCheckpointLead checkpointLead : failedLeads) {
+                try {
+                    // Reset status to pending for retry
+                    checkpointLead.setStatus(CampaignCheckpointLead.DeliveryStatus.pending);
+                    checkpointLead.setErrorMessage(null);
+                    checkpointLead.setUpdatedAt(LocalDateTime.now());
+                    checkpointLeadRepository.save(checkpointLead);
+
+                    // Get lead details
+                    Lead lead = leadRepository.findById(checkpointLead.getLeadId()).orElse(null);
+                    if (lead == null) {
+                        log.warn("Lead not found for retry: {}", checkpointLead.getLeadId());
+                        checkpointLead.setStatus(CampaignCheckpointLead.DeliveryStatus.failed);
+                        checkpointLead.setErrorMessage("Lead not found");
+                        checkpointLeadRepository.save(checkpointLead);
+                        failureCount++;
+                        continue;
+                    }
+
+                    // Get template
+                    Template emailTemplate = null;
+                    if (checkpoint.getEmailTemplateId() != null) {
+                        emailTemplate = templateRepository.findById(checkpoint.getEmailTemplateId()).orElse(null);
+                    }
+
+                    // Send email using EmailDeliveryService
+                    emailDeliveryService.sendEmailToLead(lead, emailTemplate, checkpoint);
+
+                    // Mark as sent
+                    checkpointLead.setStatus(CampaignCheckpointLead.DeliveryStatus.sent);
+                    checkpointLead.setSentAt(LocalDateTime.now());
+                    checkpointLead.setUpdatedAt(LocalDateTime.now());
+                    checkpointLeadRepository.save(checkpointLead);
+
+                    successCount++;
+                    log.info("Successfully retried email to: {}", lead.getEmail());
+
+                } catch (Exception e) {
+                    log.error("Failed to retry email for lead: {}", checkpointLead.getLeadId(), e);
+                    checkpointLead.setStatus(CampaignCheckpointLead.DeliveryStatus.failed);
+                    checkpointLead.setErrorMessage(e.getMessage());
+                    checkpointLead.setUpdatedAt(LocalDateTime.now());
+                    checkpointLeadRepository.save(checkpointLead);
+                    failureCount++;
+                }
+            }
+
+            // Update checkpoint status based on results
+            updateCheckpointStatusAfterRetry(checkpoint);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Retry completed",
+                    "retriedCount", failedLeads.size(),
+                    "successCount", successCount,
+                    "failureCount", failureCount,
+                    "checkpointStatus", checkpoint.getStatus()));
+
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         } catch (Exception e) {
-            log.error("Error completing checkpoint: {}", e.getMessage());
-            return ResponseEntity.status(500).body(Map.of("error", "Failed to complete checkpoint"));
+            log.error("Error retrying failed leads: {}", e.getMessage());
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to retry leads: " + e.getMessage()));
         }
+    }
+
+    /**
+     * Update checkpoint status after retry operation
+     */
+    private void updateCheckpointStatusAfterRetry(CampaignCheckpoint checkpoint) {
+        // Get updated delivery statistics
+        long sentLeads = checkpointLeadRepository.countByCheckpointIdAndStatus(
+                checkpoint.getId(), CampaignCheckpointLead.DeliveryStatus.sent);
+        long failedLeads = checkpointLeadRepository.countByCheckpointIdAndStatus(
+                checkpoint.getId(), CampaignCheckpointLead.DeliveryStatus.failed);
+
+        CampaignCheckpoint.CheckpointStatus newStatus;
+        if (failedLeads == 0) {
+            newStatus = CampaignCheckpoint.CheckpointStatus.completed;
+        } else if (sentLeads > 0) {
+            newStatus = CampaignCheckpoint.CheckpointStatus.partially_completed;
+        } else {
+            newStatus = CampaignCheckpoint.CheckpointStatus.paused; // All failed
+        }
+
+        checkpointService.updateCheckpoint(checkpoint.getId(), checkpoint.getOrgId(), null, null, null, null,
+                newStatus);
+
+        log.info("Updated checkpoint {} status to {} after retry ({} sent, {} failed)",
+                checkpoint.getName(), newStatus, sentLeads, failedLeads);
     }
 
     private User getUser(Authentication authentication) {
@@ -609,7 +727,7 @@ public class CampaignController {
 
     public static class CreateCheckpointRequest {
         private String name;
-        private java.time.DayOfWeek dayOfWeek;
+        private java.time.LocalDate scheduledDate;
         private java.time.LocalTime timeOfDay;
         private UUID emailTemplateId;
         private List<UUID> leadIds;
@@ -623,12 +741,12 @@ public class CampaignController {
             this.name = name;
         }
 
-        public java.time.DayOfWeek getDayOfWeek() {
-            return dayOfWeek;
+        public java.time.LocalDate getScheduledDate() {
+            return scheduledDate;
         }
 
-        public void setDayOfWeek(java.time.DayOfWeek dayOfWeek) {
-            this.dayOfWeek = dayOfWeek;
+        public void setScheduledDate(java.time.LocalDate scheduledDate) {
+            this.scheduledDate = scheduledDate;
         }
 
         public java.time.LocalTime getTimeOfDay() {
@@ -658,7 +776,7 @@ public class CampaignController {
 
     public static class UpdateCheckpointRequest {
         private String name;
-        private java.time.DayOfWeek dayOfWeek;
+        private java.time.LocalDate scheduledDate;
         private java.time.LocalTime timeOfDay;
         private UUID emailTemplateId;
         private CampaignCheckpoint.CheckpointStatus status;
@@ -672,12 +790,12 @@ public class CampaignController {
             this.name = name;
         }
 
-        public java.time.DayOfWeek getDayOfWeek() {
-            return dayOfWeek;
+        public java.time.LocalDate getScheduledDate() {
+            return scheduledDate;
         }
 
-        public void setDayOfWeek(java.time.DayOfWeek dayOfWeek) {
-            this.dayOfWeek = dayOfWeek;
+        public void setScheduledDate(java.time.LocalDate scheduledDate) {
+            this.scheduledDate = scheduledDate;
         }
 
         public java.time.LocalTime getTimeOfDay() {

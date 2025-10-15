@@ -28,6 +28,9 @@ public class Campaign {
     @Column(name = "org_id", nullable = false)
     private UUID orgId;
 
+    @Column(name = "created_by", nullable = false)
+    private Long createdBy;
+
     @Column(name = "name", nullable = false)
     private String name;
 
