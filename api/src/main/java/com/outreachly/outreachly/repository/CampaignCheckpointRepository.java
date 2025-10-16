@@ -47,10 +47,6 @@ public interface CampaignCheckpointRepository extends JpaRepository<CampaignChec
         long countByCampaignIdAndStatus(@Param("campaignId") UUID campaignId,
                         @Param("status") CampaignCheckpoint.CheckpointStatus status);
 
-        // Find active checkpoints that should be processed (for scheduling service)
-        @Query("SELECT cp FROM CampaignCheckpoint cp WHERE cp.status = 'active' AND cp.scheduledDate = :scheduledDate ORDER BY cp.timeOfDay")
-        List<CampaignCheckpoint> findActiveCheckpointsForDate(@Param("scheduledDate") LocalDate scheduledDate);
-
         // Delete all checkpoints for a campaign (cascade will handle checkpoint leads)
         void deleteByCampaignId(UUID campaignId);
 
