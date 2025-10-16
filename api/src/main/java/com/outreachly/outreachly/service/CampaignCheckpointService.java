@@ -7,6 +7,7 @@ import com.outreachly.outreachly.repository.CampaignRepository;
 import com.outreachly.outreachly.repository.CampaignCheckpointRepository;
 import com.outreachly.outreachly.repository.CampaignCheckpointLeadRepository;
 import com.outreachly.outreachly.repository.LeadRepository;
+import com.outreachly.outreachly.repository.CampaignLeadRepository;
 import com.outreachly.outreachly.entity.Template;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +33,7 @@ public class CampaignCheckpointService {
     private final CampaignRepository campaignRepository;
     private final LeadRepository leadRepository;
     private final TemplateService templateService;
+    private final CampaignLeadRepository campaignLeadRepository;
 
     /**
      * Create a new campaign checkpoint
@@ -157,13 +159,24 @@ public class CampaignCheckpointService {
      * Add leads to a checkpoint
      */
     public void addLeadsToCheckpoint(UUID checkpointId, UUID orgId, List<UUID> leadIds) {
-        log.info("Adding {} leads to checkpoint {} for organization {}", leadIds.size(), checkpointId, orgId);
+        log.info("Adding {} leads to checkpoint {}", leadIds.size(), checkpointId);
 
         // Get checkpoint to access day and time for scheduling
         CampaignCheckpoint checkpoint = checkpointRepository.findByIdAndOrgId(checkpointId, orgId)
                 .orElseThrow(() -> new IllegalArgumentException("Checkpoint not found"));
 
-        List<Lead> leads = leadRepository.findByIdInAndOrgId(leadIds, orgId);
+        // Get campaign ID from checkpoint
+        UUID campaignId = checkpoint.getCampaignId();
+
+        // Find campaign leads for this campaign
+        List<com.outreachly.outreachly.entity.CampaignLead> campaignLeads = campaignLeadRepository
+                .findByCampaignIdAndOrgId(campaignId, orgId);
+
+        // Filter to only the requested lead IDs
+        List<Lead> leads = campaignLeads.stream()
+                .filter(cl -> leadIds.contains(cl.getLeadId()))
+                .map(com.outreachly.outreachly.entity.CampaignLead::getLead)
+                .collect(Collectors.toList());
 
         if (leads.size() != leadIds.size()) {
             log.warn("Some leads not found. Requested: {}, Found: {}", leadIds.size(), leads.size());

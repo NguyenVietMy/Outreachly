@@ -37,11 +37,13 @@ import {
   Mail,
   BarChart3,
   RotateCcw,
+  Users,
 } from "lucide-react";
 import {
   useCampaignCheckpoints,
   CampaignCheckpoint,
 } from "@/hooks/useCampaignCheckpoints";
+import CheckpointLeadsModal from "./CheckpointLeadsModal";
 
 interface CampaignCheckpointsCardProps {
   campaignId: string;
@@ -115,6 +117,10 @@ export default function CampaignCheckpointsCard({
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isActivating, setIsActivating] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState<string | null>(null);
+  const [showLeadsModal, setShowLeadsModal] = useState(false);
+  const [selectedCheckpointForLeads, setSelectedCheckpointForLeads] = useState<
+    string | null
+  >(null);
 
   const [draft, setDraft] = useState<{
     name: string;
@@ -222,6 +228,16 @@ export default function CampaignCheckpointsCard({
     }
   };
 
+  const handleOpenLeadsModal = (checkpointId: string) => {
+    setSelectedCheckpointForLeads(checkpointId);
+    setShowLeadsModal(true);
+  };
+
+  const handleCloseLeadsModal = () => {
+    setShowLeadsModal(false);
+    setSelectedCheckpointForLeads(null);
+  };
+
   const getSelectedTemplate = () => {
     return draft.emailTemplateId
       ? templates.find((t) => t.id === draft.emailTemplateId)
@@ -314,6 +330,17 @@ export default function CampaignCheckpointsCard({
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                handleOpenLeadsModal(checkpoint.id)
+                              }
+                              className="bg-blue-50 hover:bg-blue-100 border-blue-200"
+                            >
+                              <Users className="mr-2 h-4 w-4" />
+                              Checkpoint Emails
+                            </Button>
                             {checkpoint.status === "pending" && (
                               <Button
                                 variant="outline"
@@ -484,6 +511,20 @@ export default function CampaignCheckpointsCard({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Checkpoint Leads Modal */}
+      {selectedCheckpointForLeads && (
+        <CheckpointLeadsModal
+          isOpen={showLeadsModal}
+          onClose={handleCloseLeadsModal}
+          campaignId={campaignId}
+          checkpointId={selectedCheckpointForLeads}
+          checkpointName={
+            checkpoints.find((cp) => cp.id === selectedCheckpointForLeads)
+              ?.name || "Unknown"
+          }
+        />
+      )}
     </>
   );
 }

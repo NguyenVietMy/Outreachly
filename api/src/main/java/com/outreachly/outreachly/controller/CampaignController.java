@@ -386,27 +386,6 @@ public class CampaignController {
         }
     }
 
-    // Checkpoint lead management
-    @PostMapping("/{campaignId}/checkpoints/{checkpointId}/leads")
-    public ResponseEntity<?> addLeadsToCheckpoint(@PathVariable UUID campaignId, @PathVariable UUID checkpointId,
-            @RequestBody AddLeadsToCheckpointRequest request, Authentication authentication) {
-        User user = getUser(authentication);
-        if (user == null)
-            return ResponseEntity.status(401).build();
-
-        UUID orgId = getOrgIdOrForbidden(user);
-
-        try {
-            checkpointService.addLeadsToCheckpoint(checkpointId, orgId, request.getLeadIds());
-            return ResponseEntity.ok(Map.of("message", "Leads added to checkpoint successfully"));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            log.error("Error adding leads to checkpoint: {}", e.getMessage());
-            return ResponseEntity.status(500).body(Map.of("error", "Failed to add leads to checkpoint"));
-        }
-    }
-
     @DeleteMapping("/{campaignId}/checkpoints/{checkpointId}/leads")
     public ResponseEntity<?> removeLeadsFromCheckpoint(@PathVariable UUID campaignId, @PathVariable UUID checkpointId,
             @RequestBody RemoveLeadsFromCheckpointRequest request, Authentication authentication) {
@@ -424,25 +403,6 @@ public class CampaignController {
         } catch (Exception e) {
             log.error("Error removing leads from checkpoint: {}", e.getMessage());
             return ResponseEntity.status(500).body(Map.of("error", "Failed to remove leads from checkpoint"));
-        }
-    }
-
-    @GetMapping("/{campaignId}/checkpoints/{checkpointId}/leads")
-    public ResponseEntity<?> getCheckpointLeads(@PathVariable UUID campaignId, @PathVariable UUID checkpointId,
-            Authentication authentication) {
-        User user = getUser(authentication);
-        if (user == null)
-            return ResponseEntity.status(401).build();
-
-        UUID orgId = getOrgIdOrForbidden(user);
-
-        try {
-            return ResponseEntity.ok(checkpointService.getCheckpointLeads(checkpointId, orgId));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            log.error("Error fetching checkpoint leads: {}", e.getMessage());
-            return ResponseEntity.status(500).body(Map.of("error", "Failed to fetch checkpoint leads"));
         }
     }
 
@@ -604,6 +564,101 @@ public class CampaignController {
         } catch (Exception e) {
             log.error("Error retrying failed leads: {}", e.getMessage());
             return ResponseEntity.status(500).body(Map.of("error", "Failed to retry leads: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Assign leads to a checkpoint
+     */
+    @PostMapping("/{campaignId}/checkpoints/{checkpointId}/leads")
+    public ResponseEntity<?> assignLeadsToCheckpoint(
+            @PathVariable UUID campaignId,
+            @PathVariable UUID checkpointId,
+            @RequestBody Map<String, Object> request,
+            Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null)
+            return ResponseEntity.status(401).build();
+
+        UUID orgId = getOrgIdOrForbidden(user);
+
+        try {
+            log.info("Assigning leads to checkpoint: {} in campaign: {}", checkpointId, campaignId);
+
+            // Verify checkpoint belongs to campaign and organization
+            CampaignCheckpoint checkpoint = checkpointService.getCheckpoint(checkpointId, orgId)
+                    .orElseThrow(() -> new IllegalArgumentException("Checkpoint not found"));
+
+            if (!checkpoint.getCampaignId().equals(campaignId)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Checkpoint does not belong to campaign"));
+            }
+
+            @SuppressWarnings("unchecked")
+            List<String> leadIds = (List<String>) request.get("leadIds");
+            if (leadIds == null || leadIds.isEmpty()) {
+                log.warn("No lead IDs provided in request");
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Lead IDs are required"));
+            }
+
+            // Convert string IDs to UUIDs
+            List<UUID> leadUuids = leadIds.stream()
+                    .map(UUID::fromString)
+                    .collect(java.util.stream.Collectors.toList());
+
+            // Add leads to checkpoint
+            checkpointService.addLeadsToCheckpoint(checkpointId, orgId, leadUuids);
+
+            log.info("Successfully assigned {} leads to checkpoint: {}", leadIds.size(), checkpoint.getName());
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Leads assigned to checkpoint successfully",
+                    "assignedCount", leadIds.size()));
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Error assigning leads to checkpoint: {}", e.getMessage());
+            return ResponseEntity.status(500)
+                    .body(Map.of("error", "Failed to assign leads: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Get leads assigned to a checkpoint
+     */
+    @GetMapping("/{campaignId}/checkpoints/{checkpointId}/leads")
+    public ResponseEntity<?> getCheckpointLeads(
+            @PathVariable UUID campaignId,
+            @PathVariable UUID checkpointId,
+            Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null)
+            return ResponseEntity.status(401).build();
+
+        UUID orgId = getOrgIdOrForbidden(user);
+
+        try {
+            // Verify checkpoint belongs to campaign and organization
+            CampaignCheckpoint checkpoint = checkpointService.getCheckpoint(checkpointId, orgId)
+                    .orElseThrow(() -> new IllegalArgumentException("Checkpoint not found"));
+
+            if (!checkpoint.getCampaignId().equals(campaignId)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Checkpoint does not belong to campaign"));
+            }
+
+            // Get checkpoint leads
+            List<CampaignCheckpointLead> checkpointLeads = checkpointLeadRepository
+                    .findByCheckpointId(checkpointId);
+
+            return ResponseEntity.ok(checkpointLeads);
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Error getting checkpoint leads: {}", e.getMessage());
+            return ResponseEntity.status(500)
+                    .body(Map.of("error", "Failed to get checkpoint leads: " + e.getMessage()));
         }
     }
 
