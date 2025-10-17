@@ -32,12 +32,10 @@ import {
   Clock,
   Play,
   Pause,
-  Trash2,
-  Calendar,
-  Mail,
-  BarChart3,
   RotateCcw,
   Users,
+  Calendar,
+  Mail,
 } from "lucide-react";
 import {
   useCampaignCheckpoints,
@@ -108,13 +106,11 @@ export default function CampaignCheckpointsCard({
     error,
     createCheckpoint,
     updateCheckpoint,
-    deleteCheckpoint,
     activateCheckpoint,
     pauseCheckpoint,
   } = useCampaignCheckpoints(campaignId);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isActivating, setIsActivating] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState<string | null>(null);
   const [showLeadsModal, setShowLeadsModal] = useState(false);
@@ -151,17 +147,6 @@ export default function CampaignCheckpointsCard({
       });
     } catch (err) {
       // Error handling is done by the hook
-    }
-  };
-
-  const handleDelete = async (checkpointId: string) => {
-    try {
-      setIsDeleting(checkpointId);
-      await deleteCheckpoint(checkpointId);
-    } catch (err) {
-      // Error handling is done by the hook
-    } finally {
-      setIsDeleting(null);
     }
   };
 
@@ -394,17 +379,6 @@ export default function CampaignCheckpointsCard({
                                   : "Retry Failed"}
                               </Button>
                             )}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDelete(checkpoint.id)}
-                              disabled={isDeleting === checkpoint.id}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              {isDeleting === checkpoint.id
-                                ? "Deleting..."
-                                : "Delete"}
-                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>

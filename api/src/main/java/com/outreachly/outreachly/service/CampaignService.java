@@ -3,9 +3,11 @@ package com.outreachly.outreachly.service;
 import com.outreachly.outreachly.entity.Campaign;
 import com.outreachly.outreachly.entity.Lead;
 import com.outreachly.outreachly.entity.CampaignLead;
+import com.outreachly.outreachly.entity.EmailEvent;
 import com.outreachly.outreachly.repository.CampaignRepository;
 import com.outreachly.outreachly.repository.LeadRepository;
 import com.outreachly.outreachly.repository.CampaignLeadRepository;
+import com.outreachly.outreachly.repository.EmailEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,7 @@ public class CampaignService {
     private final CampaignRepository campaignRepository;
     private final LeadRepository leadRepository;
     private final CampaignLeadRepository campaignLeadRepository;
+    private final EmailEventRepository emailEventRepository;
 
     /**
      * Create a new campaign
@@ -193,14 +196,20 @@ public class CampaignService {
         long totalLeads = campaignLeadRepository.countByCampaignIdAndStatus(
                 campaignId, CampaignLead.CampaignLeadStatus.active);
 
-        // TODO: Implement actual email tracking stats
-        // For now, return basic stats
+        // Get real email tracking stats from email events
+        // Note: We use DELIVERY for successful sends and REJECT for failures
+        long emailsDelivered = emailEventRepository.countByEventTypeAndCampaignId(
+                EmailEvent.EmailEventType.DELIVERY, campaignId);
+        long emailsFailed = emailEventRepository.countByEventTypeAndCampaignId(
+                EmailEvent.EmailEventType.REJECT, campaignId);
+        long emailsSent = emailsDelivered + emailsFailed; // Total attempts
+
         return CampaignStats.builder()
                 .campaignId(campaignId)
                 .totalLeads(totalLeads)
-                .emailsSent(0L) // Will be implemented with checkpoint system
-                .emailsDelivered(0L) // Will be implemented with delivery tracking
-                .emailsFailed(0L) // Will be implemented with delivery tracking
+                .emailsSent(emailsSent)
+                .emailsDelivered(emailsDelivered)
+                .emailsFailed(emailsFailed)
                 .build();
     }
 
