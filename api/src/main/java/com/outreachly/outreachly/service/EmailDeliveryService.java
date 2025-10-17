@@ -151,8 +151,18 @@ public class EmailDeliveryService {
                     campaignCreatorId,
                     checkpoint.getOrgId().toString());
 
-            // Send email via Gmail API
-            gmailService.sendEmail(lead.getEmail(), personalizedSubject, personalizedBody, isHtml, null);
+            // Send email via Gmail API using campaign creator's OAuth2 token
+            Long campaignCreatorUserId = null;
+            if (campaignCreatorId != null) {
+                try {
+                    campaignCreatorUserId = Long.parseLong(campaignCreatorId);
+                } catch (NumberFormatException e) {
+                    log.warn("Invalid campaign creator ID format: {}", campaignCreatorId);
+                }
+            }
+
+            gmailService.sendEmail(lead.getEmail(), personalizedSubject, personalizedBody, isHtml, null,
+                    campaignCreatorUserId);
 
             log.debug("Email sent successfully to: {} with messageId: {}", lead.getEmail(), messageId);
 

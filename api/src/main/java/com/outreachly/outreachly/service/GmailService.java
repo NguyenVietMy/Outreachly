@@ -7,6 +7,8 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.gmail.Gmail;
 import com.google.api.services.gmail.model.Message;
+import com.outreachly.outreachly.entity.User;
+import com.outreachly.outreachly.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -30,10 +32,12 @@ import java.time.Instant;
 public class GmailService {
 
     private final OAuth2AuthorizedClientService authorizedClientService;
+    private final UserRepository userRepository;
     private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
 
-    public GmailService(OAuth2AuthorizedClientService authorizedClientService) {
+    public GmailService(OAuth2AuthorizedClientService authorizedClientService, UserRepository userRepository) {
         this.authorizedClientService = authorizedClientService;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -41,9 +45,17 @@ public class GmailService {
      */
     public void sendEmail(String to, String subject, String body, boolean isHtml, String fromEmail)
             throws IOException, MessagingException {
+        sendEmail(to, subject, body, isHtml, fromEmail, null);
+    }
+
+    /**
+     * Send email using Gmail API with OAuth2 token for a specific user
+     */
+    public void sendEmail(String to, String subject, String body, boolean isHtml, String fromEmail, Long userId)
+            throws IOException, MessagingException {
         try {
-            // Get OAuth2 access token from current authentication
-            OAuth2AccessToken accessToken = getCurrentAccessToken();
+            // Get OAuth2 access token - try user-specific first, then current context
+            OAuth2AccessToken accessToken = userId != null ? getAccessTokenByUserId(userId) : getCurrentAccessToken();
             if (accessToken == null) {
                 throw new IllegalStateException("No valid OAuth2 access token found");
             }
@@ -62,6 +74,41 @@ public class GmailService {
         } catch (Exception e) {
             log.error("Failed to send email to: {}", to, e);
             throw new RuntimeException("Failed to send email", e);
+        }
+    }
+
+    /**
+     * Get OAuth2 access token by user ID
+     */
+    private OAuth2AccessToken getAccessTokenByUserId(Long userId) {
+        try {
+            // Get user by ID
+            User user = userRepository.findById(userId).orElse(null);
+            if (user == null) {
+                log.warn("User not found for ID: {}", userId);
+                return null;
+            }
+
+            // Try to get Gmail-specific token first
+            OAuth2AuthorizedClient gmailClient = authorizedClientService
+                    .loadAuthorizedClient("google-gmail", user.getEmail());
+            if (gmailClient != null && gmailClient.getAccessToken() != null) {
+                return gmailClient.getAccessToken();
+            }
+
+            // Fallback to Google OAuth token
+            OAuth2AuthorizedClient googleClient = authorizedClientService
+                    .loadAuthorizedClient("google", user.getEmail());
+            if (googleClient != null && googleClient.getAccessToken() != null) {
+                return googleClient.getAccessToken();
+            }
+
+            log.warn("No OAuth2 token found for user: {} (ID: {})", user.getEmail(), userId);
+            return null;
+
+        } catch (Exception e) {
+            log.error("Failed to get OAuth2 token for user ID: {}", userId, e);
+            return null;
         }
     }
 
