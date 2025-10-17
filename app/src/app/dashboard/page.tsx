@@ -17,6 +17,14 @@ export default function Dashboard() {
     // Navigate to campaign details page
   };
 
+  const handleViewAllCampaigns = () => {
+    router.push("/campaigns");
+  };
+
+  const handleCreateCampaign = () => {
+    router.push("/campaigns");
+  };
+
   const handleConfigureDomain = (profileId: string) => {
     // Navigate to domain configuration
   };
@@ -70,7 +78,11 @@ export default function Dashboard() {
             {/* Left Column - Main Content */}
             <div className="lg:col-span-2 space-y-8">
               {/* Campaign Snapshot */}
-              <CampaignSnapshot onViewDetails={handleViewCampaignDetails} />
+              <CampaignSnapshot
+                onViewDetails={handleViewCampaignDetails}
+                onViewAll={handleViewAllCampaigns}
+                onCreate={handleCreateCampaign}
+              />
 
               {/* Engagement Trends */}
               <EngagementTrends />

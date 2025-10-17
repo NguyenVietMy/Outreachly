@@ -17,10 +17,14 @@ import { useCampaignStats, CampaignWithStats } from "@/hooks/useCampaignStats";
 
 interface CampaignSnapshotProps {
   onViewDetails?: (campaignId: string) => void;
+  onViewAll?: () => void;
+  onCreate?: () => void;
 }
 
 export default function CampaignSnapshot({
   onViewDetails,
+  onViewAll,
+  onCreate,
 }: CampaignSnapshotProps) {
   const { campaignsWithStats, loading, error } = useCampaignStats();
 
@@ -41,20 +45,16 @@ export default function CampaignSnapshot({
     const delivered = stats.emailsDelivered;
     const failed = stats.emailsFailed;
 
-    // Calculate rates (using mock data for now since we don't have open/reply tracking yet)
-    const openRate =
-      sent > 0 ? Math.round(((delivered * 0.25) / sent) * 100 * 10) / 10 : 0; // Mock 25% open rate
-    const replyRate =
-      sent > 0 ? Math.round(((delivered * 0.04) / sent) * 100 * 10) / 10 : 0; // Mock 4% reply rate
-    const bounceRate =
-      sent > 0 ? Math.round((failed / sent) * 100 * 10) / 10 : 0;
+    // Calculate delivery rate: delivered / (delivered + rejected) * 100
+    const deliveryRate =
+      delivered + failed > 0
+        ? Math.round((delivered / (delivered + failed)) * 100 * 10) / 10
+        : 0;
 
     return {
       sent,
       delivered,
-      openRate,
-      replyRate,
-      bounceRate,
+      deliveryRate,
     };
   };
 
@@ -115,13 +115,6 @@ export default function CampaignSnapshot({
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </Badge>
     );
-  };
-
-  const getBounceStatus = (bounceRate: number) => {
-    if (bounceRate > 1) {
-      return { color: "text-red-600", icon: AlertTriangle };
-    }
-    return { color: "text-green-600", icon: TrendingUp };
   };
 
   if (loading) {
@@ -203,7 +196,7 @@ export default function CampaignSnapshot({
           <CardTitle className="text-lg font-semibold">
             📊 Campaign Snapshot
           </CardTitle>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={onViewAll}>
             View All Campaigns
             <ExternalLink className="h-4 w-4 ml-1" />
           </Button>
@@ -213,8 +206,6 @@ export default function CampaignSnapshot({
         <div className="space-y-4">
           {campaignsWithStats.slice(0, 5).map((campaign) => {
             const metrics = calculateMetrics(campaign);
-            const bounceStatus = getBounceStatus(metrics.bounceRate);
-            const BounceIcon = bounceStatus.icon;
 
             return (
               <div
@@ -243,23 +234,10 @@ export default function CampaignSnapshot({
                         <span className="text-gray-500"> sent</span>
                       </div>
                       <div>
-                        <span className="font-medium">{metrics.openRate}%</span>
-                        <span className="text-gray-500"> opens</span>
-                      </div>
-                      <div>
                         <span className="font-medium">
-                          {metrics.replyRate}%
+                          {metrics.deliveryRate}%
                         </span>
-                        <span className="text-gray-500"> replies</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <BounceIcon
-                          className={`h-3 w-3 ${bounceStatus.color}`}
-                        />
-                        <span className={`font-medium ${bounceStatus.color}`}>
-                          {metrics.bounceRate}%
-                        </span>
-                        <span className="text-gray-500"> bounces</span>
+                        <span className="text-gray-500"> delivered</span>
                       </div>
                     </div>
                   </div>
@@ -285,7 +263,7 @@ export default function CampaignSnapshot({
             <p className="text-sm text-gray-500 mb-4">
               Create your first campaign to start reaching out to leads
             </p>
-            <Button>Create Campaign</Button>
+            <Button onClick={onCreate}>Create Campaign</Button>
           </div>
         )}
       </CardContent>
