@@ -77,11 +77,12 @@ export function RichTextEditor({
   const availableVariables = [
     "firstName",
     "lastName",
-    "companyName",
-    "email",
+    "fullName",
+    "domain",
     "position",
-    "website",
+    "email",
     "phone",
+    "linkedinUrl",
   ];
 
   return (

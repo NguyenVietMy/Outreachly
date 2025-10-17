@@ -68,6 +68,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { EmailValidationModal } from "@/components/email/EmailValidationModal";
+import {
+  extractVariablesFromEmail,
+  validateLeads,
+  ValidationResponse,
+} from "@/lib/emailValidation";
 
 interface GmailFormData {
   recipients: string[];
@@ -144,6 +150,9 @@ export default function SendGmailPage() {
     useState<BulkEmailResult | null>(null);
   const [showGmailModal1, setShowGmailModal1] = useState(false);
   const [showGmailModal2, setShowGmailModal2] = useState(false);
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [validationResults, setValidationResults] =
+    useState<ValidationResponse | null>(null);
 
   const messageId = useMemo(
     () => `gmail_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -337,6 +346,61 @@ export default function SendGmailPage() {
     setSelectedLeads([]);
   };
 
+  // Validation modal handlers
+  const handleProceedWithAll = async () => {
+    setShowValidationModal(false);
+    const validRecipients = formData.recipients.filter(
+      (email) => email.trim() !== ""
+    );
+
+    if (validRecipients.length > 1) {
+      await sendBulkEmails();
+    } else {
+      await sendSingleEmail(validRecipients[0]);
+    }
+  };
+
+  const handleSkipInvalid = async () => {
+    if (!validationResults) return;
+
+    setShowValidationModal(false);
+
+    // Filter out invalid leads
+    const validLeadEmails = validationResults.validLeads.map(
+      (lead) => lead.email
+    );
+    const filteredRecipients = formData.recipients.filter((email) =>
+      validLeadEmails.includes(email)
+    );
+
+    // Update form data with only valid recipients
+    setFormData((prev) => ({
+      ...prev,
+      recipients: filteredRecipients,
+    }));
+
+    // Update selected leads to only include valid ones
+    const validLeadIds = validationResults.validLeads.map(
+      (lead) => lead.leadId
+    );
+    const filteredSelectedLeads = selectedLeads.filter((lead) =>
+      validLeadIds.includes(lead.id)
+    );
+    setSelectedLeads(filteredSelectedLeads);
+
+    // Send emails
+    if (filteredRecipients.length > 1) {
+      await sendBulkEmails();
+    } else if (filteredRecipients.length === 1) {
+      await sendSingleEmail(filteredRecipients[0]);
+    }
+  };
+
+  const handleCancelValidation = () => {
+    setShowValidationModal(false);
+    setValidationResults(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -362,12 +426,42 @@ export default function SendGmailPage() {
       (email) => email.trim() !== ""
     );
 
-    // Automatically choose between single and bulk sending
+    // Extract variables from email content
+    const variableResult = extractVariablesFromEmail(
+      formData.subject,
+      formData.content
+    );
+
+    console.log("Variable extraction result:", variableResult);
+    console.log("Selected leads:", selectedLeads);
+    console.log("All leads:", leads);
+
+    // If there are personalization variables, validate leads
+    if (variableResult.totalVariables > 0) {
+      // Use selectedLeads if available, otherwise find leads by email
+      const leadsToValidate =
+        selectedLeads.length > 0
+          ? selectedLeads
+          : leads.filter((lead) => validRecipients.includes(lead.email));
+
+      console.log("Leads to validate:", leadsToValidate);
+
+      if (leadsToValidate.length > 0) {
+        const validation = validateLeads(
+          leadsToValidate,
+          variableResult.requiredVariables
+        );
+        console.log("Validation result:", validation);
+        setValidationResults(validation);
+        setShowValidationModal(true);
+        return;
+      }
+    }
+
+    // No personalization variables or no leads selected, proceed directly
     if (validRecipients.length > 1) {
-      // Use bulk sending for multiple recipients
       await sendBulkEmails();
     } else {
-      // Use single sending for one recipient
       await sendSingleEmail(validRecipients[0]);
     }
   };
@@ -870,6 +964,48 @@ export default function SendGmailPage() {
                         detectedUrls={detectedUrls}
                       />
 
+                      {/* Variable Preview */}
+                      {(() => {
+                        const variableResult = extractVariablesFromEmail(
+                          formData.subject,
+                          formData.content
+                        );
+                        if (variableResult.totalVariables > 0) {
+                          return (
+                            <div className="space-y-2 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                              <div className="flex items-center gap-2">
+                                <Mail className="h-4 w-4 text-blue-600" />
+                                <span className="text-sm font-medium text-blue-800">
+                                  Personalization Variables Detected
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap gap-1">
+                                {variableResult.requiredVariables.map(
+                                  (variable) => (
+                                    <Badge
+                                      key={variable}
+                                      variant="secondary"
+                                      className="bg-blue-100 text-blue-800"
+                                    >
+                                      {`{{${variable}}}`}
+                                    </Badge>
+                                  )
+                                )}
+                              </div>
+                              <p className="text-xs text-blue-600">
+                                {variableResult.totalVariables} variable
+                                {variableResult.totalVariables > 1
+                                  ? "s"
+                                  : ""}{" "}
+                                will be validated against lead data before
+                                sending
+                              </p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+
                       {/* Advanced Options */}
                       <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
                         <h4 className="font-medium text-sm text-gray-700">
@@ -1264,6 +1400,16 @@ export default function SendGmailPage() {
             }))
           }
           onUse={(t: any) => loadTemplate(t as unknown as EmailTemplate)}
+        />
+
+        {/* Email Validation Modal */}
+        <EmailValidationModal
+          open={showValidationModal}
+          onOpenChange={setShowValidationModal}
+          validationResults={validationResults}
+          onProceed={handleProceedWithAll}
+          onCancel={handleCancelValidation}
+          onSkipInvalid={handleSkipInvalid}
         />
 
         {/* Gmail Connect Modals - Using Dialog for better click-outside behavior */}
