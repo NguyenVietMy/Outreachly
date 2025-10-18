@@ -80,8 +80,6 @@ interface EmailFormData {
   isHtml: boolean;
   templateId?: string;
   campaignId?: string;
-  scheduledAt?: string;
-  priority: "low" | "normal" | "high";
 }
 
 interface EmailResponse {
@@ -179,7 +177,6 @@ export default function SendEmailPage() {
     subject: "",
     content: "",
     isHtml: true,
-    priority: "normal",
   });
 
   // Click tracking
@@ -1780,56 +1777,6 @@ export default function SendEmailPage() {
                             </div>
                           )}
 
-                          {/* Advanced Options */}
-                          <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
-                            <h4 className="font-medium text-sm text-gray-700">
-                              Advanced Options
-                            </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <Label htmlFor="priority">Priority</Label>
-                                <Select
-                                  value={formData.priority}
-                                  onValueChange={(
-                                    value: "low" | "normal" | "high"
-                                  ) =>
-                                    setFormData((prev) => ({
-                                      ...prev,
-                                      priority: value,
-                                    }))
-                                  }
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="low">Low</SelectItem>
-                                    <SelectItem value="normal">
-                                      Normal
-                                    </SelectItem>
-                                    <SelectItem value="high">High</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="scheduledAt">
-                                  Schedule Send (Optional)
-                                </Label>
-                                <Input
-                                  id="scheduledAt"
-                                  type="datetime-local"
-                                  value={formData.scheduledAt || ""}
-                                  onChange={(e) =>
-                                    setFormData((prev) => ({
-                                      ...prev,
-                                      scheduledAt: e.target.value,
-                                    }))
-                                  }
-                                />
-                              </div>
-                            </div>
-                          </div>
-
                           {/* Submit Button */}
                           <Button
                             type="submit"
@@ -1847,12 +1794,8 @@ export default function SendEmailPage() {
                               <>
                                 <Send className="mr-2 h-5 w-5" />
                                 {selectedLeads.length > 0 && formData.templateId
-                                  ? formData.scheduledAt
-                                    ? `Schedule ${selectedLeads.length} Personalized Emails`
-                                    : `Send ${selectedLeads.length} Personalized Emails`
-                                  : formData.scheduledAt
-                                    ? "Schedule Email"
-                                    : "Send Email"}
+                                  ? `Send ${selectedLeads.length} Personalized Emails`
+                                  : "Send Email"}
                               </>
                             )}
                           </Button>
