@@ -1909,51 +1909,6 @@ export default function SendEmailPage() {
                         </CardContent>
                       </Card>
                     )}
-
-                    {/* Quick Actions */}
-                    <Card className="shadow-lg border-0">
-                      <CardHeader className="pb-3 bg-gradient-to-r from-purple-50 to-pink-50">
-                        <CardTitle className="text-sm font-medium flex items-center gap-2">
-                          <Zap className="h-4 w-4 text-purple-600" />
-                          Quick Actions
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="pt-4">
-                        <div className="space-y-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="w-full justify-start"
-                            onClick={() => setActiveTab("templates")}
-                          >
-                            <BookOpen className="h-4 w-4 mr-2" />
-                            Browse Templates
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="w-full justify-start"
-                            onClick={() => setActiveTab("history")}
-                          >
-                            <History className="h-4 w-4 mr-2" />
-                            View History
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="w-full justify-start"
-                            onClick={() => setActiveTab("analytics")}
-                          >
-                            <BarChart3 className="h-4 w-4 mr-2" />
-                            View Analytics
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-
                     {/* Security Tips */}
                     <Card className="shadow-lg border-0">
                       <CardHeader className="pb-3 bg-gradient-to-r from-orange-50 to-yellow-50">
