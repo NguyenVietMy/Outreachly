@@ -65,6 +65,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import AuthGuard from "@/components/AuthGuard";
 import { useLeads, Lead } from "@/hooks/useLeads";
 import { EmailValidationModal } from "@/components/email/EmailValidationModal";
+import TemplateBrowserModal from "@/components/templates/TemplateBrowserModal";
 import {
   extractVariablesFromEmail,
   validateLeads,
@@ -1455,67 +1456,10 @@ export default function SendEmailPage() {
                               recipients
                             </CardDescription>
                           </div>
-                          {formData.templateId && (
-                            <Badge
-                              variant="secondary"
-                              className="flex items-center gap-1"
-                            >
-                              <FileText className="h-3 w-3" />
-                              Template Loaded
-                            </Badge>
-                          )}
                         </div>
                       </CardHeader>
                       <CardContent className="p-6">
                         <form onSubmit={handleSubmit} className="space-y-6">
-                          {/* Template Selection */}
-                          {templates.length > 0 && (
-                            <div className="space-y-2">
-                              <Label>Email Template</Label>
-                              <div className="flex gap-2">
-                                <Select
-                                  value={formData.templateId || ""}
-                                  onValueChange={(value) => {
-                                    if (value) {
-                                      const template = templates.find(
-                                        (t) => t.id === value
-                                      );
-                                      if (template) loadTemplate(template);
-                                    } else {
-                                      clearTemplate();
-                                    }
-                                  }}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select a template (optional)" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {templates.map((template) => (
-                                      <SelectItem
-                                        key={template.id}
-                                        value={template.id}
-                                      >
-                                        {template.name}{" "}
-                                        {template.category &&
-                                          `(${template.category})`}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                {formData.templateId && (
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={clearTemplate}
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
                           {/* Lead Selection */}
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
@@ -1718,64 +1662,10 @@ export default function SendEmailPage() {
                             placeholder="Enter your email content..."
                             maxLength={10000}
                             error={errors.content}
+                            onBrowseTemplates={() =>
+                              setShowTemplates(!showTemplates)
+                            }
                           />
-
-                          {/* Template Preview with Lead Data */}
-                          {selectedLeads.length > 0 && formData.templateId && (
-                            <div className="space-y-2">
-                              <Label>Preview with Lead Data</Label>
-                              <div className="border rounded-lg p-4 bg-blue-50">
-                                <div className="text-sm text-blue-600 mb-2">
-                                  Preview with: {selectedLeads[0].firstName}{" "}
-                                  {selectedLeads[0].lastName}
-                                </div>
-                                <div className="space-y-2">
-                                  <div>
-                                    <span className="font-medium text-sm">
-                                      Subject:{" "}
-                                    </span>
-                                    <span className="text-sm">
-                                      {(() => {
-                                        const template = templates.find(
-                                          (t) => t.id === formData.templateId
-                                        );
-                                        if (template) {
-                                          const personalized =
-                                            getPersonalizedContent(
-                                              template,
-                                              selectedLeads[0]
-                                            );
-                                          return personalized.subject;
-                                        }
-                                        return formData.subject;
-                                      })()}
-                                    </span>
-                                  </div>
-                                  <div>
-                                    <span className="font-medium text-sm">
-                                      Content:{" "}
-                                    </span>
-                                    <div className="text-sm mt-1 p-2 bg-white rounded border max-h-32 overflow-y-auto">
-                                      {(() => {
-                                        const template = templates.find(
-                                          (t) => t.id === formData.templateId
-                                        );
-                                        if (template) {
-                                          const personalized =
-                                            getPersonalizedContent(
-                                              template,
-                                              selectedLeads[0]
-                                            );
-                                          return personalized.content;
-                                        }
-                                        return formData.content;
-                                      })()}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
 
                           {/* Submit Button */}
                           <Button
@@ -1793,7 +1683,7 @@ export default function SendEmailPage() {
                             ) : (
                               <>
                                 <Send className="mr-2 h-5 w-5" />
-                                {selectedLeads.length > 0 && formData.templateId
+                                {selectedLeads.length > 0
                                   ? `Send ${selectedLeads.length} Personalized Emails`
                                   : "Send Email"}
                               </>
@@ -2149,6 +2039,21 @@ export default function SendEmailPage() {
             </Tabs>
           </div>
         </div>
+
+        {/* Template Browser Modal */}
+        <TemplateBrowserModal
+          open={showTemplates}
+          onOpenChange={setShowTemplates}
+          platform="EMAIL"
+          selectedTemplateId={formData.templateId || null}
+          onSelect={(t: any) =>
+            setFormData((prev) => ({
+              ...prev,
+              templateId: t.id,
+            }))
+          }
+          onUse={(t: any) => loadTemplate(t as unknown as EmailTemplate)}
+        />
 
         {/* Email Validation Modal */}
         {showValidationModal && validationResults && (
