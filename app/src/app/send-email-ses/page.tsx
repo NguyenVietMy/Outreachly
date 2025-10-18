@@ -64,6 +64,14 @@ import { RichTextEditor } from "@/components/email/RichTextEditor";
 import DashboardLayout from "@/components/DashboardLayout";
 import AuthGuard from "@/components/AuthGuard";
 import { useLeads, Lead } from "@/hooks/useLeads";
+import { EmailValidationModal } from "@/components/email/EmailValidationModal";
+import {
+  extractVariablesFromEmail,
+  validateLeads,
+  ValidationResponse,
+} from "@/lib/emailValidation";
+import { useClickTracking } from "@/hooks/useClickTracking";
+import { convertToHtmlEmail } from "@/lib/emailConverter";
 
 interface EmailFormData {
   recipients: string[];
@@ -106,6 +114,25 @@ interface EmailStats {
   replyRate: number;
 }
 
+interface ResendResponse {
+  success: boolean;
+  message: string;
+  messageId?: string;
+}
+
+interface BulkEmailResult {
+  success: boolean;
+  message: string;
+  totalRecipients: number;
+  successfulSends: number;
+  failedSends: number;
+  results?: Array<{
+    email: string;
+    success: boolean;
+    message: string;
+  }>;
+}
+
 export default function SendEmailPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -139,6 +166,11 @@ export default function SendEmailPage() {
   const [emailHistory, setEmailHistory] = useState<EmailResponse[]>([]);
   const [selectedLeads, setSelectedLeads] = useState<Lead[]>([]);
   const [showLeadSelection, setShowLeadSelection] = useState(false);
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [validationResults, setValidationResults] =
+    useState<ValidationResponse | null>(null);
+  const [lastBulkResponse, setLastBulkResponse] =
+    useState<BulkEmailResult | null>(null);
 
   const { leads, loading: leadsLoading } = useLeads();
 
@@ -148,6 +180,15 @@ export default function SendEmailPage() {
     content: "",
     isHtml: true,
     priority: "normal",
+  });
+
+  // Click tracking
+  const { isTrackingEnabled, processedContent } = useClickTracking({
+    emailContent: formData.content,
+    messageId: "",
+    userId: user?.id?.toString() || "",
+    campaignId: formData.campaignId,
+    recipients: formData.recipients,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -383,26 +424,593 @@ export default function SendEmailPage() {
     setSelectedLeads([]);
   };
 
+  // Helper function to convert LeadValidationResult to Lead format for personalization
+  const convertValidationResultToLead = (validationResult: any): Lead => {
+    return {
+      id: validationResult.leadId,
+      firstName: validationResult.firstName || "",
+      lastName: validationResult.lastName || "",
+      domain: validationResult.companyName || "",
+      email: validationResult.email,
+      phone: "",
+      position: "",
+      positionRaw: "",
+      seniority: "",
+      department: "",
+      linkedinUrl: "",
+      twitter: "",
+      confidenceScore: 0,
+      emailType: "unknown",
+      customTextField: "",
+      source: "",
+      verifiedStatus: "unknown",
+      enrichedJson: "",
+      enrichmentHistory: "",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      orgId: user?.orgId || "",
+      listId: "",
+      campaigns: [],
+    };
+  };
+
+  // Validation modal handlers
+  const handleProceedWithAll = async () => {
+    console.log("handleProceedWithAll called");
+    setShowValidationModal(false);
+
+    if (!validationResults) {
+      console.log("No validation results found");
+      return;
+    }
+
+    console.log("Validation results:", validationResults);
+    setIsSending(true);
+    setLastResponse(null);
+    setLastBulkResponse(null);
+
+    try {
+      // Send personalized emails to all leads (both valid and invalid)
+      const allLeads = [
+        ...validationResults.validLeads,
+        ...validationResults.invalidLeads,
+      ];
+
+      if (allLeads.length === 0) {
+        console.log("No leads found to send emails to");
+        toast({
+          title: "No Leads",
+          description: "No leads found to send emails to.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log("Sending emails to", allLeads.length, "leads");
+
+      // Send personalized emails to each lead
+      const personalizedEmails = allLeads.map((lead) => {
+        // Apply personalization using the lead data
+        const leadForPersonalization = convertValidationResultToLead(lead);
+
+        // Personalize subject and content for THIS specific lead
+        const personalizedSubject = substituteTemplateVariables(
+          formData.subject,
+          leadForPersonalization
+        );
+        const personalizedContent = substituteTemplateVariables(
+          formData.content,
+          leadForPersonalization
+        );
+
+        // Apply personalization to the content that will be sent
+        const contentToSend = isTrackingEnabled
+          ? substituteTemplateVariables(
+              processedContent,
+              leadForPersonalization
+            )
+          : personalizedContent;
+
+        const { htmlContent } = convertToHtmlEmail(contentToSend);
+
+        return {
+          subject: personalizedSubject.trim(),
+          content: htmlContent,
+          recipients: [lead.email],
+          isHtml: true,
+          replyTo: null,
+          campaignId: formData.campaignId,
+        };
+      });
+
+      // Send each personalized email using Email API
+      console.log("Starting to send emails via Email API");
+      const emailPromises = personalizedEmails.map(async (emailRequest) => {
+        console.log("Sending email to:", emailRequest.recipients[0]);
+        const response = await fetch(`${API_URL}/api/email/send`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify(emailRequest),
+        });
+        const result = await response.json();
+        console.log("Email send result:", result);
+        return result;
+      });
+
+      console.log("Waiting for all emails to complete...");
+      const results = await Promise.all(emailPromises);
+      console.log("All email results:", results);
+      const successfulCount = results.filter((r) => r.success).length;
+      const failedCount = results.length - successfulCount;
+
+      toast({
+        title: "Personalized Emails Sent",
+        description: `Sent ${successfulCount} personalized emails, ${failedCount} failed`,
+      });
+
+      // Reset form
+      setFormData((prev) => ({
+        ...prev,
+        subject: "",
+        content: "",
+        recipients: [],
+      }));
+      setSelectedLeads([]);
+    } catch (error) {
+      console.error("Error sending personalized emails:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send personalized emails. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      console.log("Email sending process completed");
+      setIsSending(false);
+    }
+  };
+
+  const handleSkipInvalid = async () => {
+    if (!validationResults) return;
+
+    setShowValidationModal(false);
+
+    setIsSending(true);
+    setLastResponse(null);
+    setLastBulkResponse(null);
+
+    try {
+      // Send personalized emails only to valid leads
+      const validLeads = validationResults.validLeads;
+
+      if (validLeads.length === 0) {
+        toast({
+          title: "No Valid Leads",
+          description: "No valid leads found to send emails to.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Send personalized emails to each valid lead
+      const personalizedEmails = validLeads.map((lead) => {
+        // Apply personalization using the lead data
+        const leadForPersonalization = convertValidationResultToLead(lead);
+
+        // Personalize subject and content for THIS specific lead
+        const personalizedSubject = substituteTemplateVariables(
+          formData.subject,
+          leadForPersonalization
+        );
+        const personalizedContent = substituteTemplateVariables(
+          formData.content,
+          leadForPersonalization
+        );
+
+        // Apply personalization to the content that will be sent
+        const contentToSend = isTrackingEnabled
+          ? substituteTemplateVariables(
+              processedContent,
+              leadForPersonalization
+            )
+          : personalizedContent;
+
+        const { htmlContent } = convertToHtmlEmail(contentToSend);
+
+        return {
+          subject: personalizedSubject.trim(),
+          content: htmlContent,
+          recipients: [lead.email],
+          isHtml: true,
+          replyTo: null,
+          campaignId: formData.campaignId,
+        };
+      });
+
+      // Send each personalized email using Email API
+      console.log("Starting to send emails via Email API");
+      const emailPromises = personalizedEmails.map(async (emailRequest) => {
+        const response = await fetch(`${API_URL}/api/email/send`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify(emailRequest),
+        });
+        return response.json();
+      });
+
+      const results = await Promise.all(emailPromises);
+      const successfulCount = results.filter((r) => r.success).length;
+      const failedCount = results.length - successfulCount;
+
+      toast({
+        title: "Valid Emails Sent",
+        description: `Sent ${successfulCount} personalized emails to valid leads, ${failedCount} failed`,
+      });
+
+      // Reset form
+      setFormData((prev) => ({
+        ...prev,
+        subject: "",
+        content: "",
+        recipients: [],
+      }));
+      setSelectedLeads([]);
+    } catch (error) {
+      console.error("Error sending emails to valid leads:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send emails to valid leads. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleCancelValidation = () => {
+    setShowValidationModal(false);
+    setValidationResults(null);
+  };
+
+  const sendSingleEmail = async (recipient: string) => {
+    setIsSending(true);
+    setLastResponse(null);
+    setLastBulkResponse(null);
+
+    try {
+      let personalizedSubject = formData.subject;
+      let personalizedContent = formData.content;
+
+      // Find the lead for personalization
+      const lead =
+        selectedLeads.find((l) => l.email === recipient) ||
+        leads.find((l) => l.email === recipient);
+
+      if (lead) {
+        // If there's a template, use template personalization
+        if (formData.templateId) {
+          const template = templates.find((t) => t.id === formData.templateId);
+          if (template) {
+            const personalized = getPersonalizedContent(template, lead);
+            personalizedSubject = personalized.subject;
+            personalizedContent = personalized.content;
+          }
+        } else {
+          // Use direct variable substitution
+          personalizedSubject = substituteTemplateVariables(
+            formData.subject,
+            lead
+          );
+          personalizedContent = substituteTemplateVariables(
+            formData.content,
+            lead
+          );
+        }
+      }
+
+      const contentToSend = isTrackingEnabled
+        ? processedContent
+        : personalizedContent;
+
+      const { htmlContent } = convertToHtmlEmail(contentToSend);
+
+      const resendRequest = {
+        to: recipient,
+        subject: (personalizedSubject || "").trim(),
+        body: htmlContent,
+        html: true,
+        from: undefined,
+      };
+
+      const response = await fetch(`${API_URL}/api/resend/send`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(resendRequest),
+      });
+
+      const result: ResendResponse = await response.json();
+      // Convert ResendResponse to EmailResponse format for compatibility
+      const emailResponse: EmailResponse = {
+        messageId: result.messageId || "",
+        success: result.success,
+        message: result.message,
+        timestamp: new Date().toISOString(),
+        totalRecipients: 1,
+        successfulRecipients: result.success ? 1 : 0,
+        failedRecipients: result.success ? [] : [recipient],
+      };
+      setLastResponse(emailResponse);
+
+      if (result.success) {
+        toast({
+          title: "Email Sent Successfully",
+          description: `Email sent to ${recipient} via Resend API`,
+        });
+
+        // Reset form
+        setFormData((prev) => ({
+          ...prev,
+          subject: "",
+          content: "",
+          recipients: [],
+        }));
+        setSelectedLeads([]);
+      } else {
+        toast({
+          title: "Email Failed",
+          description: result.message || "Failed to send email",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error sending email via Resend API:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send email via Resend API. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const sendBulkEmails = async () => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to send emails.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const validRecipients = formData.recipients.filter(
+      (email) => email.trim() !== ""
+    );
+
+    if (validRecipients.length === 0) {
+      toast({
+        title: "No Recipients",
+        description: "Please add at least one recipient email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.subject?.trim()) {
+      toast({
+        title: "Subject Required",
+        description: "Please enter an email subject.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.content?.trim()) {
+      toast({
+        title: "Content Required",
+        description: "Please enter email content.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSending(true);
+    setLastBulkResponse(null);
+
+    try {
+      // If we have selected leads, send personalized emails individually
+      if (selectedLeads.length > 0) {
+        const personalizedEmails = selectedLeads.map((lead) => {
+          let personalizedSubject = formData.subject;
+          let personalizedContent = formData.content;
+
+          // If there's a template, use template personalization
+          if (formData.templateId) {
+            const template = templates.find(
+              (t) => t.id === formData.templateId
+            );
+            if (template) {
+              const personalized = getPersonalizedContent(template, lead);
+              personalizedSubject = personalized.subject;
+              personalizedContent = personalized.content;
+            }
+          } else {
+            // Use direct variable substitution
+            personalizedSubject = substituteTemplateVariables(
+              formData.subject,
+              lead
+            );
+            personalizedContent = substituteTemplateVariables(
+              formData.content,
+              lead
+            );
+          }
+
+          const contentToSend = isTrackingEnabled
+            ? processedContent
+            : personalizedContent;
+
+          const { htmlContent } = convertToHtmlEmail(contentToSend);
+
+          return {
+            to: lead.email,
+            subject: personalizedSubject.trim(),
+            body: htmlContent,
+            html: true,
+            from: undefined,
+          };
+        });
+
+        // Send each personalized email individually
+        const emailPromises = personalizedEmails.map(async (emailRequest) => {
+          const response = await fetch(`${API_URL}/api/email/send`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            credentials: "include",
+            body: JSON.stringify(emailRequest),
+          });
+          return response.json();
+        });
+
+        const results = await Promise.all(emailPromises);
+        const successfulCount = results.filter((r) => r.success).length;
+        const failedCount = results.length - successfulCount;
+
+        toast({
+          title: "Personalized Emails Sent",
+          description: `Sent ${successfulCount} personalized emails, ${failedCount} failed`,
+        });
+
+        // Reset form
+        setFormData((prev) => ({
+          ...prev,
+          subject: "",
+          content: "",
+          recipients: [],
+        }));
+        setSelectedLeads([]);
+        return;
+      }
+
+      // Fallback to regular bulk sending (no personalization)
+      const contentToSend = isTrackingEnabled
+        ? processedContent
+        : formData.content;
+
+      const { htmlContent } = convertToHtmlEmail(contentToSend);
+
+      const bulkRequest = {
+        subject: formData.subject.trim(),
+        content: htmlContent,
+        recipients: validRecipients,
+        isHtml: true,
+        replyTo: null,
+        campaignId: formData.campaignId,
+      };
+
+      const response = await fetch(`${API_URL}/api/email/send-bulk`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(bulkRequest),
+      });
+
+      const result: BulkEmailResult = await response.json();
+      setLastBulkResponse(result);
+
+      if (result.success) {
+        toast({
+          title: "Bulk Emails Sent",
+          description: `Successfully sent ${result.successfulSends} of ${result.totalRecipients} emails.`,
+        });
+
+        // Reset form on successful bulk send
+        setFormData((prev) => ({
+          ...prev,
+          subject: "",
+          content: "",
+          recipients: [],
+        }));
+        setSelectedLeads([]);
+      } else {
+        toast({
+          title: "Bulk Send Failed",
+          description: result.message || "Failed to send bulk emails.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Bulk email sending error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send bulk emails. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   // Template variable substitution
   const substituteTemplateVariables = (text: string, lead: Lead): string => {
     if (!text || !lead) return text;
 
     let result = text
+      // Handle firstName variations
       .replace(/\{\{\s*first_name\s*\}\}/gi, lead.firstName || "")
+      .replace(/\{\{\s*firstName\s*\}\}/gi, lead.firstName || "")
+      .replace(/\{\{\s*firstname\s*\}\}/gi, lead.firstName || "")
+      // Handle lastName variations
       .replace(/\{\{\s*last_name\s*\}\}/gi, lead.lastName || "")
+      .replace(/\{\{\s*lastName\s*\}\}/gi, lead.lastName || "")
+      .replace(/\{\{\s*lastname\s*\}\}/gi, lead.lastName || "")
+      // Handle fullName (combination)
+      .replace(
+        /\{\{\s*full_name\s*\}\}/gi,
+        `${lead.firstName || ""} ${lead.lastName || ""}`.trim()
+      )
+      .replace(
+        /\{\{\s*fullName\s*\}\}/gi,
+        `${lead.firstName || ""} ${lead.lastName || ""}`.trim()
+      )
+      .replace(
+        /\{\{\s*fullname\s*\}\}/gi,
+        `${lead.firstName || ""} ${lead.lastName || ""}`.trim()
+      )
+      // Handle email
       .replace(/\{\{\s*email\s*\}\}/gi, lead.email || "")
+      // Handle company variations
       .replace(/\{\{\s*company\s*\}\}/gi, lead.domain || "")
+      .replace(/\{\{\s*domain\s*\}\}/gi, lead.domain || "")
+      // Handle position variations
       .replace(/\{\{\s*title\s*\}\}/gi, lead.position || "")
       .replace(/\{\{\s*position\s*\}\}/gi, lead.position || "")
+      .replace(/\{\{\s*job_title\s*\}\}/gi, lead.position || "")
+      // Handle other fields
       .replace(/\{\{\s*department\s*\}\}/gi, lead.department || "")
       .replace(/\{\{\s*seniority\s*\}\}/gi, lead.seniority || "")
       .replace(/\{\{\s*phone\s*\}\}/gi, lead.phone || "")
       .replace(/\{\{\s*linkedin\s*\}\}/gi, lead.linkedinUrl || "")
       .replace(/\{\{\s*twitter\s*\}\}/gi, lead.twitter || "");
 
-    // Also handle any remaining variables that might not have been replaced
-    result = result.replace(/\{\{\s*[^}]+\s*\}\}/g, ""); // Remove any remaining {{variable}} patterns
-
+    // Only remove variables that couldn't be matched
+    const remainingVariables = result.match(/\{\{\s*[^}]+\s*\}\}/g);
+    if (remainingVariables) {
+      result = result.replace(/\{\{\s*[^}]+\s*\}\}/g, ""); // Remove any remaining {{variable}} patterns
+    }
     return result;
   };
 
@@ -455,83 +1063,104 @@ export default function SendEmailPage() {
         (email) => email.trim() !== ""
       );
 
-      // If we have selected leads and a template, send personalized emails
-      if (selectedLeads.length > 0 && formData.templateId) {
-        const template = templates.find((t) => t.id === formData.templateId);
-        if (template) {
-          // Send personalized emails to each lead
-          const personalizedEmails = selectedLeads.map((lead) => {
-            const personalized = getPersonalizedContent(template, lead);
-            return {
-              recipients: [lead.email],
-              subject: personalized.subject,
-              content: personalized.content,
-              replyTo: null,
-              isHtml: personalized.isHtml,
-              campaignId: null,
-            };
-          });
+      // Extract variables from email content
+      const variableResult = extractVariablesFromEmail(
+        formData.subject,
+        formData.content
+      );
+      // If there are personalization variables, validate leads
+      if (variableResult.totalVariables > 0) {
+        // Use selectedLeads if available, otherwise find leads by email
+        const leadsToValidate =
+          selectedLeads.length > 0
+            ? selectedLeads
+            : leads.filter((lead) => validRecipients.includes(lead.email));
 
-          // Send each personalized email
-          const emailPromises = personalizedEmails.map(async (emailRequest) => {
-            const response = await fetch(`${API_URL}/api/email/send`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              credentials: "include",
-              body: JSON.stringify(emailRequest),
-            });
-            return response.json();
-          });
-
-          const results = await Promise.all(emailPromises);
-          const successfulCount = results.filter((r) => r.success).length;
-          const failedCount = results.length - successfulCount;
-
-          toast({
-            title: "Personalized Emails Sent",
-            description: `Sent ${successfulCount} personalized emails, ${failedCount} failed`,
-          });
-
-          // Reset form
-          setFormData((prev) => ({
-            ...prev,
-            subject: "",
-            content: "",
-            recipients: [],
-          }));
-          setSelectedLeads([]);
+        if (leadsToValidate.length > 0) {
+          const validation = validateLeads(
+            leadsToValidate,
+            variableResult.requiredVariables
+          );
+          setValidationResults(validation);
+          setShowValidationModal(true);
+          setIsSending(false);
           return;
         }
       }
 
-      // Fallback to regular email sending
-      const emailRequest = {
-        recipients: validRecipients,
-        subject: (formData.subject || "").trim(),
-        content: (formData.content || "").trim(),
-        replyTo: null,
-        isHtml: formData.isHtml,
-        campaignId: null,
-      };
+      // If we have selected leads, send personalized emails
+      if (selectedLeads.length > 0) {
+        // Send personalized emails to each lead
+        const personalizedEmails = selectedLeads.map((lead) => {
+          let personalizedSubject = formData.subject;
+          let personalizedContent = formData.content;
 
-      const response = await fetch(`${API_URL}/api/email/send`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(emailRequest),
-      });
+          // If there's a template, use template personalization
+          if (formData.templateId) {
+            const template = templates.find(
+              (t) => t.id === formData.templateId
+            );
+            if (template) {
+              const personalized = getPersonalizedContent(template, lead);
+              personalizedSubject = personalized.subject;
+              personalizedContent = personalized.content;
+            }
+          } else {
+            // Use direct variable substitution
+            personalizedSubject = substituteTemplateVariables(
+              formData.subject,
+              lead
+            );
+            personalizedContent = substituteTemplateVariables(
+              formData.content,
+              lead
+            );
+          }
 
-      const data: EmailResponse = await response.json();
-      setLastResponse(data);
+          return {
+            recipients: [lead.email],
+            subject: personalizedSubject,
+            content: personalizedContent,
+            replyTo: null,
+            isHtml: formData.isHtml,
+            campaignId: formData.campaignId,
+          };
+        });
 
-      if (data.success) {
+        // Send each personalized email using Resend API
+        const emailPromises = personalizedEmails.map(async (emailRequest) => {
+          const contentToSend = isTrackingEnabled
+            ? processedContent
+            : emailRequest.content;
+
+          const { htmlContent } = convertToHtmlEmail(contentToSend);
+
+          const resendRequest = {
+            to: emailRequest.recipients[0],
+            subject: emailRequest.subject.trim(),
+            body: htmlContent,
+            html: true,
+            from: undefined,
+          };
+
+          const response = await fetch(`${API_URL}/api/email/send`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            credentials: "include",
+            body: JSON.stringify(resendRequest),
+          });
+          return response.json();
+        });
+
+        const results = await Promise.all(emailPromises);
+        const successfulCount = results.filter((r) => r.success).length;
+        const failedCount = results.length - successfulCount;
+
         toast({
-          title: "Email Sent Successfully",
-          description: `Email sent to ${data.successfulRecipients} recipient(s)`,
+          title: "Personalized Emails Sent",
+          description: `Sent ${successfulCount} personalized emails, ${failedCount} failed`,
         });
 
         // Reset form
@@ -542,23 +1171,107 @@ export default function SendEmailPage() {
           recipients: [],
         }));
         setSelectedLeads([]);
-      } else {
-        // Check if it's a SES verification error
-        if (data.message && data.message.includes("not verified")) {
+        return;
+      }
+
+      // Fallback to regular email sending using Resend API
+      const contentToSend = isTrackingEnabled
+        ? processedContent
+        : formData.content;
+
+      const { htmlContent } = convertToHtmlEmail(contentToSend);
+
+      if (validRecipients.length > 1) {
+        // Use bulk sending for multiple recipients
+        const bulkRequest = {
+          recipients: validRecipients,
+          subject: formData.subject.trim(),
+          body: htmlContent,
+          html: true,
+          from: undefined,
+          campaignId: formData.campaignId,
+          userId: user?.id?.toString(),
+        };
+
+        const response = await fetch(`${API_URL}/api/email/send-bulk`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify(bulkRequest),
+        });
+
+        const result: BulkEmailResult = await response.json();
+        setLastBulkResponse(result);
+
+        if (result.success) {
           toast({
-            title: "Email Address Not Verified",
-            description:
-              "The recipient email address needs to be verified in AWS SES. This is required in sandbox mode.",
-            variant: "destructive",
+            title: "Bulk Emails Sent",
+            description: `Successfully sent ${result.successfulSends} of ${result.totalRecipients} emails.`,
           });
         } else {
           toast({
-            title: "Failed to Send Email",
-            description: data.message,
+            title: "Bulk Send Failed",
+            description: result.message || "Failed to send bulk emails.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        // Use single email sending for one recipient
+        const emailRequest = {
+          subject: formData.subject.trim(),
+          content: htmlContent,
+          recipients: [validRecipients[0]],
+          isHtml: true,
+          replyTo: null,
+          campaignId: formData.campaignId,
+        };
+
+        const response = await fetch(`${API_URL}/api/email/send`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify(emailRequest),
+        });
+
+        const result: ResendResponse = await response.json();
+        // Convert ResendResponse to EmailResponse format for compatibility
+        const emailResponse: EmailResponse = {
+          messageId: result.messageId || "",
+          success: result.success,
+          message: result.message,
+          timestamp: new Date().toISOString(),
+          totalRecipients: 1,
+          successfulRecipients: result.success ? 1 : 0,
+          failedRecipients: result.success ? [] : [validRecipients[0]],
+        };
+        setLastResponse(emailResponse);
+
+        if (result.success) {
+          toast({
+            title: "Email Sent Successfully",
+            description: `Email sent to ${validRecipients[0]} via Resend API`,
+          });
+        } else {
+          toast({
+            title: "Email Failed",
+            description: result.message || "Failed to send email",
             variant: "destructive",
           });
         }
       }
+
+      // Reset form
+      setFormData((prev) => ({
+        ...prev,
+        subject: "",
+        content: "",
+        recipients: [],
+      }));
+      setSelectedLeads([]);
     } catch (error) {
       console.error("Error sending email:", error);
       toast({
@@ -1538,6 +2251,18 @@ export default function SendEmailPage() {
             </Tabs>
           </div>
         </div>
+
+        {/* Email Validation Modal */}
+        {showValidationModal && validationResults && (
+          <EmailValidationModal
+            open={showValidationModal}
+            onOpenChange={setShowValidationModal}
+            onProceed={handleProceedWithAll}
+            onCancel={handleCancelValidation}
+            onSkipInvalid={handleSkipInvalid}
+            validationResults={validationResults}
+          />
+        )}
       </DashboardLayout>
     </AuthGuard>
   );
