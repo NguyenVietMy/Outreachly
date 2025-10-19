@@ -21,7 +21,7 @@ public class EmailRequest {
 
     private String templateId;
     private Map<String, Object> templateData;
-    private boolean isHtml = true;
+    private boolean html = true;
     private String replyTo;
     private String campaignId;
 }

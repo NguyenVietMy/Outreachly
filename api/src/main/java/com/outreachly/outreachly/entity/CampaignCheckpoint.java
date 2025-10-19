@@ -46,6 +46,11 @@ public class CampaignCheckpoint {
     private UUID emailTemplateId;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "email_provider", nullable = false)
+    @Builder.Default
+    private EmailProvider emailProvider = EmailProvider.GMAIL;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     @Builder.Default
     private CheckpointStatus status = CheckpointStatus.pending;
@@ -113,5 +118,10 @@ public class CampaignCheckpoint {
         paused, // Temporarily stopped
         completed, // All emails sent successfully
         partially_completed // Some emails sent, some failed
+    }
+
+    public enum EmailProvider {
+        GMAIL, // Gmail API
+        RESEND // Resend API
     }
 }

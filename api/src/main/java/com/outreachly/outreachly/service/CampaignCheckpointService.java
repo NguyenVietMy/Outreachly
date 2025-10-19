@@ -40,7 +40,7 @@ public class CampaignCheckpointService {
      */
     public CampaignCheckpoint createCheckpoint(UUID campaignId, UUID orgId, String name,
             LocalDate scheduledDate, LocalTime timeOfDay,
-            UUID emailTemplateId, List<UUID> leadIds) {
+            UUID emailTemplateId, CampaignCheckpoint.EmailProvider emailProvider, List<UUID> leadIds) {
         log.info("Creating checkpoint '{}' for campaign {} on {} at {}", name, campaignId, scheduledDate, timeOfDay);
 
         // Verify campaign belongs to organization
@@ -66,6 +66,7 @@ public class CampaignCheckpointService {
                 .scheduledDate(scheduledDate)
                 .timeOfDay(timeOfDay)
                 .emailTemplateId(emailTemplateId)
+                .emailProvider(emailProvider != null ? emailProvider : CampaignCheckpoint.EmailProvider.GMAIL)
                 .status(CampaignCheckpoint.CheckpointStatus.pending)
                 .build();
 

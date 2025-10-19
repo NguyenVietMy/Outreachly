@@ -9,6 +9,7 @@ export interface CampaignCheckpoint {
   scheduledDate: string; // YYYY-MM-DD format
   timeOfDay: string; // HH:mm:ss format
   emailTemplateId?: string;
+  emailProvider: "GMAIL" | "RESEND";
   status: "pending" | "active" | "paused" | "completed" | "partially_completed";
   createdAt: string;
   updatedAt: string;
@@ -129,6 +130,7 @@ export function useCampaignCheckpoints(campaignId?: string) {
     scheduledDate: string;
     timeOfDay: string;
     emailTemplateId?: string;
+    emailProvider?: "GMAIL" | "RESEND";
     leadIds?: string[];
   }) => {
     if (!campaignId) throw new Error("Campaign ID is required");

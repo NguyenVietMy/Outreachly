@@ -123,11 +123,13 @@ export default function CampaignCheckpointsCard({
     scheduledDate: string;
     timeOfDay: string;
     emailTemplateId: string | null;
+    emailProvider: "GMAIL" | "RESEND";
   }>({
     name: "",
     scheduledDate: new Date().toISOString().split("T")[0], // Today's date in YYYY-MM-DD format
     timeOfDay: "09:00",
     emailTemplateId: null,
+    emailProvider: "GMAIL",
   });
 
   const handleCreate = async () => {
@@ -137,6 +139,7 @@ export default function CampaignCheckpointsCard({
         scheduledDate: draft.scheduledDate,
         timeOfDay: draft.timeOfDay + ":00", // Add seconds
         emailTemplateId: draft.emailTemplateId || undefined,
+        emailProvider: draft.emailProvider,
       });
       setIsCreateOpen(false);
       setDraft({
@@ -144,6 +147,7 @@ export default function CampaignCheckpointsCard({
         scheduledDate: new Date().toISOString().split("T")[0],
         timeOfDay: "09:00",
         emailTemplateId: null,
+        emailProvider: "GMAIL",
       });
     } catch (err) {
       // Error handling is done by the hook
@@ -311,7 +315,14 @@ export default function CampaignCheckpointsCard({
                           )}
                         </TableCell>
                         <TableCell>
-                          <StatusBadge status={checkpoint.status} />
+                          <div className="flex items-center gap-2">
+                            <StatusBadge status={checkpoint.status} />
+                            <Badge variant="outline" className="text-xs">
+                              {checkpoint.emailProvider === "GMAIL"
+                                ? "Gmail"
+                                : "Resend"}
+                            </Badge>
+                          </div>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
@@ -472,6 +483,30 @@ export default function CampaignCheckpointsCard({
                   No template selected - emails will be sent without a template
                 </p>
               )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email-provider">Email Provider</Label>
+              <Select
+                value={draft.emailProvider}
+                onValueChange={(v) =>
+                  setDraft((d) => ({
+                    ...d,
+                    emailProvider: v as "GMAIL" | "RESEND",
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GMAIL">Gmail API</SelectItem>
+                  <SelectItem value="RESEND">Resend</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Choose how emails will be sent for this checkpoint
+              </p>
             </div>
 
             <div className="flex justify-end gap-2">

@@ -34,6 +34,8 @@ public class EmailDeliveryService {
     private final LeadRepository leadRepository;
     private final TemplateRepository templateRepository;
     private final GmailService gmailService;
+    private final OrganizationEmailService organizationEmailService;
+    private final RateLimitService rateLimitService;
     private final DeliveryTrackingService deliveryTrackingService;
     private final ObjectMapper objectMapper;
     private final CampaignRepository campaignRepository;
@@ -52,6 +54,24 @@ public class EmailDeliveryService {
         }
 
         log.info("Sending emails to {} leads for checkpoint: {}", checkpointLeads.size(), checkpoint.getName());
+
+        // Check rate limit before sending emails
+        String campaignCreatorId = getCampaignCreatorId(checkpoint);
+        if (!rateLimitService.canSendEmails(campaignCreatorId, checkpoint.getOrgId().toString(),
+                checkpointLeads.size())) {
+            log.warn("🚫 Rate limit exceeded for checkpoint: {} - {} emails requested, but quota exceeded",
+                    checkpoint.getName(), checkpointLeads.size());
+
+            // Mark checkpoint as paused due to rate limit
+            checkpoint.setStatus(CampaignCheckpoint.CheckpointStatus.paused);
+            campaignRepository.save(checkpoint.getCampaign());
+
+            throw new RuntimeException(
+                    "Rate limit exceeded. Checkpoint paused. Please wait before sending more emails.");
+        }
+
+        log.info("✅ Rate limit check passed for checkpoint: {} - {} emails can be sent",
+                checkpoint.getName(), checkpointLeads.size());
 
         // Get email template if specified
         Template emailTemplate = null;
@@ -134,14 +154,7 @@ public class EmailDeliveryService {
                     java.util.UUID.randomUUID().toString().substring(0, 8);
 
             // Get campaign creator for tracking
-            String campaignCreatorId = null;
-            try {
-                campaignCreatorId = campaignRepository.findById(checkpoint.getCampaignId())
-                        .map(campaign -> campaign.getCreatedBy().toString())
-                        .orElse(null);
-            } catch (Exception e) {
-                log.warn("Failed to get campaign creator for tracking: {}", e.getMessage());
-            }
+            String campaignCreatorId = getCampaignCreatorId(checkpoint);
 
             // Record SENT event before API call
             deliveryTrackingService.recordEmailDelivered(
@@ -151,20 +164,40 @@ public class EmailDeliveryService {
                     campaignCreatorId,
                     checkpoint.getOrgId().toString());
 
-            // Send email via Gmail API using campaign creator's OAuth2 token
-            Long campaignCreatorUserId = null;
-            if (campaignCreatorId != null) {
-                try {
-                    campaignCreatorUserId = Long.parseLong(campaignCreatorId);
-                } catch (NumberFormatException e) {
-                    log.warn("Invalid campaign creator ID format: {}", campaignCreatorId);
+            // Send email using the configured provider
+            if (checkpoint.getEmailProvider() == CampaignCheckpoint.EmailProvider.GMAIL) {
+                // Send via Gmail API using campaign creator's OAuth2 token
+                Long campaignCreatorUserId = null;
+                if (campaignCreatorId != null) {
+                    try {
+                        campaignCreatorUserId = Long.parseLong(campaignCreatorId);
+                    } catch (NumberFormatException e) {
+                        log.warn("Invalid campaign creator ID format: {}", campaignCreatorId);
+                    }
                 }
+
+                gmailService.sendEmail(lead.getEmail(), personalizedSubject, personalizedBody, isHtml, null,
+                        campaignCreatorUserId);
+            } else {
+                // Send via OrganizationEmailService (SES, Resend, etc.)
+                com.outreachly.outreachly.dto.EmailRequest emailRequest = new com.outreachly.outreachly.dto.EmailRequest();
+                emailRequest.setSubject(personalizedSubject);
+                emailRequest.setContent(personalizedBody);
+                emailRequest.setRecipients(List.of(lead.getEmail()));
+                emailRequest.setHtml(isHtml);
+                emailRequest.setCampaignId(checkpoint.getCampaignId().toString());
+
+                // Convert checkpoint email provider to EmailProviderType
+                com.outreachly.outreachly.service.email.EmailProviderType providerType = checkpoint
+                        .getEmailProvider() == CampaignCheckpoint.EmailProvider.RESEND
+                                ? com.outreachly.outreachly.service.email.EmailProviderType.RESEND
+                                : com.outreachly.outreachly.service.email.EmailProviderType.AWS_SES;
+
+                organizationEmailService.sendEmail(checkpoint.getOrgId(), emailRequest, providerType);
             }
 
-            gmailService.sendEmail(lead.getEmail(), personalizedSubject, personalizedBody, isHtml, null,
-                    campaignCreatorUserId);
-
-            log.debug("Email sent successfully to: {} with messageId: {}", lead.getEmail(), messageId);
+            log.debug("Email sent successfully to: {} with messageId: {} via provider: {}",
+                    lead.getEmail(), messageId, checkpoint.getEmailProvider());
 
         } catch (Exception e) {
             log.error("Failed to send email to: {}", lead.getEmail(), e);
@@ -194,6 +227,20 @@ public class EmailDeliveryService {
         leadData.put("last_name", lead.getLastName() != null ? lead.getLastName() : "");
 
         return leadData;
+    }
+
+    /**
+     * Get campaign creator ID for rate limiting
+     */
+    private String getCampaignCreatorId(CampaignCheckpoint checkpoint) {
+        try {
+            return campaignRepository.findById(checkpoint.getCampaignId())
+                    .map(campaign -> campaign.getCreatedBy().toString())
+                    .orElse(null);
+        } catch (Exception e) {
+            log.warn("Failed to get campaign creator for rate limiting: {}", e.getMessage());
+            return null;
+        }
     }
 
     /**

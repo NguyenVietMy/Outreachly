@@ -314,7 +314,7 @@ public class CampaignController {
             CampaignCheckpoint checkpoint = checkpointService.createCheckpoint(
                     campaignId, orgId, request.getName(),
                     request.getScheduledDate(), request.getTimeOfDay(),
-                    request.getEmailTemplateId(), request.getLeadIds());
+                    request.getEmailTemplateId(), request.getEmailProvider(), request.getLeadIds());
             return ResponseEntity.ok(checkpoint);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
@@ -785,6 +785,7 @@ public class CampaignController {
         private java.time.LocalDate scheduledDate;
         private java.time.LocalTime timeOfDay;
         private UUID emailTemplateId;
+        private CampaignCheckpoint.EmailProvider emailProvider;
         private List<UUID> leadIds;
 
         // Getters and setters
@@ -820,6 +821,14 @@ public class CampaignController {
             this.emailTemplateId = emailTemplateId;
         }
 
+        public CampaignCheckpoint.EmailProvider getEmailProvider() {
+            return emailProvider;
+        }
+
+        public void setEmailProvider(CampaignCheckpoint.EmailProvider emailProvider) {
+            this.emailProvider = emailProvider;
+        }
+
         public List<UUID> getLeadIds() {
             return leadIds;
         }
@@ -834,6 +843,7 @@ public class CampaignController {
         private java.time.LocalDate scheduledDate;
         private java.time.LocalTime timeOfDay;
         private UUID emailTemplateId;
+        private CampaignCheckpoint.EmailProvider emailProvider;
         private CampaignCheckpoint.CheckpointStatus status;
 
         // Getters and setters
@@ -867,6 +877,14 @@ public class CampaignController {
 
         public void setEmailTemplateId(UUID emailTemplateId) {
             this.emailTemplateId = emailTemplateId;
+        }
+
+        public CampaignCheckpoint.EmailProvider getEmailProvider() {
+            return emailProvider;
+        }
+
+        public void setEmailProvider(CampaignCheckpoint.EmailProvider emailProvider) {
+            this.emailProvider = emailProvider;
         }
 
         public CampaignCheckpoint.CheckpointStatus getStatus() {
