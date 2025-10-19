@@ -949,14 +949,14 @@ export default function SendEmailPage() {
 
       const { htmlContent } = convertToHtmlEmail(contentToSend);
 
-      const bulkRequest = {
+      const bulkRequest = validRecipients.map((recipient) => ({
         subject: formData.subject.trim(),
         content: htmlContent,
-        recipients: validRecipients,
+        recipients: [recipient],
         isHtml: true,
         replyTo: null,
         campaignId: formData.campaignId,
-      };
+      }));
 
       const response = await fetch(`${API_URL}/api/email/send-bulk`, {
         method: "POST",
@@ -1224,15 +1224,14 @@ export default function SendEmailPage() {
 
       if (validRecipients.length > 1) {
         // Use bulk sending for multiple recipients
-        const bulkRequest = {
-          recipients: validRecipients,
+        const bulkRequest = validRecipients.map((recipient) => ({
           subject: formData.subject.trim(),
-          body: htmlContent,
-          html: true,
-          from: undefined,
+          content: htmlContent,
+          recipients: [recipient],
+          isHtml: true,
+          replyTo: null,
           campaignId: formData.campaignId,
-          userId: user?.id?.toString(),
-        };
+        }));
 
         const response = await fetch(`${API_URL}/api/email/send-bulk`, {
           method: "POST",
@@ -1695,7 +1694,7 @@ export default function SendEmailPage() {
                             (rateLimitInfo.remaining / rateLimitInfo.limit) *
                             100
                           }
-                          className="h-2"
+                          className="h-2 [&>div]:bg-green-500"
                         />
                         <div
                           className={`text-xs ${rateLimitInfo.remaining > 10 ? "text-gray-500" : "text-orange-600 font-medium"}`}

@@ -76,7 +76,10 @@ public class RateLimitService {
      */
     public boolean canSendEmails(String userId, String orgId, int emailCount) {
         RateLimitInfo rateLimitInfo = checkRateLimit(userId, orgId);
-        return rateLimitInfo.getRemaining() >= emailCount;
+        boolean canSend = rateLimitInfo.getRemaining() >= emailCount;
+        log.info("🚦 CAN SEND RESULT - Remaining: {} >= Requested: {} = {}",
+                rateLimitInfo.getRemaining(), emailCount, canSend);
+        return canSend;
     }
 
     /**
