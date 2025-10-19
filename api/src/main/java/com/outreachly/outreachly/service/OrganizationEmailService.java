@@ -7,6 +7,7 @@ import com.outreachly.outreachly.entity.OrganizationSettings;
 import com.outreachly.outreachly.entity.User;
 import com.outreachly.outreachly.repository.OrganizationSettingsRepository;
 import com.outreachly.outreachly.repository.UserRepository;
+import com.outreachly.outreachly.service.DeliveryTrackingService;
 import com.outreachly.outreachly.service.email.EmailProvider;
 import com.outreachly.outreachly.service.email.EmailProviderFactory;
 import com.outreachly.outreachly.service.email.EmailProviderType;
@@ -36,6 +37,7 @@ public class OrganizationEmailService {
     private final OrganizationSettingsRepository settingsRepository;
     private final UserRepository userRepository;
     private final UserResendConfigService userResendConfigService;
+    private final DeliveryTrackingService deliveryTrackingService;
 
     /**
      * Send email using the organization's configured provider
@@ -43,21 +45,79 @@ public class OrganizationEmailService {
      */
     public EmailResponse sendEmail(UUID orgId, EmailRequest emailRequest) {
         EmailProvider provider = getOrganizationProvider(orgId);
+        Long userId = getCurrentUserId();
+        String userIdStr = userId != null ? userId.toString() : null;
+        String orgIdStr = orgId.toString();
 
-        // If provider is Resend, try to use user-specific configuration
-        if (provider instanceof ResendEmailProvider) {
-            ResendEmailProvider resendProvider = (ResendEmailProvider) provider;
-            Long userId = getCurrentUserId();
+        // Generate unique message ID for tracking
+        String messageId = generateMessageId(provider.getProviderType());
 
-            if (userId != null && userResendConfigService.hasConfig(userId)) {
-                log.info("Using user-specific Resend configuration for user: {}", userId);
-                return resendProvider.sendEmailWithUserConfig(emailRequest, userId);
+        EmailResponse response;
+        try {
+            // If provider is Resend, try to use user-specific configuration
+            if (provider instanceof ResendEmailProvider) {
+                ResendEmailProvider resendProvider = (ResendEmailProvider) provider;
+
+                if (userId != null && userResendConfigService.hasConfig(userId)) {
+                    log.info("Using user-specific Resend configuration for user: {}", userId);
+                    response = resendProvider.sendEmailWithUserConfig(emailRequest, userId);
+                } else {
+                    log.info("No user-specific Resend config found, using global config");
+                    response = provider.sendEmail(emailRequest);
+                }
             } else {
-                log.info("No user-specific Resend config found, using global config");
+                response = provider.sendEmail(emailRequest);
             }
+
+            // Record email events for each recipient
+            if (response.isSuccess()) {
+                for (String recipient : emailRequest.getRecipients()) {
+                    deliveryTrackingService.recordEmailDelivered(
+                            messageId + "_" + recipient.hashCode(),
+                            recipient,
+                            emailRequest.getCampaignId(),
+                            userIdStr,
+                            orgIdStr);
+                }
+            } else {
+                // Record failed delivery for all recipients
+                for (String recipient : emailRequest.getRecipients()) {
+                    deliveryTrackingService.recordEmailRejected(
+                            messageId + "_" + recipient.hashCode(),
+                            recipient,
+                            emailRequest.getCampaignId(),
+                            userIdStr,
+                            orgIdStr,
+                            response.getMessage());
+                }
+            }
+
+        } catch (Exception e) {
+            log.error("Failed to send email via {}: {}", provider.getProviderType(), e.getMessage(), e);
+
+            // Record failed delivery for all recipients
+            for (String recipient : emailRequest.getRecipients()) {
+                deliveryTrackingService.recordEmailRejected(
+                        messageId + "_" + recipient.hashCode(),
+                        recipient,
+                        emailRequest.getCampaignId(),
+                        userIdStr,
+                        orgIdStr,
+                        e.getMessage());
+            }
+
+            // Return error response
+            response = EmailResponse.builder()
+                    .success(false)
+                    .message("Failed to send email: " + e.getMessage())
+                    .timestamp(java.time.LocalDateTime.now())
+                    .totalRecipients(emailRequest.getRecipients().size())
+                    .successfulRecipients(0)
+                    .failedRecipients(emailRequest.getRecipients())
+                    .build();
         }
 
-        return provider.sendEmail(emailRequest);
+        return response;
     }
 
     /**
@@ -65,7 +125,71 @@ public class OrganizationEmailService {
      */
     public EmailResponse sendBulkEmail(UUID orgId, List<EmailRequest> emailRequests) {
         EmailProvider provider = getOrganizationProvider(orgId);
-        return provider.sendBulkEmail(emailRequests);
+        Long userId = getCurrentUserId();
+        String userIdStr = userId != null ? userId.toString() : null;
+        String orgIdStr = orgId.toString();
+
+        // Generate unique message ID for tracking
+        String messageId = generateMessageId(provider.getProviderType());
+
+        EmailResponse response;
+        try {
+            response = provider.sendBulkEmail(emailRequests);
+
+            // Record email events for each recipient in each request
+            for (EmailRequest request : emailRequests) {
+                if (response.isSuccess()) {
+                    for (String recipient : request.getRecipients()) {
+                        deliveryTrackingService.recordEmailDelivered(
+                                messageId + "_" + recipient.hashCode(),
+                                recipient,
+                                request.getCampaignId(),
+                                userIdStr,
+                                orgIdStr);
+                    }
+                } else {
+                    // Record failed delivery for all recipients
+                    for (String recipient : request.getRecipients()) {
+                        deliveryTrackingService.recordEmailRejected(
+                                messageId + "_" + recipient.hashCode(),
+                                recipient,
+                                request.getCampaignId(),
+                                userIdStr,
+                                orgIdStr,
+                                response.getMessage());
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            log.error("Failed to send bulk email via {}: {}", provider.getProviderType(), e.getMessage(), e);
+
+            // Record failed delivery for all recipients in all requests
+            for (EmailRequest request : emailRequests) {
+                for (String recipient : request.getRecipients()) {
+                    deliveryTrackingService.recordEmailRejected(
+                            messageId + "_" + recipient.hashCode(),
+                            recipient,
+                            request.getCampaignId(),
+                            userIdStr,
+                            orgIdStr,
+                            e.getMessage());
+                }
+            }
+
+            // Return error response
+            response = EmailResponse.builder()
+                    .success(false)
+                    .message("Failed to send bulk email: " + e.getMessage())
+                    .timestamp(java.time.LocalDateTime.now())
+                    .totalRecipients(emailRequests.stream().mapToInt(r -> r.getRecipients().size()).sum())
+                    .successfulRecipients(0)
+                    .failedRecipients(emailRequests.stream().flatMap(r -> r.getRecipients().stream())
+                            .collect(java.util.stream.Collectors.toList()))
+                    .build();
+        }
+
+        return response;
     }
 
     /**
@@ -73,7 +197,66 @@ public class OrganizationEmailService {
      */
     public EmailResponse sendEmail(UUID orgId, EmailRequest emailRequest, EmailProviderType providerType) {
         EmailProvider provider = emailProviderFactory.getProvider(providerType);
-        return provider.sendEmail(emailRequest);
+        Long userId = getCurrentUserId();
+        String userIdStr = userId != null ? userId.toString() : null;
+        String orgIdStr = orgId.toString();
+
+        // Generate unique message ID for tracking
+        String messageId = generateMessageId(providerType);
+
+        EmailResponse response;
+        try {
+            response = provider.sendEmail(emailRequest);
+
+            // Record email events for each recipient
+            if (response.isSuccess()) {
+                for (String recipient : emailRequest.getRecipients()) {
+                    deliveryTrackingService.recordEmailDelivered(
+                            messageId + "_" + recipient.hashCode(),
+                            recipient,
+                            emailRequest.getCampaignId(),
+                            userIdStr,
+                            orgIdStr);
+                }
+            } else {
+                // Record failed delivery for all recipients
+                for (String recipient : emailRequest.getRecipients()) {
+                    deliveryTrackingService.recordEmailRejected(
+                            messageId + "_" + recipient.hashCode(),
+                            recipient,
+                            emailRequest.getCampaignId(),
+                            userIdStr,
+                            orgIdStr,
+                            response.getMessage());
+                }
+            }
+
+        } catch (Exception e) {
+            log.error("Failed to send email via {}: {}", providerType, e.getMessage(), e);
+
+            // Record failed delivery for all recipients
+            for (String recipient : emailRequest.getRecipients()) {
+                deliveryTrackingService.recordEmailRejected(
+                        messageId + "_" + recipient.hashCode(),
+                        recipient,
+                        emailRequest.getCampaignId(),
+                        userIdStr,
+                        orgIdStr,
+                        e.getMessage());
+            }
+
+            // Return error response
+            response = EmailResponse.builder()
+                    .success(false)
+                    .message("Failed to send email: " + e.getMessage())
+                    .timestamp(java.time.LocalDateTime.now())
+                    .totalRecipients(emailRequest.getRecipients().size())
+                    .successfulRecipients(0)
+                    .failedRecipients(emailRequest.getRecipients())
+                    .build();
+        }
+
+        return response;
     }
 
     /**
@@ -167,11 +350,17 @@ public class OrganizationEmailService {
     }
 
     /**
-     * Get email history using the organization's configured provider
+     * Get email history for a specific user
      */
-    public List<EmailEvent> getEmailHistory(UUID orgId, String emailAddress) {
-        EmailProvider provider = getOrganizationProvider(orgId);
-        return provider.getEmailHistory(emailAddress);
+    public List<EmailEvent> getEmailHistory(UUID orgId, String userId) {
+        return deliveryTrackingService.getEmailHistoryByUser(orgId, userId);
+    }
+
+    /**
+     * Get email statistics for a specific user
+     */
+    public Map<String, Object> getEmailStats(UUID orgId, String userId) {
+        return deliveryTrackingService.getUserEmailStats(orgId, userId);
     }
 
     private EmailProviderType parseProviderType(String providerString) {
@@ -199,5 +388,13 @@ public class OrganizationEmailService {
             log.warn("Failed to get current user ID: {}", e.getMessage());
         }
         return null;
+    }
+
+    /**
+     * Generate a unique message ID for tracking
+     */
+    private String generateMessageId(EmailProviderType providerType) {
+        return providerType.name().toLowerCase() + "_" + System.currentTimeMillis() + "_" +
+                java.util.UUID.randomUUID().toString().substring(0, 8);
     }
 }

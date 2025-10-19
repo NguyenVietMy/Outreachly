@@ -5,6 +5,7 @@ import com.outreachly.outreachly.dto.EmailResponse;
 import com.outreachly.outreachly.entity.EmailEvent;
 import com.outreachly.outreachly.entity.User;
 import com.outreachly.outreachly.service.OrganizationEmailService;
+import com.outreachly.outreachly.service.RateLimitService;
 import com.outreachly.outreachly.service.UserService;
 import com.outreachly.outreachly.service.email.EmailProviderType;
 import jakarta.validation.Valid;
@@ -27,6 +28,7 @@ public class EmailController {
 
     private final OrganizationEmailService emailService;
     private final UserService userService;
+    private final RateLimitService rateLimitService;
     // Removed unused CsvImportService field
 
     @PostMapping("/send")
@@ -35,6 +37,18 @@ public class EmailController {
             Authentication authentication) {
 
         UUID orgId = getOrgIdFromAuthentication(authentication);
+        User user = getUser(authentication);
+
+        // Check rate limit before sending
+        if (!rateLimitService.canSendEmails(user.getId().toString(),
+                user.getOrgId() != null ? user.getOrgId().toString() : null,
+                emailRequest.getRecipients().size())) {
+            return ResponseEntity.status(429).body(EmailResponse.builder()
+                    .success(false)
+                    .message("Rate limit exceeded. Please wait before sending more emails.")
+                    .build());
+        }
+
         log.info("Sending email to {} recipients for user: {} in org: {}",
                 emailRequest.getRecipients().size(),
                 authentication.getName(),
@@ -51,6 +65,23 @@ public class EmailController {
             Authentication authentication) {
 
         UUID orgId = getOrgIdFromAuthentication(authentication);
+        User user = getUser(authentication);
+
+        // Calculate total recipients
+        int totalRecipients = emailRequests.stream()
+                .mapToInt(req -> req.getRecipients().size())
+                .sum();
+
+        // Check rate limit before sending
+        if (!rateLimitService.canSendEmails(user.getId().toString(),
+                user.getOrgId() != null ? user.getOrgId().toString() : null,
+                totalRecipients)) {
+            return ResponseEntity.status(429).body(EmailResponse.builder()
+                    .success(false)
+                    .message("Rate limit exceeded. Please wait before sending more emails.")
+                    .build());
+        }
+
         log.info("Sending bulk email with {} requests for user: {} in org: {}",
                 emailRequests.size(),
                 authentication.getName(),
@@ -63,14 +94,22 @@ public class EmailController {
 
     @GetMapping("/rate-limit")
     public ResponseEntity<Map<String, Object>> getRateLimit(Authentication authentication) {
-        // Simple rate limiting implementation
-        // In production, you'd use Redis or similar for distributed rate limiting
-        Map<String, Object> rateLimitInfo = new HashMap<>();
-        rateLimitInfo.put("remaining", 100); // This would be calculated based on user's actual usage
-        rateLimitInfo.put("resetTime", null);
-        rateLimitInfo.put("limit", 100);
+        User user = getUser(authentication);
+        if (user == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
+        }
 
-        return ResponseEntity.ok(rateLimitInfo);
+        RateLimitService.RateLimitInfo rateLimitInfo = rateLimitService.getRateLimitInfo(
+                user.getId().toString(),
+                user.getOrgId() != null ? user.getOrgId().toString() : null);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("remaining", rateLimitInfo.getRemaining());
+        response.put("limit", rateLimitInfo.getLimit());
+        response.put("resetTime", rateLimitInfo.getResetTime());
+        response.put("resetTimeSeconds", rateLimitInfo.getResetTimeSeconds());
+
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/verify/{email}")
@@ -148,9 +187,24 @@ public class EmailController {
         return ResponseEntity.ok(history);
     }
 
-    @GetMapping("/health")
-    public ResponseEntity<String> healthCheck() {
-        return ResponseEntity.ok("Email service is healthy");
+    @GetMapping("/history")
+    public ResponseEntity<List<EmailEvent>> getEmailHistory(Authentication authentication) {
+        UUID orgId = getOrgIdFromAuthentication(authentication);
+        User user = getUser(authentication);
+        log.info("Getting email history for user: {} in org: {}", authentication.getName(), orgId);
+
+        List<EmailEvent> history = emailService.getEmailHistory(orgId, user.getId().toString());
+        return ResponseEntity.ok(history);
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<Map<String, Object>> getEmailStats(Authentication authentication) {
+        UUID orgId = getOrgIdFromAuthentication(authentication);
+        User user = getUser(authentication);
+        log.info("Getting email stats for user: {} in org: {}", authentication.getName(), orgId);
+
+        Map<String, Object> stats = emailService.getEmailStats(orgId, user.getId().toString());
+        return ResponseEntity.ok(stats);
     }
 
     @GetMapping("/providers")

@@ -142,7 +142,9 @@ export default function SendEmailPage() {
 
   const [rateLimitInfo, setRateLimitInfo] = useState({
     remaining: 100,
+    limit: 100,
     resetTime: null,
+    resetTimeSeconds: 0,
   });
   const [verificationStatus, setVerificationStatus] = useState({
     sandboxMode: false,
@@ -191,6 +193,21 @@ export default function SendEmailPage() {
   const API_URL =
     process.env.NEXT_PUBLIC_API_URL || "https://api.outreach-ly.com";
 
+  // Function to refresh rate limit info
+  const refreshRateLimit = async () => {
+    try {
+      const rateLimitResponse = await fetch(`${API_URL}/api/email/rate-limit`, {
+        credentials: "include",
+      });
+      if (rateLimitResponse.ok) {
+        const rateLimitData = await rateLimitResponse.json();
+        setRateLimitInfo(rateLimitData);
+      }
+    } catch (error) {
+      console.error("Failed to refresh rate limit:", error);
+    }
+  };
+
   // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
@@ -212,6 +229,14 @@ export default function SendEmailPage() {
         if (rateLimitResponse.ok) {
           const rateLimitData = await rateLimitResponse.json();
           setRateLimitInfo(rateLimitData);
+        } else {
+          console.error("Failed to load rate limit:", rateLimitResponse.status);
+          setRateLimitInfo({
+            remaining: 0,
+            limit: 100,
+            resetTime: null,
+            resetTimeSeconds: 0,
+          });
         }
 
         // Load verification status
@@ -529,6 +554,18 @@ export default function SendEmailPage() {
           credentials: "include",
           body: JSON.stringify(emailRequest),
         });
+
+        if (response.status === 429) {
+          await refreshRateLimit();
+          toast({
+            title: "Rate Limit Exceeded",
+            description:
+              "You have reached your daily email limit. Please try again tomorrow.",
+            variant: "destructive",
+          });
+          return;
+        }
+
         const result = await response.json();
         console.log("Email send result:", result);
         return result;
@@ -544,6 +581,9 @@ export default function SendEmailPage() {
         title: "Personalized Emails Sent",
         description: `Sent ${successfulCount} personalized emails, ${failedCount} failed`,
       });
+
+      // Refresh rate limit after sending
+      await refreshRateLimit();
 
       // Reset form
       setFormData((prev) => ({
@@ -645,6 +685,9 @@ export default function SendEmailPage() {
         title: "Valid Emails Sent",
         description: `Sent ${successfulCount} personalized emails to valid leads, ${failedCount} failed`,
       });
+
+      // Refresh rate limit after sending
+      await refreshRateLimit();
 
       // Reset form
       setFormData((prev) => ({
@@ -748,6 +791,8 @@ export default function SendEmailPage() {
           title: "Email Sent Successfully",
           description: `Email sent to ${recipient} via Resend API`,
         });
+
+        await refreshRateLimit();
 
         // Reset form
         setFormData((prev) => ({
@@ -930,6 +975,8 @@ export default function SendEmailPage() {
           title: "Bulk Emails Sent",
           description: `Successfully sent ${result.successfulSends} of ${result.totalRecipients} emails.`,
         });
+
+        await refreshRateLimit();
 
         // Reset form on successful bulk send
         setFormData((prev) => ({
@@ -1196,6 +1243,17 @@ export default function SendEmailPage() {
           body: JSON.stringify(bulkRequest),
         });
 
+        if (response.status === 429) {
+          await refreshRateLimit();
+          toast({
+            title: "Rate Limit Exceeded",
+            description:
+              "You have reached your daily email limit. Please try again tomorrow.",
+            variant: "destructive",
+          });
+          return;
+        }
+
         const result: BulkEmailResult = await response.json();
         setLastBulkResponse(result);
 
@@ -1204,6 +1262,8 @@ export default function SendEmailPage() {
             title: "Bulk Emails Sent",
             description: `Successfully sent ${result.successfulSends} of ${result.totalRecipients} emails.`,
           });
+
+          await refreshRateLimit();
         } else {
           toast({
             title: "Bulk Send Failed",
@@ -1231,6 +1291,17 @@ export default function SendEmailPage() {
           body: JSON.stringify(emailRequest),
         });
 
+        if (response.status === 429) {
+          await refreshRateLimit();
+          toast({
+            title: "Rate Limit Exceeded",
+            description:
+              "You have reached your daily email limit. Please try again tomorrow.",
+            variant: "destructive",
+          });
+          return;
+        }
+
         const result: ResendResponse = await response.json();
         // Convert ResendResponse to EmailResponse format for compatibility
         const emailResponse: EmailResponse = {
@@ -1249,6 +1320,8 @@ export default function SendEmailPage() {
             title: "Email Sent Successfully",
             description: `Email sent to ${validRecipients[0]} via Resend API`,
           });
+
+          await refreshRateLimit();
         } else {
           toast({
             title: "Email Failed",
@@ -1586,9 +1659,17 @@ export default function SendEmailPage() {
                 <div className="space-y-4 md:space-y-6">
                   {/* Rate Limit Status */}
                   <Card className="shadow-lg border-0">
-                    <CardHeader className="pb-3 bg-gradient-to-r from-green-50 to-emerald-50">
+                    <CardHeader
+                      className={`pb-3 ${
+                        rateLimitInfo.remaining > 10
+                          ? "bg-gradient-to-r from-green-50 to-emerald-50"
+                          : "bg-gradient-to-r from-orange-50 to-red-50"
+                      }`}
+                    >
                       <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-green-600" />
+                        <Clock
+                          className={`h-4 w-4 ${rateLimitInfo.remaining > 10 ? "text-green-600" : "text-orange-600"}`}
+                        />
                         Rate Limit Status
                       </CardTitle>
                     </CardHeader>
@@ -1610,13 +1691,28 @@ export default function SendEmailPage() {
                           </Badge>
                         </div>
                         <Progress
-                          value={(rateLimitInfo.remaining / 100) * 100}
+                          value={
+                            (rateLimitInfo.remaining / rateLimitInfo.limit) *
+                            100
+                          }
                           className="h-2"
                         />
-                        <div className="text-xs text-gray-500">
+                        <div
+                          className={`text-xs ${rateLimitInfo.remaining > 10 ? "text-gray-500" : "text-orange-600 font-medium"}`}
+                        >
                           {rateLimitInfo.remaining > 10 ? "Good" : "Low"}{" "}
                           remaining
                         </div>
+                        {rateLimitInfo.resetTimeSeconds > 0 && (
+                          <div className="text-xs text-gray-400">
+                            Resets in{" "}
+                            {Math.floor(rateLimitInfo.resetTimeSeconds / 3600)}h{" "}
+                            {Math.floor(
+                              (rateLimitInfo.resetTimeSeconds % 3600) / 60
+                            )}
+                            m
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>

@@ -13,6 +13,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -304,6 +306,71 @@ public class DeliveryTrackingService {
 
         return String.format("UTC Date: %s, System Date: %s, Timezone: %s",
                 today, systemToday, ZoneOffset.UTC);
+    }
+
+    /**
+     * Get email history for a specific user
+     */
+    public List<EmailEvent> getEmailHistoryByUser(UUID orgId, String userId) {
+        try {
+            return emailEventRepository.findByUserIdAndOrgIdOrderByTimestampDesc(userId, orgId);
+        } catch (Exception e) {
+            log.error("Failed to get email history for user: {} org: {}", userId, orgId, e);
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Get email statistics for a specific user
+     */
+    public Map<String, Object> getUserEmailStats(UUID orgId, String userId) {
+        try {
+            LocalDate today = LocalDate.now(ZoneOffset.UTC);
+            LocalDateTime startOfDay = today.atStartOfDay();
+            LocalDateTime endOfDay = today.plusDays(1).atStartOfDay();
+
+            LocalDate weekStart = today.minusDays(7);
+            LocalDate monthStart = today.minusDays(30);
+
+            Map<String, Object> stats = new HashMap<>();
+
+            // Today's stats
+            long sentToday = emailEventRepository.countByUserIdAndOrgIdAndTimestampBetweenAndEventType(
+                    userId, orgId, startOfDay, endOfDay, EmailEvent.EmailEventType.DELIVERY);
+
+            // Week's stats
+            long sentThisWeek = emailEventRepository.countByUserIdAndOrgIdAndTimestampBetweenAndEventType(
+                    userId, orgId, weekStart.atStartOfDay(), endOfDay, EmailEvent.EmailEventType.DELIVERY);
+
+            // Month's stats
+            long sentThisMonth = emailEventRepository.countByUserIdAndOrgIdAndTimestampBetweenAndEventType(
+                    userId, orgId, monthStart.atStartOfDay(), endOfDay, EmailEvent.EmailEventType.DELIVERY);
+
+            // Calculate rates (simplified - in production you'd have more sophisticated
+            // tracking)
+            double openRate = 0.0; // Would need OPEN events
+            double clickRate = 0.0; // Would need CLICK events
+            double replyRate = 0.0; // Would need reply tracking
+
+            stats.put("sentToday", (int) sentToday);
+            stats.put("sentThisWeek", (int) sentThisWeek);
+            stats.put("sentThisMonth", (int) sentThisMonth);
+            stats.put("openRate", openRate);
+            stats.put("clickRate", clickRate);
+            stats.put("replyRate", replyRate);
+
+            return stats;
+        } catch (Exception e) {
+            log.error("Failed to get email stats for user: {} org: {}", userId, orgId, e);
+            Map<String, Object> defaultStats = new HashMap<>();
+            defaultStats.put("sentToday", 0);
+            defaultStats.put("sentThisWeek", 0);
+            defaultStats.put("sentThisMonth", 0);
+            defaultStats.put("openRate", 0.0);
+            defaultStats.put("clickRate", 0.0);
+            defaultStats.put("replyRate", 0.0);
+            return defaultStats;
+        }
     }
 
     /**

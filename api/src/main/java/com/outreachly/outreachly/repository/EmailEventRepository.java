@@ -54,4 +54,11 @@ public interface EmailEventRepository extends JpaRepository<EmailEvent, Long> {
 
         long countByEventTypeAndTimestampBetween(EmailEvent.EmailEventType eventType, LocalDateTime start,
                         LocalDateTime end);
+
+        // Rate limiting method
+        long countByUserIdAndOrgIdAndTimestampBetweenAndEventType(String userId, UUID orgId,
+                        LocalDateTime start, LocalDateTime end, EmailEvent.EmailEventType eventType);
+
+        // User-specific methods
+        List<EmailEvent> findByUserIdAndOrgIdOrderByTimestampDesc(String userId, UUID orgId);
 }
