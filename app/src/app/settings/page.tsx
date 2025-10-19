@@ -81,9 +81,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Email providers state
   const [emailProviders, setEmailProviders] = useState<EmailProvider[]>([]);
@@ -129,9 +127,7 @@ export default function SettingsPage() {
 
   // Monitor Resend configuration changes
   useEffect(() => {
-    if (resendConfigModified) {
-      setHasUnsavedChanges(true);
-    }
+    // Configuration changes are handled automatically
   }, [resendConfigModified]);
 
   // Load timezone data on component mount
@@ -228,41 +224,11 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSaveSettings = async () => {
-    setIsSaving(true);
-    try {
-      // Save Resend configuration if it has been modified
-      if (resendConfig.apiKey && resendConfig.fromEmail) {
-        await saveResendConfig();
-      }
-
-      setHasUnsavedChanges(false);
-      toast({
-        title: "Settings Saved",
-        description: "Your settings have been saved successfully.",
-      });
-    } catch (error) {
-      console.error("Failed to save settings:", error);
-      toast({
-        title: "Error",
-        description: `Failed to save settings: ${error instanceof Error ? error.message : "Unknown error"}`,
-        variant: "destructive",
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const markAsChanged = () => {
-    setHasUnsavedChanges(true);
-  };
-
   const switchEmailProvider = async (
     providerId: string,
     config: EmailProvider["config"]
   ) => {
     try {
-      setIsSaving(true);
       const response = await fetch(
         API_URL + "/api/settings/email-providers/" + providerId + "/switch",
         {
@@ -294,8 +260,6 @@ export default function SettingsPage() {
         description: "Failed to switch email provider. Please try again.",
         variant: "destructive",
       });
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -388,8 +352,6 @@ export default function SettingsPage() {
 
   const saveResendConfig = async () => {
     try {
-      setIsSaving(true);
-
       // Validate inputs
       if (!resendConfig.apiKey || !resendConfig.fromEmail) {
         toast({
@@ -430,8 +392,6 @@ export default function SettingsPage() {
         description: "Failed to save Resend configuration",
         variant: "destructive",
       });
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -629,36 +589,12 @@ export default function SettingsPage() {
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {/* Header */}
             <div className="mb-8">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  <Settings className="h-8 w-8 text-blue-600" />
-                  <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-                </div>
-                <Button
-                  onClick={handleSaveSettings}
-                  disabled={isSaving}
-                  variant={hasUnsavedChanges ? "default" : "outline"}
-                >
-                  {isSaving ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="mr-2 h-4 w-4" />
-                      {hasUnsavedChanges ? "Save Changes" : "Save All Settings"}
-                    </>
-                  )}
-                </Button>
+              <div className="flex items-center gap-3 mb-2">
+                <Settings className="h-8 w-8 text-blue-600" />
+                <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
               </div>
               <p className="text-gray-600">
                 Manage your account preferences and email configuration
-                {hasUnsavedChanges && (
-                  <span className="ml-2 text-orange-600 font-medium">
-                    • You have unsaved changes
-                  </span>
-                )}
               </p>
             </div>
 
@@ -766,7 +702,6 @@ export default function SettingsPage() {
                                     updateEmailProvider(provider.id, {
                                       isActive: false,
                                     });
-                                    markAsChanged();
                                   }
                                 }}
                               />
@@ -905,25 +840,16 @@ export default function SettingsPage() {
                                   <div className="flex gap-2 pt-4">
                                     <Button
                                       onClick={saveResendConfig}
-                                      disabled={isSaving || isLoading}
+                                      disabled={isLoading}
                                     >
-                                      {isSaving ? (
-                                        <>
-                                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                          Saving...
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Save className="mr-2 h-4 w-4" />
-                                          Save Configuration
-                                        </>
-                                      )}
+                                      <Save className="mr-2 h-4 w-4" />
+                                      Save Configuration
                                     </Button>
 
                                     <Button
                                       variant="outline"
                                       onClick={testResendConfig}
-                                      disabled={isLoading || isSaving}
+                                      disabled={isLoading}
                                     >
                                       {isLoading ? (
                                         <>
@@ -940,7 +866,7 @@ export default function SettingsPage() {
                                         <AlertDialogTrigger asChild>
                                           <Button
                                             variant="destructive"
-                                            disabled={isLoading || isSaving}
+                                            disabled={isLoading}
                                           >
                                             <Trash2 className="mr-2 h-4 w-4" />
                                             Delete
@@ -1017,7 +943,6 @@ export default function SettingsPage() {
                                                   apiKey: e.target.value,
                                                 },
                                               });
-                                              markAsChanged();
                                             }}
                                             placeholder="Enter your API key"
                                           />
@@ -1052,7 +977,6 @@ export default function SettingsPage() {
                                               fromEmail: e.target.value,
                                             },
                                           });
-                                          markAsChanged();
                                         }}
                                         placeholder="noreply@yourdomain.com"
                                       />
@@ -1068,7 +992,6 @@ export default function SettingsPage() {
                                               fromName: e.target.value,
                                             },
                                           });
-                                          markAsChanged();
                                         }}
                                         placeholder="Your Company"
                                       />

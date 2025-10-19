@@ -217,6 +217,19 @@ public class EmailController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/domains")
+    public ResponseEntity<List<Map<String, Object>>> getRegisteredDomains(Authentication authentication) {
+        UUID orgId = getOrgIdFromAuthentication(authentication);
+        User user = getUser(authentication);
+
+        if (user == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        List<Map<String, Object>> domains = emailService.getRegisteredDomains(orgId, user.getId());
+        return ResponseEntity.ok(domains);
+    }
+
     @PostMapping("/send/{provider}")
     public ResponseEntity<EmailResponse> sendEmailWithProvider(
             @PathVariable String provider,

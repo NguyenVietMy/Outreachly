@@ -101,12 +101,14 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Compliance & Trust Cues */}
-          <ComplianceTrustCues
-            onViewPrivacyPolicy={handleViewPrivacyPolicy}
-            onViewTerms={handleViewTerms}
-            onViewDPA={handleViewDPA}
-          />
+          {/* Privacy & Compliance Links */}
+          <div className="mt-8">
+            <ComplianceTrustCues
+              onViewPrivacyPolicy={handleViewPrivacyPolicy}
+              onViewTerms={handleViewTerms}
+              onViewDPA={handleViewDPA}
+            />
+          </div>
         </div>
       </DashboardLayout>
     </AuthGuard>

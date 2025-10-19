@@ -5,6 +5,7 @@ import com.outreachly.outreachly.dto.EmailResponse;
 import com.outreachly.outreachly.entity.EmailEvent;
 import com.outreachly.outreachly.entity.OrganizationSettings;
 import com.outreachly.outreachly.entity.User;
+import com.outreachly.outreachly.entity.UserResendConfig;
 import com.outreachly.outreachly.repository.OrganizationSettingsRepository;
 import com.outreachly.outreachly.repository.UserRepository;
 import com.outreachly.outreachly.service.DeliveryTrackingService;
@@ -20,6 +21,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -396,5 +399,42 @@ public class OrganizationEmailService {
     private String generateMessageId(EmailProviderType providerType) {
         return providerType.name().toLowerCase() + "_" + System.currentTimeMillis() + "_" +
                 java.util.UUID.randomUUID().toString().substring(0, 8);
+    }
+
+    /**
+     * Get registered domains for the organization and user
+     */
+    public List<Map<String, Object>> getRegisteredDomains(UUID orgId, Long userId) {
+        List<Map<String, Object>> domains = new ArrayList<>();
+
+        // Get Resend domains from user config
+        Optional<UserResendConfig> resendConfig = userResendConfigService.getActiveConfig(userId);
+        if (resendConfig.isPresent() && resendConfig.get().getDomain() != null) {
+            Map<String, Object> domain = new HashMap<>();
+            domain.put("id", resendConfig.get().getId().toString());
+            domain.put("domain", resendConfig.get().getDomain());
+            domain.put("provider", "Resend");
+            domain.put("fromEmail", resendConfig.get().getFromEmail());
+            domain.put("fromName", resendConfig.get().getFromName());
+            domain.put("isActive", resendConfig.get().getIsActive());
+            domain.put("lastUpdated", resendConfig.get().getUpdatedAt());
+            domains.add(domain);
+        } else {
+            // Show default domain if no Resend config found
+            Map<String, Object> defaultDomain = new HashMap<>();
+            defaultDomain.put("id", "default");
+            defaultDomain.put("domain", "outreach-ly.com");
+            defaultDomain.put("provider", "Default");
+            defaultDomain.put("fromEmail", "noreply@outreach-ly.com");
+            defaultDomain.put("fromName", "Outreachly");
+            defaultDomain.put("isActive", true);
+            defaultDomain.put("lastUpdated", java.time.LocalDateTime.now().toString());
+            domains.add(defaultDomain);
+        }
+
+        // TODO: Add Gmail domains if needed
+        // For now, we'll just show Resend domains or default
+
+        return domains;
     }
 }
