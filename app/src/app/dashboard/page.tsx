@@ -26,11 +26,7 @@ export default function Dashboard() {
   };
 
   const handleConfigureDomain = (profileId: string) => {
-    // Navigate to domain configuration
-  };
-
-  const handleViewProfileDetails = (profileId: string) => {
-    // Navigate to profile details
+    router.push("/settings");
   };
 
   const handleViewActivityDetails = (activityId: string) => {
@@ -88,10 +84,7 @@ export default function Dashboard() {
               <EngagementTrends />
 
               {/* Sending Profile Health */}
-              <SendingProfileHealth
-                onConfigureDomain={handleConfigureDomain}
-                onViewDetails={handleViewProfileDetails}
-              />
+              <SendingProfileHealth onConfigureDomain={handleConfigureDomain} />
             </div>
 
             {/* Right Column - Sidebar */}

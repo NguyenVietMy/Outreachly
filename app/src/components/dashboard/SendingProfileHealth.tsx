@@ -10,7 +10,6 @@ import {
   XCircle,
   AlertTriangle,
   Settings,
-  ExternalLink,
   Info,
   Globe,
   Mail,
@@ -28,12 +27,10 @@ interface RegisteredDomain {
 
 interface SendingProfileHealthProps {
   onConfigureDomain?: (profileId: string) => void;
-  onViewDetails?: (profileId: string) => void;
 }
 
 export default function SendingProfileHealth({
   onConfigureDomain,
-  onViewDetails,
 }: SendingProfileHealthProps) {
   const [domains, setDomains] = useState<RegisteredDomain[]>([]);
   const [loading, setLoading] = useState(true);
@@ -183,24 +180,14 @@ export default function SendingProfileHealth({
                     Last updated: {formatLastUpdated(domain.lastUpdated)}
                   </span>
                   {domain.id !== "default" && (
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onConfigureDomain?.(domain.id)}
-                      >
-                        <Settings className="h-3 w-3 mr-1" />
-                        Configure
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onViewDetails?.(domain.id)}
-                      >
-                        <ExternalLink className="h-3 w-3 mr-1" />
-                        Details
-                      </Button>
-                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onConfigureDomain?.(domain.id)}
+                    >
+                      <Settings className="h-3 w-3 mr-1" />
+                      Configure
+                    </Button>
                   )}
                 </div>
               </div>

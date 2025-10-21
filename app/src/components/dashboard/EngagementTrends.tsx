@@ -10,16 +10,9 @@ import { useAuth } from "@/contexts/AuthContext";
 
 interface EngagementTrendsProps {
   data?: TrendData[];
-  period?: "7d" | "30d";
-  onPeriodChange?: (period: "7d" | "30d") => void;
 }
 
-export default function EngagementTrends({
-  data,
-  period = "7d",
-  onPeriodChange,
-}: EngagementTrendsProps) {
-  const [selectedPeriod, setSelectedPeriod] = useState<"7d" | "30d">(period);
+export default function EngagementTrends({ data }: EngagementTrendsProps) {
   const { user } = useAuth();
   const {
     trendData: apiTrendData,
@@ -31,17 +24,12 @@ export default function EngagementTrends({
   // Use provided data, API data, or fallback to empty array
   const trendData = data || apiTrendData || [];
 
-  // Fetch data when period changes
+  // Fetch data for 7 days
   useEffect(() => {
     if (!data) {
-      fetchTrendData(selectedPeriod);
+      fetchTrendData("7d");
     }
-  }, [selectedPeriod, data]);
-
-  const handlePeriodChange = (newPeriod: "7d" | "30d") => {
-    setSelectedPeriod(newPeriod);
-    onPeriodChange?.(newPeriod);
-  };
+  }, [data]);
 
   // Calculate averages and trends from API data
   const avgDelivered = Math.round(
@@ -110,7 +98,7 @@ export default function EngagementTrends({
       const offsetPart = timezone.substring(3);
       if (offsetPart.startsWith("+")) {
         const hours = parseInt(offsetPart.substring(1));
-        return `Etc/GMT-${hours}`; // Note: GMT offsets are inverted
+        return `UTC+${hours}`;
       } else if (
         offsetPart.startsWith("−") ||
         offsetPart.startsWith("-") ||
@@ -118,11 +106,11 @@ export default function EngagementTrends({
       ) {
         // Handle Unicode minus (U+2212), regular minus, and corrupted minus
         const hours = parseInt(offsetPart.substring(1));
-        return `Etc/GMT+${hours}`; // Note: GMT offsets are inverted
+        return `UTC-${hours}`;
       }
     }
 
-    return "UTC"; // Fallback
+    return timezone; // Return the original timezone if it doesn't match UTC format
   };
 
   return (
@@ -130,24 +118,8 @@ export default function EngagementTrends({
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold">
-            📈 Engagement Trends
+            📈 Engagement Trends (7 Days)
           </CardTitle>
-          <div className="flex space-x-2">
-            <Button
-              variant={selectedPeriod === "7d" ? "default" : "outline"}
-              size="sm"
-              onClick={() => handlePeriodChange("7d")}
-            >
-              7 Days
-            </Button>
-            <Button
-              variant={selectedPeriod === "30d" ? "default" : "outline"}
-              size="sm"
-              onClick={() => handlePeriodChange("30d")}
-            >
-              30 Days
-            </Button>
-          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -189,7 +161,8 @@ export default function EngagementTrends({
           {/* Simple Bar Chart Visualization */}
           <div className="space-y-2">
             <h4 className="font-medium text-gray-900">
-              Daily Delivery Metrics ({user?.timezone || "UTC±0"})
+              Daily Delivery Metrics (
+              {getTimezoneString(user?.timezone || "UTC±0")})
             </h4>
             {loading && (
               <div className="text-center py-4 text-gray-500">
