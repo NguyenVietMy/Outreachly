@@ -5,6 +5,7 @@ import com.outreachly.outreachly.dto.ResendConfigResponse;
 import com.outreachly.outreachly.entity.User;
 import com.outreachly.outreachly.entity.UserResendConfig;
 import com.outreachly.outreachly.repository.UserRepository;
+import com.outreachly.outreachly.service.ActivityFeedService;
 import com.outreachly.outreachly.service.UserResendConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,7 @@ public class UserResendConfigController {
 
     private final UserResendConfigService userResendConfigService;
     private final UserRepository userRepository;
+    private final ActivityFeedService activityFeedService;
     private final WebClient resendWebClient;
 
     /**
@@ -117,6 +119,23 @@ public class UserResendConfigController {
             }
 
             UserResendConfig config = saveResult.getConfig();
+
+            // Create activity feed entry for domain configuration
+            try {
+                User user = userRepository.findById(userId).orElse(null);
+                if (user != null && user.getOrgId() != null) {
+                    activityFeedService.createDomainActivity(
+                            user.getOrgId(),
+                            userId,
+                            config.getDomain(),
+                            com.outreachly.outreachly.entity.ActivityFeed.ActivityStatus.success);
+                    log.info("Created domain configuration activity for domain: {} by user: {}",
+                            config.getDomain(), userId);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to create activity feed entry for domain configuration: {}", e.getMessage());
+                // Don't fail the main operation if activity tracking fails
+            }
 
             ResendConfigResponse response = ResendConfigResponse.builder()
                     .fromEmail(config.getFromEmail())
