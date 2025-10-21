@@ -44,6 +44,13 @@ public class UserResendConfig {
     @Builder.Default
     private Boolean isActive = true;
 
+    @Column(name = "is_domain_verified")
+    @Builder.Default
+    private Boolean isDomainVerified = false;
+
+    @Column(name = "verification_code")
+    private String verificationCode;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

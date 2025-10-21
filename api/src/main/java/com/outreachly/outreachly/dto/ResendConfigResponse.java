@@ -20,6 +20,7 @@ public class ResendConfigResponse {
     private String fromName;
     private String domain;
     private Boolean isActive;
+    private Boolean isDomainVerified;
     private String apiKeyMasked; // Only show last 4 characters
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

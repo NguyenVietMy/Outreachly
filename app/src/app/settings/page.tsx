@@ -72,10 +72,6 @@ interface EmailProvider {
   };
 }
 
-interface UserSettings {
-  // No settings needed for MVP
-}
-
 export default function SettingsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -86,9 +82,6 @@ export default function SettingsPage() {
   // Email providers state
   const [emailProviders, setEmailProviders] = useState<EmailProvider[]>([]);
   const [loadingProviders, setLoadingProviders] = useState(true);
-
-  // User settings state - not needed for MVP
-  const [settings, setSettings] = useState<UserSettings>({});
 
   // Resend configuration state
   const [resendConfig, setResendConfig] = useState({
@@ -108,6 +101,13 @@ export default function SettingsPage() {
   const [timezoneSuccess, setTimezoneSuccess] = useState(false);
   const [hasResendConfig, setHasResendConfig] = useState(false);
   const [resendConfigModified, setResendConfigModified] = useState(false);
+  const [isDomainVerified, setIsDomainVerified] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [isVerificationSent, setIsVerificationSent] = useState(false);
+  const [isVerifyingDomain, setIsVerifyingDomain] = useState(false);
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
+  const [verificationError, setVerificationError] = useState("");
+  const [verificationSuccess, setVerificationSuccess] = useState("");
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -116,19 +116,13 @@ export default function SettingsPage() {
     }
   }, [user, authLoading, router]);
 
-  // Load settings and email providers on component mount
+  // Load email providers on component mount
   useEffect(() => {
     if (user && !authLoading) {
-      loadSettings();
       loadEmailProviders();
       loadResendConfig();
     }
   }, [user, authLoading]);
-
-  // Monitor Resend configuration changes
-  useEffect(() => {
-    // Configuration changes are handled automatically
-  }, [resendConfigModified]);
 
   // Load timezone data on component mount
   useEffect(() => {
@@ -137,30 +131,6 @@ export default function SettingsPage() {
       loadCurrentTimezone();
     }
   }, [user]);
-
-  const loadSettings = async () => {
-    try {
-      const response = await fetch(API_URL + "/api/settings", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-      });
-      if (response.ok) {
-        const data = await response.json();
-        // Update settings based on API response
-        // No notification settings to load anymore
-      }
-    } catch (error) {
-      console.error("Failed to load settings:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load settings. Using defaults.",
-        variant: "destructive",
-      });
-    }
-  };
 
   const loadEmailProviders = async () => {
     try {
@@ -263,47 +233,6 @@ export default function SettingsPage() {
     }
   };
 
-  const testEmailProvider = async (
-    providerId: string,
-    config: EmailProvider["config"]
-  ) => {
-    try {
-      const response = await fetch(
-        API_URL + "/api/settings/email-providers/" + providerId + "/test",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify(config),
-        }
-      );
-
-      const result = await response.json();
-
-      if (result.isValid) {
-        toast({
-          title: "Configuration Valid",
-          description: "Email provider configuration is working correctly.",
-        });
-      } else {
-        toast({
-          title: "Configuration Invalid",
-          description: result.message || "Please check your configuration.",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error("Failed to test email provider:", error);
-      toast({
-        title: "Test Failed",
-        description: "Failed to test email provider configuration.",
-        variant: "destructive",
-      });
-    }
-  };
-
   const updateEmailProvider = (
     providerId: string,
     updates: Partial<EmailProvider>
@@ -340,8 +269,10 @@ export default function SettingsPage() {
           domain: config.domain || "",
         });
         setHasResendConfig(true);
+        setIsDomainVerified(config.isDomainVerified || false);
       } else if (response.status === 404) {
         setHasResendConfig(false);
+        setIsDomainVerified(false);
       }
     } catch (error) {
       console.error("Failed to load Resend config:", error);
@@ -370,10 +301,7 @@ export default function SettingsPage() {
       });
 
       if (response.ok) {
-        toast({
-          title: "Success",
-          description: "Resend configuration saved successfully",
-        });
+        setVerificationSuccess("Saved successfully");
         setHasResendConfig(true);
         setResendConfigModified(false);
         // Reload config
@@ -395,51 +323,6 @@ export default function SettingsPage() {
     }
   };
 
-  const testResendConfig = async () => {
-    try {
-      setIsLoading(true);
-
-      if (!resendConfig.apiKey || !resendConfig.fromEmail) {
-        toast({
-          title: "Validation Error",
-          description: "API Key and From Email are required to test",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const response = await fetch(API_URL + "/api/user/resend/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(resendConfig),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast({
-          title: "Success",
-          description: result.message || "Configuration is valid!",
-        });
-      } else {
-        toast({
-          title: "Configuration Invalid",
-          description: result.message || "Please check your configuration",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Test Failed",
-        description: "Failed to test Resend configuration",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const deleteResendConfig = async () => {
     try {
       setIsLoading(true);
@@ -450,10 +333,7 @@ export default function SettingsPage() {
       });
 
       if (response.ok) {
-        toast({
-          title: "Success",
-          description: "Resend configuration deleted successfully",
-        });
+        setVerificationSuccess("Configuration deleted successfully");
         setResendConfig({
           apiKey: "",
           fromEmail: "",
@@ -461,6 +341,9 @@ export default function SettingsPage() {
           domain: "",
         });
         setHasResendConfig(false);
+        setIsDomainVerified(false);
+        setIsVerificationSent(false);
+        setVerificationCode("");
       } else {
         toast({
           title: "Error",
@@ -476,6 +359,94 @@ export default function SettingsPage() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const sendDomainVerification = async () => {
+    try {
+      setIsVerifyingDomain(true);
+      setVerificationError(""); // Clear previous errors
+      setVerificationSuccess(""); // Clear previous success messages
+
+      if (!resendConfig.apiKey || !resendConfig.fromEmail) {
+        setVerificationError(
+          "API Key and From Email are required to send verification"
+        );
+        return;
+      }
+
+      const response = await fetch(API_URL + "/api/user/resend/verify-domain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(resendConfig),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: "Verification Email Sent",
+          description: result.message,
+        });
+        setIsVerificationSent(true);
+        setVerificationError(""); // Clear any previous errors
+      } else {
+        setVerificationError(result.message);
+      }
+    } catch (error) {
+      console.error("Error sending verification:", error);
+      setVerificationError(
+        "Failed to send verification email. Please check your connection and try again."
+      );
+    } finally {
+      setIsVerifyingDomain(false);
+    }
+  };
+
+  const verifyDomainCode = async () => {
+    try {
+      setIsVerifyingCode(true);
+
+      if (!verificationCode.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Please enter the verification code",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await fetch(API_URL + "/api/user/resend/verify-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ verificationCode: verificationCode.trim() }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setVerificationSuccess(result.message);
+        setIsDomainVerified(true);
+        setIsVerificationSent(false);
+        setVerificationCode("");
+        setVerificationError(""); // Clear any previous errors
+      } else {
+        toast({
+          title: "Verification Failed",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to verify code",
+        variant: "destructive",
+      });
+    } finally {
+      setIsVerifyingCode(false);
     }
   };
 
@@ -661,28 +632,9 @@ export default function SettingsPage() {
                               )}
                             </div>
                             <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  testEmailProvider(
-                                    provider.id,
-                                    provider.config
-                                  )
-                                }
-                                disabled={
-                                  !provider.config?.apiKey ||
-                                  !provider.config?.fromEmail
-                                }
-                              >
-                                Test
-                              </Button>
                               <Switch
                                 checked={provider.isActive}
                                 onCheckedChange={(checked) => {
-                                  console.log(
-                                    `Switching ${provider.id} to ${checked}`
-                                  );
                                   if (checked) {
                                     // Enable this provider and disable all others
                                     setEmailProviders((prev) => {
@@ -744,6 +696,8 @@ export default function SettingsPage() {
                                             apiKey: e.target.value,
                                           }));
                                           setResendConfigModified(true);
+                                          setVerificationError(""); // Clear error when user types
+                                          setVerificationSuccess(""); // Clear success message when user types
                                         }}
                                         placeholder="re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                                       />
@@ -791,6 +745,8 @@ export default function SettingsPage() {
                                             fromEmail: e.target.value,
                                           }));
                                           setResendConfigModified(true);
+                                          setVerificationError(""); // Clear error when user types
+                                          setVerificationSuccess(""); // Clear success message when user types
                                         }}
                                         placeholder="noreply@yourdomain.com"
                                       />
@@ -809,6 +765,8 @@ export default function SettingsPage() {
                                             fromName: e.target.value,
                                           }));
                                           setResendConfigModified(true);
+                                          setVerificationError(""); // Clear error when user types
+                                          setVerificationSuccess(""); // Clear success message when user types
                                         }}
                                         placeholder="Your Company"
                                       />
@@ -828,6 +786,7 @@ export default function SettingsPage() {
                                           domain: e.target.value,
                                         }));
                                         setResendConfigModified(true);
+                                        setVerificationError(""); // Clear error when user types
                                       }}
                                       placeholder="yourdomain.com"
                                     />
@@ -837,69 +796,193 @@ export default function SettingsPage() {
                                     </p>
                                   </div>
 
-                                  <div className="flex gap-2 pt-4">
-                                    <Button
-                                      onClick={saveResendConfig}
-                                      disabled={isLoading}
-                                    >
-                                      <Save className="mr-2 h-4 w-4" />
-                                      Save Configuration
-                                    </Button>
-
-                                    <Button
-                                      variant="outline"
-                                      onClick={testResendConfig}
-                                      disabled={isLoading}
-                                    >
-                                      {isLoading ? (
-                                        <>
-                                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                          Testing...
-                                        </>
-                                      ) : (
-                                        "Test Configuration"
-                                      )}
-                                    </Button>
-
-                                    {hasResendConfig && (
-                                      <AlertDialog>
-                                        <AlertDialogTrigger asChild>
+                                  {/* Domain Verification Section */}
+                                  {!isDomainVerified && (
+                                    <div className="space-y-4 pt-4">
+                                      {!isVerificationSent ? (
+                                        <div className="space-y-3">
                                           <Button
-                                            variant="destructive"
-                                            disabled={isLoading}
+                                            onClick={sendDomainVerification}
+                                            disabled={
+                                              isVerifyingDomain ||
+                                              !resendConfig.apiKey ||
+                                              !resendConfig.fromEmail
+                                            }
+                                            className="w-full"
                                           >
-                                            <Trash2 className="mr-2 h-4 w-4" />
-                                            Delete
+                                            {isVerifyingDomain ? (
+                                              <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Sending Verification...
+                                              </>
+                                            ) : (
+                                              "Validate Domain"
+                                            )}
                                           </Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                          <AlertDialogHeader>
-                                            <AlertDialogTitle>
-                                              Delete Resend Configuration
-                                            </AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                              Are you sure you want to delete
-                                              your Resend configuration? You
-                                              will no longer be able to send
-                                              emails using your own Resend
-                                              account.
-                                            </AlertDialogDescription>
-                                          </AlertDialogHeader>
-                                          <AlertDialogFooter>
-                                            <AlertDialogCancel>
-                                              Cancel
-                                            </AlertDialogCancel>
-                                            <AlertDialogAction
-                                              onClick={deleteResendConfig}
-                                              className="bg-red-600 hover:bg-red-700"
+
+                                          {/* Error Message Display */}
+                                          {verificationError && (
+                                            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+                                              <div className="flex items-center">
+                                                <AlertCircle className="h-4 w-4 text-red-600 mr-2" />
+                                                <p className="text-sm text-red-800 font-medium">
+                                                  {verificationError}
+                                                </p>
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          <Alert className="border-yellow-200 bg-yellow-50">
+                                            <AlertCircle className="h-4 w-4 text-yellow-600" />
+                                            <AlertDescription className="text-yellow-800">
+                                              <div className="font-medium mb-1">
+                                                Domain Verification Required
+                                              </div>
+                                              <p className="text-sm">
+                                                Before saving your
+                                                configuration, we need to verify
+                                                that you own the domain. Click
+                                                "Validate Domain" to receive a
+                                                verification code at your login
+                                                email.
+                                              </p>
+                                            </AlertDescription>
+                                          </Alert>
+                                        </div>
+                                      ) : (
+                                        <div className="space-y-3">
+                                          <div className="space-y-2">
+                                            <Label htmlFor="verification-code">
+                                              Verification Code
+                                            </Label>
+                                            <div className="flex gap-2">
+                                              <Input
+                                                id="verification-code"
+                                                value={verificationCode}
+                                                onChange={(e) =>
+                                                  setVerificationCode(
+                                                    e.target.value
+                                                  )
+                                                }
+                                                placeholder="Enter 6-digit code"
+                                                maxLength={6}
+                                                className="text-center text-lg tracking-widest"
+                                              />
+                                              <Button
+                                                onClick={verifyDomainCode}
+                                                disabled={
+                                                  isVerifyingCode ||
+                                                  !verificationCode.trim()
+                                                }
+                                              >
+                                                {isVerifyingCode ? (
+                                                  <>
+                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                    Verifying...
+                                                  </>
+                                                ) : (
+                                                  "Verify"
+                                                )}
+                                              </Button>
+                                            </div>
+                                          </div>
+
+                                          <Alert className="border-blue-200 bg-blue-50">
+                                            <AlertCircle className="h-4 w-4 text-blue-600" />
+                                            <AlertDescription className="text-blue-800">
+                                              <div className="font-medium mb-1">
+                                                Check Your Email
+                                              </div>
+                                              <p className="text-sm">
+                                                We've sent a 6-digit
+                                                verification code to your login
+                                                email address. Please check your
+                                                inbox and spam folder. If you
+                                                don't see the email, verify that
+                                                your API key and email address
+                                                are correct.
+                                              </p>
+                                            </AlertDescription>
+                                          </Alert>
+
+                                          <Button
+                                            variant="outline"
+                                            onClick={() => {
+                                              setIsVerificationSent(false);
+                                              setVerificationCode("");
+                                            }}
+                                            className="w-full"
+                                          >
+                                            Resend Verification Code
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Success Message Display */}
+                                  {verificationSuccess && (
+                                    <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                                      <div className="flex items-center">
+                                        <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
+                                        <p className="text-sm text-green-800 font-medium">
+                                          {verificationSuccess}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Action Buttons - Only show after domain verification */}
+                                  {isDomainVerified && (
+                                    <div className="flex gap-2 pt-4">
+                                      <Button
+                                        onClick={saveResendConfig}
+                                        disabled={isLoading}
+                                      >
+                                        <Save className="mr-2 h-4 w-4" />
+                                        Save Configuration
+                                      </Button>
+
+                                      {hasResendConfig && (
+                                        <AlertDialog>
+                                          <AlertDialogTrigger asChild>
+                                            <Button
+                                              variant="destructive"
+                                              disabled={isLoading}
                                             >
-                                              Yes, Delete Configuration
-                                            </AlertDialogAction>
-                                          </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                      </AlertDialog>
-                                    )}
-                                  </div>
+                                              <Trash2 className="mr-2 h-4 w-4" />
+                                              Delete
+                                            </Button>
+                                          </AlertDialogTrigger>
+                                          <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                              <AlertDialogTitle>
+                                                Delete Resend Configuration
+                                              </AlertDialogTitle>
+                                              <AlertDialogDescription>
+                                                Are you sure you want to delete
+                                                your Resend configuration? You
+                                                will no longer be able to send
+                                                emails using your own Resend
+                                                account.
+                                              </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                              <AlertDialogCancel>
+                                                Cancel
+                                              </AlertDialogCancel>
+                                              <AlertDialogAction
+                                                onClick={deleteResendConfig}
+                                                className="bg-red-600 hover:bg-red-700"
+                                              >
+                                                Yes, Delete Configuration
+                                              </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                          </AlertDialogContent>
+                                        </AlertDialog>
+                                      )}
+                                    </div>
+                                  )}
 
                                   <Alert className="border-blue-200 bg-blue-50">
                                     <AlertCircle className="h-4 w-4 text-blue-600" />
