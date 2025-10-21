@@ -13,6 +13,9 @@ import {
   Upload,
   FileText,
   Search,
+  Send,
+  Mailbox,
+  Target,
 } from "lucide-react";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
@@ -30,9 +33,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
     { name: "Lead Discovery", href: "/lead-discovery", icon: Search },
-    { name: "Send Email", href: "/send-email-ses", icon: Mail },
-    { name: "Send Gmail", href: "/send-gmail", icon: Mail },
-    { name: "Campaigns", href: "/campaigns", icon: Mail },
+    { name: "Domain Sending", href: "/send-email-ses", icon: Send },
+    { name: "Send Gmail", href: "/send-gmail", icon: Mailbox },
+    { name: "Campaigns", href: "/campaigns", icon: Target },
     { name: "Leads", href: "/leads", icon: Users },
     { name: "Import Leads", href: "/import", icon: Upload },
     { name: "Templates", href: "/templates", icon: FileText },

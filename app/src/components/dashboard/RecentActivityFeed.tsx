@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Upload,
   Mail,
@@ -13,7 +14,9 @@ import {
   Clock,
   TrendingUp,
   TrendingDown,
+  RefreshCw,
 } from "lucide-react";
+import { useImportHistory } from "@/hooks/useImportHistory";
 
 interface ActivityItem {
   id: string;
@@ -47,81 +50,78 @@ export default function RecentActivityFeed({
   activities,
   onViewDetails,
 }: RecentActivityFeedProps) {
-  // Mock data for demonstration
-  const mockActivities: ActivityItem[] = [
-    {
-      id: "1",
-      type: "import",
-      title: "CSV import completed",
-      description:
-        "Successfully processed 9,532 leads from Enterprise Prospects Q4.csv",
-      timestamp: "2 minutes ago",
-      metadata: { count: 9532 },
-    },
-    {
-      id: "2",
-      type: "campaign",
-      title: "Campaign sent",
-      description: "Q4 Enterprise Outreach campaign delivered 1,200 emails",
-      timestamp: "15 minutes ago",
-      metadata: { count: 1200, campaignName: "Q4 Enterprise Outreach" },
-    },
-    {
-      id: "3",
-      type: "bounce",
-      title: "Bounce rate alert",
-      description:
-        "Bounce rate hit 1.2%, risky addresses automatically suppressed",
-      timestamp: "1 hour ago",
-      metadata: { rate: 1.2, status: "warning" },
-    },
-    {
-      id: "4",
-      type: "reply",
-      title: "New reply received",
-      description: "Sarah Johnson from ACME Inc. replied to your outreach",
-      timestamp: "2 hours ago",
-      metadata: { leadName: "Sarah Johnson", companyName: "ACME Inc." },
-    },
-    {
-      id: "5",
-      type: "verification",
-      title: "Lead verification completed",
-      description:
-        "Verified 2,380 email addresses from Enterprise Prospects Q4 list",
-      timestamp: "3 hours ago",
-      metadata: { count: 2380 },
-    },
-    {
-      id: "6",
-      type: "configuration",
-      title: "Domain configured",
-      description:
-        "Successfully set up SPF, DKIM, and DMARC records for outreach-ly.com",
-      timestamp: "5 hours ago",
-      metadata: { status: "success" },
-    },
-    {
-      id: "7",
-      type: "campaign",
-      title: "Campaign paused",
-      description:
-        "Product Demo Follow-up campaign paused due to high bounce rate",
-      timestamp: "1 day ago",
-      metadata: { campaignName: "Product Demo Follow-up", status: "paused" },
-    },
-    {
-      id: "8",
-      type: "import",
-      title: "CSV import failed",
-      description:
-        "Failed to import Startup Founders.csv - duplicate email addresses detected",
-      timestamp: "2 days ago",
-      metadata: { status: "error" },
-    },
-  ];
+  const { importJobs, loading, error, refetch } = useImportHistory();
 
-  const activityData = activities || mockActivities;
+  // Convert import jobs to activity items
+  const convertImportJobsToActivities = (jobs: any[]): ActivityItem[] => {
+    return jobs.map((job) => {
+      const status = job.status?.toLowerCase();
+      let title = "";
+      let description = "";
+      let type: ActivityItem["type"] = "import";
+      let metadata: any = { count: job.processedRows };
+
+      switch (status) {
+        case "completed":
+          title = "CSV import completed";
+          description = `Successfully processed ${job.processedRows} leads from ${job.filename}`;
+          metadata = { count: job.processedRows, status: "success" };
+          break;
+        case "failed":
+          title = "CSV import failed";
+          description = `Failed to import ${job.filename}${job.errorMessage ? ` - ${job.errorMessage}` : ""}`;
+          metadata = { status: "error" };
+          break;
+        case "processing":
+          title = "CSV import in progress";
+          description = `Processing ${job.totalRows} leads from ${job.filename}`;
+          metadata = { count: job.totalRows, status: "processing" };
+          break;
+        case "pending":
+          title = "CSV import queued";
+          description = `Queued ${job.totalRows} leads from ${job.filename} for processing`;
+          metadata = { count: job.totalRows, status: "pending" };
+          break;
+        default:
+          title = "CSV import";
+          description = `Import job for ${job.filename}`;
+      }
+
+      return {
+        id: job.id,
+        type,
+        title,
+        description,
+        timestamp: formatTimestamp(job.createdAt),
+        metadata,
+      };
+    });
+  };
+
+  // Format timestamp to relative time
+  const formatTimestamp = (dateString: string): string => {
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+      if (diffInSeconds < 60) return "just now";
+      if (diffInSeconds < 3600)
+        return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+      if (diffInSeconds < 86400)
+        return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+      if (diffInSeconds < 2592000)
+        return `${Math.floor(diffInSeconds / 86400)} days ago`;
+      if (diffInSeconds < 31536000)
+        return `${Math.floor(diffInSeconds / 2592000)} months ago`;
+      return `${Math.floor(diffInSeconds / 31536000)} years ago`;
+    } catch {
+      return "Unknown";
+    }
+  };
+
+  // Use provided activities or convert import jobs to activities
+  const activityData = activities || convertImportJobsToActivities(importJobs);
 
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -210,93 +210,122 @@ export default function RecentActivityFeed({
   return (
     <Card className="mb-8">
       <CardHeader>
-        <CardTitle className="text-lg font-semibold">
-          📬 Recent Activity Feed
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg font-semibold">
+            📬 Recent Activity Feed
+          </CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refetch}
+            disabled={loading}
+            className="ml-2"
+          >
+            <RefreshCw
+              className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
+            />
+            Refresh
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          {activityData.map((activity, index) => {
-            const isLast = index === activityData.length - 1;
+        {loading && (
+          <div className="flex items-center justify-center py-8">
+            <RefreshCw className="h-6 w-6 animate-spin mr-2" />
+            <span>Loading recent activity...</span>
+          </div>
+        )}
 
-            return (
-              <div key={activity.id} className="relative">
-                {/* Timeline line */}
-                {!isLast && (
-                  <div className="absolute left-4 top-8 w-px h-8 bg-gray-200"></div>
-                )}
+        {error && (
+          <div className="text-red-500 text-sm mb-4 p-3 bg-red-50 rounded-lg">
+            {error}
+          </div>
+        )}
 
-                <div
-                  className="flex items-start space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
-                  onClick={() => onViewDetails?.(activity.id)}
-                >
-                  {/* Icon */}
+        {!loading && !error && (
+          <div className="space-y-4">
+            {activityData.map((activity, index) => {
+              const isLast = index === activityData.length - 1;
+
+              return (
+                <div key={activity.id} className="relative">
+                  {/* Timeline line */}
+                  {!isLast && (
+                    <div className="absolute left-4 top-8 w-px h-8 bg-gray-200"></div>
+                  )}
+
                   <div
-                    className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${getActivityColor(activity.type)}`}
+                    className="flex items-start space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+                    onClick={() => onViewDetails?.(activity.id)}
                   >
-                    {getActivityIcon(activity.type)}
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <h3 className="text-sm font-medium text-gray-900">
-                        {activity.title}
-                      </h3>
-                      <div className="flex items-center space-x-2">
-                        {getStatusBadge(activity.metadata)}
-                        <span className="text-xs text-gray-500">
-                          {activity.timestamp}
-                        </span>
-                      </div>
+                    {/* Icon */}
+                    <div
+                      className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${getActivityColor(activity.type)}`}
+                    >
+                      {getActivityIcon(activity.type)}
                     </div>
 
-                    <p className="text-sm text-gray-600 mb-2">
-                      {activity.description}
-                    </p>
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className="text-sm font-medium text-gray-900">
+                          {activity.title}
+                        </h3>
+                        <div className="flex items-center space-x-2">
+                          {getStatusBadge(activity.metadata)}
+                          <span className="text-xs text-gray-500">
+                            {activity.timestamp}
+                          </span>
+                        </div>
+                      </div>
 
-                    {/* Metadata */}
-                    {activity.metadata && (
-                      <div className="flex items-center space-x-4 text-xs text-gray-500">
-                        {activity.metadata.count && (
-                          <span className="flex items-center space-x-1">
-                            <span className="font-medium">
-                              {activity.metadata.count.toLocaleString()}
-                            </span>
-                            <span>items</span>
-                          </span>
-                        )}
-                        {activity.metadata.rate && (
-                          <span className="flex items-center space-x-1">
-                            {getTrendIcon(activity.type, activity.metadata)}
-                            <span className="font-medium">
-                              {activity.metadata.rate}%
-                            </span>
-                            <span>rate</span>
-                          </span>
-                        )}
-                        {activity.metadata.campaignName && (
-                          <span className="font-medium text-blue-600">
-                            {activity.metadata.campaignName}
-                          </span>
-                        )}
-                        {activity.metadata.leadName &&
-                          activity.metadata.companyName && (
-                            <span>
-                              {activity.metadata.leadName} (
-                              {activity.metadata.companyName})
+                      <p className="text-sm text-gray-600 mb-2">
+                        {activity.description}
+                      </p>
+
+                      {/* Metadata */}
+                      {activity.metadata && (
+                        <div className="flex items-center space-x-4 text-xs text-gray-500">
+                          {activity.metadata.count && (
+                            <span className="flex items-center space-x-1">
+                              <span className="font-medium">
+                                {activity.metadata.count.toLocaleString()}
+                              </span>
+                              <span>items</span>
                             </span>
                           )}
-                      </div>
-                    )}
+                          {activity.metadata.rate && (
+                            <span className="flex items-center space-x-1">
+                              {getTrendIcon(activity.type, activity.metadata)}
+                              <span className="font-medium">
+                                {activity.metadata.rate}%
+                              </span>
+                              <span>rate</span>
+                            </span>
+                          )}
+                          {activity.metadata.campaignName && (
+                            <span className="font-medium text-blue-600">
+                              {activity.metadata.campaignName}
+                            </span>
+                          )}
+                          {activity.metadata.leadName &&
+                            activity.metadata.companyName && (
+                              <span>
+                                {activity.metadata.leadName} (
+                                {activity.metadata.companyName})
+                              </span>
+                            )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
 
-        {activityData.length === 0 && (
+        {!loading && !error && activityData.length === 0 && (
           <div className="text-center py-8">
             <div className="text-gray-400 mb-2">
               <Clock className="h-12 w-12 mx-auto" />
@@ -311,13 +340,14 @@ export default function RecentActivityFeed({
         )}
 
         {/* View All Activities */}
-        <div className="mt-6 pt-4 border-t border-gray-200">
-          <button className="text-sm text-blue-600 hover:text-blue-800 font-medium">
-            View all activity →
-          </button>
-        </div>
+        {!loading && !error && activityData.length > 0 && (
+          <div className="mt-6 pt-4 border-t border-gray-200">
+            <button className="text-sm text-blue-600 hover:text-blue-800 font-medium">
+              View all activity →
+            </button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
 }
-
