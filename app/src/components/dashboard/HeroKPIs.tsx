@@ -154,14 +154,16 @@ export default function HeroKPIs({ data }: HeroKPIsProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-orange-600">
-            {kpiData.quotaUsage.emailsSentToday.toLocaleString()}
+            {(
+              kpiData.quotaUsage.dailyCap - kpiData.quotaUsage.emailsSentToday
+            ).toLocaleString()}
           </div>
           <div className="flex items-center justify-between mt-1">
             <p className="text-xs text-muted-foreground">
-              / {kpiData.quotaUsage.dailyCap.toLocaleString()} today
+              remaining / {kpiData.quotaUsage.dailyCap.toLocaleString()}
             </p>
             <Badge variant="secondary" className="text-xs">
-              {kpiData.quotaUsage.planUsagePercent}%
+              {kpiData.quotaUsage.planUsagePercent}% used
             </Badge>
           </div>
         </CardContent>

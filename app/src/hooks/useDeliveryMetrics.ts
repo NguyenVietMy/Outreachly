@@ -56,6 +56,16 @@ export function useDeliveryMetrics() {
   const [trendData, setTrendData] = useState<TrendData[]>([]);
   const [kpiData, setKpiData] = useState<KPIData | null>(null);
   const [dateInfo, setDateInfo] = useState<string | null>(null);
+  const [activeCampaigns, setActiveCampaigns] = useState<{
+    running: number;
+    paused: number;
+  }>({ running: 0, paused: 0 });
+  const [rateLimitInfo, setRateLimitInfo] = useState<{
+    remaining: number;
+    limit: number;
+    resetTime: string | null;
+    resetTimeSeconds: number;
+  }>({ remaining: 0, limit: 100, resetTime: null, resetTimeSeconds: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -137,6 +147,51 @@ export function useDeliveryMetrics() {
     }
   };
 
+  const fetchActiveCampaigns = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/campaigns`, {
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) throw new Error("Failed to fetch campaigns");
+      const campaigns = await response.json();
+
+      // Count active and paused campaigns
+      const running = campaigns.filter(
+        (campaign: any) => campaign.status === "active"
+      ).length;
+      const paused = campaigns.filter(
+        (campaign: any) => campaign.status === "paused"
+      ).length;
+
+      setActiveCampaigns({ running, paused });
+    } catch (err) {
+      console.error("Error fetching active campaigns:", err);
+      setActiveCampaigns({ running: 0, paused: 0 });
+    }
+  }, []);
+
+  const fetchRateLimit = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/email/rate-limit`, {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to fetch rate limit");
+      const rateLimitData = await response.json();
+      setRateLimitInfo(rateLimitData);
+    } catch (err) {
+      console.error("Error fetching rate limit:", err);
+      setRateLimitInfo({
+        remaining: 0,
+        limit: 100,
+        resetTime: null,
+        resetTimeSeconds: 0,
+      });
+    }
+  }, []);
+
   const fetchDateInfo = useCallback(async () => {
     try {
       const response = await fetch(
@@ -162,6 +217,8 @@ export function useDeliveryMetrics() {
       await fetchUserStats();
       await fetchTrendData("7d");
       await fetchDateInfo();
+      await fetchActiveCampaigns();
+      await fetchRateLimit();
       // Note: We'll need to get campaignId from context/auth for campaign-specific stats
     } catch (err) {
       console.error("Error loading delivery metrics:", err);
@@ -169,16 +226,38 @@ export function useDeliveryMetrics() {
     } finally {
       setLoading(false);
     }
-  }, [fetchUserStats, fetchTrendData, fetchDateInfo]);
+  }, [
+    fetchUserStats,
+    fetchTrendData,
+    fetchDateInfo,
+    fetchActiveCampaigns,
+    fetchRateLimit,
+  ]);
 
-  const generateKPIData = (stats: DeliveryStats | null): KPIData => {
+  const generateKPIData = (
+    stats: DeliveryStats | null,
+    campaigns: { running: number; paused: number },
+    rateLimit: {
+      remaining: number;
+      limit: number;
+      resetTime: string | null;
+      resetTimeSeconds: number;
+    }
+  ): KPIData => {
     if (!stats) {
       return {
         leadsImported: { thisWeek: 0, total: 0 },
-        activeCampaigns: { running: 0, paused: 0 },
+        activeCampaigns: campaigns,
         engagementRate: { deliveryRate: 0, replyRate: 0 },
         deliverabilityHealth: { bounceRate: 0, complaintRate: 0 },
-        quotaUsage: { emailsSentToday: 0, dailyCap: 2000, planUsagePercent: 0 },
+        quotaUsage: {
+          emailsSentToday: rateLimit.limit - rateLimit.remaining,
+          dailyCap: rateLimit.limit,
+          planUsagePercent: Math.min(
+            100,
+            ((rateLimit.limit - rateLimit.remaining) / rateLimit.limit) * 100
+          ),
+        },
       };
     }
 
@@ -187,10 +266,7 @@ export function useDeliveryMetrics() {
         thisWeek: Math.round(stats.totalSent * 0.1), // Assume 10% of total sent this week
         total: stats.totalSent,
       },
-      activeCampaigns: {
-        running: Math.max(1, Math.floor(stats.totalSent / 1000)), // Estimate based on volume
-        paused: 0,
-      },
+      activeCampaigns: campaigns,
       engagementRate: {
         deliveryRate: stats.deliveryRate,
         replyRate: 0, // We'll implement reply tracking later
@@ -203,11 +279,11 @@ export function useDeliveryMetrics() {
         complaintRate: 0, // We'll implement complaint tracking later
       },
       quotaUsage: {
-        emailsSentToday: Math.round(stats.totalSent * 0.05), // Assume 5% sent today
-        dailyCap: 2000,
+        emailsSentToday: rateLimit.limit - rateLimit.remaining,
+        dailyCap: rateLimit.limit,
         planUsagePercent: Math.min(
           100,
-          ((stats.totalSent * 0.05) / 2000) * 100
+          ((rateLimit.limit - rateLimit.remaining) / rateLimit.limit) * 100
         ),
       },
     };
@@ -219,9 +295,9 @@ export function useDeliveryMetrics() {
 
   useEffect(() => {
     if (userStats) {
-      setKpiData(generateKPIData(userStats));
+      setKpiData(generateKPIData(userStats, activeCampaigns, rateLimitInfo));
     }
-  }, [userStats]);
+  }, [userStats, activeCampaigns, rateLimitInfo]);
 
   return {
     userStats,
