@@ -4,6 +4,7 @@ import com.outreachly.outreachly.entity.CampaignCheckpoint;
 import com.outreachly.outreachly.entity.CampaignCheckpointLead;
 import com.outreachly.outreachly.entity.Campaign;
 import com.outreachly.outreachly.entity.User;
+import com.outreachly.outreachly.entity.ActivityFeed;
 import com.outreachly.outreachly.repository.CampaignCheckpointRepository;
 import com.outreachly.outreachly.repository.CampaignCheckpointLeadRepository;
 import com.outreachly.outreachly.repository.CampaignRepository;
@@ -36,6 +37,7 @@ public class CheckpointScheduler {
     private final UserRepository userRepository;
     private final TimeService timeService;
     private final EmailDeliveryService emailDeliveryService;
+    private final ActivityFeedService activityFeedService;
 
     /**
      * Process all ready checkpoints every minute
@@ -179,6 +181,13 @@ public class CheckpointScheduler {
         checkpoint.setUpdatedAt(LocalDateTime.now());
         checkpointRepository.save(checkpoint);
 
+        // Create activity feed entry for checkpoint completion
+        try {
+            createCheckpointCompletionActivity(checkpoint, newStatus, sentLeads, failedLeads);
+        } catch (Exception e) {
+            log.warn("Failed to create activity feed entry for checkpoint completion: {}", checkpoint.getId(), e);
+        }
+
         log.debug("Updated checkpoint {} status to {} ({} sent, {} failed)",
                 checkpoint.getName(), newStatus, sentLeads, failedLeads);
     }
@@ -209,6 +218,72 @@ public class CheckpointScheduler {
         // The status will be updated by updateCheckpointStatus() method
         // This method is just for clarity and future extensibility
         log.debug("Marking checkpoint {} as executed today", checkpoint.getName());
+    }
+
+    /**
+     * Create activity feed entry for checkpoint completion
+     */
+    private void createCheckpointCompletionActivity(CampaignCheckpoint checkpoint,
+            CampaignCheckpoint.CheckpointStatus status, long sentLeads, long failedLeads) {
+
+        // Get campaign and creator info
+        Campaign campaign = campaignRepository.findById(checkpoint.getCampaignId()).orElse(null);
+        if (campaign == null) {
+            log.warn("Campaign not found for checkpoint completion activity: {}", checkpoint.getId());
+            return;
+        }
+
+        User campaignCreator = userRepository.findById(campaign.getCreatedBy()).orElse(null);
+        if (campaignCreator == null) {
+            log.warn("Campaign creator not found for checkpoint completion activity: {}", checkpoint.getId());
+            return;
+        }
+
+        // Determine activity status based on checkpoint status
+        ActivityFeed.ActivityStatus activityStatus;
+
+        switch (status) {
+            case completed:
+                activityStatus = ActivityFeed.ActivityStatus.success;
+                break;
+            case partially_completed:
+                activityStatus = ActivityFeed.ActivityStatus.warning;
+                break;
+            case paused:
+                activityStatus = ActivityFeed.ActivityStatus.error;
+                break;
+            default:
+                activityStatus = ActivityFeed.ActivityStatus.processing;
+                break;
+        }
+
+        // Create activity feed entry
+        activityFeedService.createCheckpointActivity(
+                checkpoint.getOrgId(),
+                campaignCreator.getId(),
+                checkpoint.getName(),
+                getActionFromStatus(status),
+                (int) (sentLeads + failedLeads), // total lead count
+                activityStatus);
+
+        log.info("Created checkpoint completion activity for checkpoint: {} (status: {})",
+                checkpoint.getName(), status);
+    }
+
+    /**
+     * Get action string from checkpoint status
+     */
+    private String getActionFromStatus(CampaignCheckpoint.CheckpointStatus status) {
+        switch (status) {
+            case completed:
+                return "Completed";
+            case partially_completed:
+                return "Partially Completed";
+            case paused:
+                return "Failed";
+            default:
+                return "Updated";
+        }
     }
 
     /**

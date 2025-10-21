@@ -197,12 +197,14 @@ public class CampaignService {
                 campaignId, CampaignLead.CampaignLeadStatus.active);
 
         // Get real email tracking stats from email events
-        // Note: We use DELIVERY for successful sends and REJECT for failures
+        // Use same logic as rate limiter: count DELIVERY events only (successful sends)
         long emailsDelivered = emailEventRepository.countByEventTypeAndCampaignId(
                 EmailEvent.EmailEventType.DELIVERY, campaignId);
         long emailsFailed = emailEventRepository.countByEventTypeAndCampaignId(
                 EmailEvent.EmailEventType.REJECT, campaignId);
-        long emailsSent = emailsDelivered + emailsFailed; // Total attempts
+
+        // Total emails sent = only successful deliveries (like rate limiter)
+        long emailsSent = emailsDelivered;
 
         return CampaignStats.builder()
                 .campaignId(campaignId)

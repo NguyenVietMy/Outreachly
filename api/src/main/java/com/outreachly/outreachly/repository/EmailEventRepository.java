@@ -41,6 +41,15 @@ public interface EmailEventRepository extends JpaRepository<EmailEvent, Long> {
 
         long countByEventTypeAndCampaignId(EmailEvent.EmailEventType eventType, UUID campaignId);
 
+        // Count distinct emails (to avoid double-counting retries)
+        @Query("SELECT COUNT(DISTINCT e.emailAddress) FROM EmailEvent e WHERE e.eventType = :eventType AND e.campaignId = :campaignId")
+        long countDistinctEmailsByEventTypeAndCampaignId(@Param("eventType") EmailEvent.EmailEventType eventType,
+                        @Param("campaignId") UUID campaignId);
+
+        // Count all distinct emails for a campaign (both delivered and failed)
+        @Query("SELECT COUNT(DISTINCT e.emailAddress) FROM EmailEvent e WHERE e.campaignId = :campaignId AND e.eventType IN ('DELIVERY', 'REJECT')")
+        long countDistinctEmailsByCampaignId(@Param("campaignId") UUID campaignId);
+
         long countByEventTypeAndUserId(EmailEvent.EmailEventType eventType, String userId);
 
         long countByEventTypeAndOrgId(EmailEvent.EmailEventType eventType, UUID orgId);
