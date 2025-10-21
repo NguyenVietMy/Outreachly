@@ -334,6 +334,31 @@ public class CampaignController {
                     campaignId, orgId, request.getName(),
                     request.getScheduledDate(), request.getTimeOfDay(),
                     request.getEmailTemplateId(), request.getEmailProvider(), request.getLeadIds());
+
+            // Create activity feed entry for checkpoint creation
+            try {
+                // Get campaign name for better activity tracking
+                String campaignName = campaignService.getCampaign(campaignId, orgId)
+                        .map(Campaign::getName)
+                        .orElse("Unknown Campaign");
+
+                // Count leads assigned to this checkpoint
+                int leadCount = request.getLeadIds() != null ? request.getLeadIds().size() : 0;
+
+                activityFeedService.createCheckpointActivity(
+                        orgId,
+                        user.getId(),
+                        "created",
+                        checkpoint.getName(),
+                        leadCount,
+                        com.outreachly.outreachly.entity.ActivityFeed.ActivityStatus.success);
+                log.info("Created checkpoint creation activity for checkpoint: {} in campaign: {} by user: {}",
+                        checkpoint.getName(), campaignName, user.getId());
+            } catch (Exception e) {
+                log.warn("Failed to create activity feed entry for checkpoint creation: {}", e.getMessage());
+                // Don't fail the main operation if activity tracking fails
+            }
+
             return ResponseEntity.ok(checkpoint);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
@@ -521,7 +546,9 @@ public class CampaignController {
             int successCount = 0;
             int failureCount = 0;
 
-            for (CampaignCheckpointLead checkpointLead : failedLeads) {
+            for (int i = 0; i < failedLeads.size(); i++) {
+                CampaignCheckpointLead checkpointLead = failedLeads.get(i);
+
                 try {
                     // Reset status to pending for retry
                     checkpointLead.setStatus(CampaignCheckpointLead.DeliveryStatus.pending);
@@ -556,7 +583,7 @@ public class CampaignController {
                     checkpointLeadRepository.save(checkpointLead);
 
                     successCount++;
-                    log.info("Successfully retried email to: {}", lead.getEmail());
+                    log.info("Successfully retried email to: {} ({}/{})", lead.getEmail(), i + 1, failedLeads.size());
 
                 } catch (Exception e) {
                     log.error("Failed to retry email for lead: {}", checkpointLead.getLeadId(), e);

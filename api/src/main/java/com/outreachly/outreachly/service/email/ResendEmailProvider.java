@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.Optional;
 
 /**
@@ -45,6 +46,9 @@ public class ResendEmailProvider extends AbstractEmailProvider {
 
     @Value("${resend.from-email:}")
     private String fromEmail;
+
+    // Rate limiting for Resend API (2 requests per second)
+    private final AtomicLong lastRequestTime = new AtomicLong(0);
 
     @PostConstruct
     public void init() {
@@ -151,6 +155,30 @@ public class ResendEmailProvider extends AbstractEmailProvider {
     }
 
     /**
+     * Rate limiting to ensure we don't exceed Resend's rate limits
+     * Uses synchronized method to ensure thread safety across multiple checkpoints
+     */
+    private synchronized void enforceRateLimit() {
+        long currentTime = System.currentTimeMillis();
+        long lastTime = lastRequestTime.get();
+        long timeSinceLastRequest = currentTime - lastTime;
+
+        // Use 1 second between requests to be safe
+        if (timeSinceLastRequest < 1000) {
+            long delayNeeded = 1000 - timeSinceLastRequest;
+            try {
+                Thread.sleep(delayNeeded);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("Interrupted while rate limiting", e);
+            }
+        }
+
+        // Update the last request time
+        lastRequestTime.set(System.currentTimeMillis());
+    }
+
+    /**
      * Core email sending logic with specific configuration
      */
     private EmailResponse sendEmailWithConfig(EmailRequest emailRequest, String userApiKey, String userFromEmail,
@@ -179,6 +207,9 @@ public class ResendEmailProvider extends AbstractEmailProvider {
             }
 
             log.info("Sending email via Resend to: {}, from: {}", emailRequest.getRecipients(), fromAddress);
+
+            // Enforce rate limiting before making API call
+            enforceRateLimit();
 
             // Send email via Resend API
             @SuppressWarnings("unchecked")

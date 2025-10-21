@@ -85,11 +85,14 @@ public class EmailDeliveryService {
             }
         }
 
-        // Process each lead
+        // Process each lead with rate limiting
         int successCount = 0;
         int failureCount = 0;
+        long startTime = System.currentTimeMillis();
 
-        for (CampaignCheckpointLead checkpointLead : checkpointLeads) {
+        for (int i = 0; i < checkpointLeads.size(); i++) {
+            CampaignCheckpointLead checkpointLead = checkpointLeads.get(i);
+
             try {
                 // Get lead details
                 Lead lead = leadRepository.findById(checkpointLead.getLeadId())
@@ -109,12 +112,34 @@ public class EmailDeliveryService {
                 markLeadAsSent(checkpointLead);
                 successCount++;
 
-                log.debug("Email sent successfully to: {}", lead.getEmail());
+                log.debug("Email sent successfully to: {} ({}/{})", lead.getEmail(), i + 1, checkpointLeads.size());
+
+                // Rate limiting: Ensure we don't exceed 1 request per second for Resend
+                if (i < checkpointLeads.size() - 1) { // Don't delay after the last email
+                    long elapsedTime = System.currentTimeMillis() - startTime;
+                    long expectedTime = (i + 1) * 1000; // 1000ms per request = 1 request per second
+
+                    if (elapsedTime < expectedTime) {
+                        long delayNeeded = expectedTime - elapsedTime;
+                        Thread.sleep(delayNeeded);
+                    }
+                }
 
             } catch (Exception e) {
                 log.error("Failed to send email to lead: {}", checkpointLead.getLeadId(), e);
                 markLeadAsFailed(checkpointLead, e.getMessage());
                 failureCount++;
+
+                // If it's a rate limit error, add extra delay before continuing
+                if (e.getMessage() != null && e.getMessage().contains("429")) {
+                    log.warn("Rate limit hit, adding extra delay before continuing...");
+                    try {
+                        Thread.sleep(1000); // Wait 1 second before continuing
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.error("Interrupted while waiting for rate limit", ie);
+                    }
+                }
             }
         }
 

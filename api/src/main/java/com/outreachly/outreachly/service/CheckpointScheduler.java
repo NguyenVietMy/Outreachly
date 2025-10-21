@@ -64,16 +64,22 @@ public class CheckpointScheduler {
             for (CampaignCheckpoint checkpoint : activeCheckpoints) {
                 try {
                     // Check if this checkpoint should execute now based on timezone
-                    if (shouldExecuteCheckpoint(checkpoint, nowUtc)) {
+                    // AND hasn't already been executed today
+                    if (shouldExecuteCheckpoint(checkpoint, nowUtc) && !hasBeenExecutedToday(checkpoint)) {
                         log.info("Executing checkpoint: {} at {}", checkpoint.getName(), nowUtc);
 
                         // Send emails for this checkpoint
                         emailDeliveryService.sendCheckpointEmails(checkpoint);
 
+                        // Mark as executed today to prevent duplicate runs
+                        markAsExecutedToday(checkpoint);
+
                         // Determine checkpoint status based on results
                         updateCheckpointStatus(checkpoint);
 
                         successCount++;
+                    } else if (shouldExecuteCheckpoint(checkpoint, nowUtc)) {
+                        log.debug("Checkpoint {} already executed today, skipping", checkpoint.getName());
                     }
 
                 } catch (Exception e) {
@@ -183,6 +189,26 @@ public class CheckpointScheduler {
     public void processCheckpointsNow() {
         log.info("Manual checkpoint processing triggered");
         processReadyCheckpoints();
+    }
+
+    /**
+     * Check if checkpoint has already been executed today
+     */
+    private boolean hasBeenExecutedToday(CampaignCheckpoint checkpoint) {
+        // Check if checkpoint status is completed, partially_completed, or paused
+        // These statuses indicate it has already been processed
+        return checkpoint.getStatus() == CampaignCheckpoint.CheckpointStatus.completed ||
+                checkpoint.getStatus() == CampaignCheckpoint.CheckpointStatus.partially_completed ||
+                checkpoint.getStatus() == CampaignCheckpoint.CheckpointStatus.paused;
+    }
+
+    /**
+     * Mark checkpoint as executed today to prevent duplicate runs
+     */
+    private void markAsExecutedToday(CampaignCheckpoint checkpoint) {
+        // The status will be updated by updateCheckpointStatus() method
+        // This method is just for clarity and future extensibility
+        log.debug("Marking checkpoint {} as executed today", checkpoint.getName());
     }
 
     /**

@@ -84,7 +84,10 @@ function formatTime(timeString: string): string {
 
 function formatDate(dateString: string): string {
   try {
-    const date = new Date(dateString);
+    // Parse the date string as a local date (YYYY-MM-DD format)
+    // Split the date string and create a Date object in local timezone
+    const [year, month, day] = dateString.split("-").map(Number);
+    const date = new Date(year, month - 1, day); // month is 0-indexed
     return date.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
