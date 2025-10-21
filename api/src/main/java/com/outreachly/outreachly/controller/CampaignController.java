@@ -9,6 +9,7 @@ import com.outreachly.outreachly.entity.User;
 import com.outreachly.outreachly.repository.CampaignCheckpointLeadRepository;
 import com.outreachly.outreachly.repository.LeadRepository;
 import com.outreachly.outreachly.repository.TemplateRepository;
+import com.outreachly.outreachly.service.ActivityFeedService;
 import com.outreachly.outreachly.service.CampaignService;
 import com.outreachly.outreachly.service.CampaignCheckpointService;
 import com.outreachly.outreachly.service.EmailDeliveryService;
@@ -35,6 +36,7 @@ public class CampaignController {
     private final CampaignCheckpointService checkpointService;
     private final TemplateService templateService;
     private final UserService userService;
+    private final ActivityFeedService activityFeedService;
     private final CampaignCheckpointLeadRepository checkpointLeadRepository;
     private final LeadRepository leadRepository;
     private final TemplateRepository templateRepository;
@@ -68,6 +70,23 @@ public class CampaignController {
         try {
             Campaign savedCampaign = campaignService.createCampaign(orgId, user.getId(), request.getName(),
                     request.getDescription());
+
+            // Create activity feed entry for campaign creation
+            try {
+                activityFeedService.createCampaignActivity(
+                        orgId,
+                        user.getId(),
+                        "created",
+                        savedCampaign.getName(),
+                        0, // No emails sent yet
+                        com.outreachly.outreachly.entity.ActivityFeed.ActivityStatus.success);
+                log.info("Created campaign creation activity for campaign: {} by user: {}",
+                        savedCampaign.getName(), user.getId());
+            } catch (Exception e) {
+                log.warn("Failed to create activity feed entry for campaign creation: {}", e.getMessage());
+                // Don't fail the main operation if activity tracking fails
+            }
+
             return ResponseEntity.ok(savedCampaign);
         } catch (Exception e) {
             log.error("Error creating campaign: {}", e.getMessage());
