@@ -181,14 +181,6 @@ public class EmailDeliveryService {
             // Get campaign creator for tracking
             String campaignCreatorId = getCampaignCreatorId(checkpoint);
 
-            // Record SENT event before API call
-            deliveryTrackingService.recordEmailDelivered(
-                    messageId,
-                    lead.getEmail(),
-                    checkpoint.getCampaignId().toString(),
-                    campaignCreatorId,
-                    checkpoint.getOrgId().toString());
-
             // Send email using the configured provider
             if (checkpoint.getEmailProvider() == CampaignCheckpoint.EmailProvider.GMAIL) {
                 // Send via Gmail API using campaign creator's OAuth2 token
@@ -203,6 +195,14 @@ public class EmailDeliveryService {
 
                 gmailService.sendEmail(lead.getEmail(), personalizedSubject, personalizedBody, isHtml, null,
                         campaignCreatorUserId);
+                
+                // Record delivery for Gmail (since GmailService doesn't track delivery)
+                deliveryTrackingService.recordEmailDelivered(
+                        messageId,
+                        lead.getEmail(),
+                        checkpoint.getCampaignId().toString(),
+                        campaignCreatorId,
+                        checkpoint.getOrgId().toString());
             } else {
                 // Send via OrganizationEmailService (SES, Resend, etc.)
                 com.outreachly.outreachly.dto.EmailRequest emailRequest = new com.outreachly.outreachly.dto.EmailRequest();
