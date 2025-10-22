@@ -338,7 +338,7 @@ export default function CheckpointLeadsModal({
                   <SelectContent>
                     <SelectItem value="all">All Positions</SelectItem>
                     {positions.map((position) => (
-                      <SelectItem key={position} value={position}>
+                      <SelectItem key={position} value={position || ""}>
                         {position}
                       </SelectItem>
                     ))}
