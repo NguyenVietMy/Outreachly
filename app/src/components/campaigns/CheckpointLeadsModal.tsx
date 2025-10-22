@@ -71,7 +71,7 @@ export default function CheckpointLeadsModal({
     process.env.NEXT_PUBLIC_API_URL || "https://api.outreach-ly.com";
 
   // Get leads for this campaign
-  const { leads, loading, assignLeadsToCheckpoint } = useLeads(campaignId);
+  const { leads, loading } = useLeads(campaignId);
 
   // Get checkpoint data to check which leads are already assigned
   const { checkpoints } = useCampaignCheckpoints(campaignId);

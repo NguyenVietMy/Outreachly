@@ -15,6 +15,8 @@ import {
   TrendingUp,
   TrendingDown,
   RefreshCw,
+  Target,
+  Flag,
 } from "lucide-react";
 import { useActivityFeed } from "@/hooks/useActivityFeed";
 
@@ -52,7 +54,12 @@ export default function RecentActivityFeed({
   activities,
   onViewDetails,
 }: RecentActivityFeedProps) {
-  const { activities: activityFeedData, loading, error, refetch } = useActivityFeed();
+  const {
+    activities: activityFeedData,
+    loading,
+    error,
+    refetch,
+  } = useActivityFeed();
 
   // Convert activity feed data to activity items
   const convertActivityFeedToActivities = (feedData: any[]): ActivityItem[] => {
@@ -119,7 +126,8 @@ export default function RecentActivityFeed({
   };
 
   // Use provided activities or convert activity feed data to activities
-  const activityData = activities || convertActivityFeedToActivities(activityFeedData);
+  const activityData =
+    activities || convertActivityFeedToActivities(activityFeedData);
 
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -130,7 +138,7 @@ export default function RecentActivityFeed({
       case "domain":
         return <Settings className="h-4 w-4" />;
       case "checkpoint":
-        return <CheckCircle className="h-4 w-4" />;
+        return <Flag className="h-4 w-4" />;
       case "bounce":
         return <AlertTriangle className="h-4 w-4" />;
       case "reply":

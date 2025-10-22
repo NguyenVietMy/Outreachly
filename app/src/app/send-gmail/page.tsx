@@ -1475,11 +1475,13 @@ export default function SendGmailPage() {
           <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto p-0">
             <div className="p-6 space-y-4">
               <DialogHeader>
-                <DialogTitle>About the Google consent screen</DialogTitle>
+                <DialogTitle>Connect your Gmail account</DialogTitle>
                 <DialogDescription>
-                  Google will ask you to grant the <code>gmail.send</code>{" "}
-                  permission so Outreachly can send the messages you compose.
-                  You can disconnect anytime in your Google Account.
+                  You'll be redirected to Google to grant permission to send
+                  email from your Gmail account. This consent screen is expected
+                  for apps requesting Gmail send access. We never see your
+                  password, and you can revoke access anytime in your Google
+                  Account settings.
                 </DialogDescription>
                 <div className="bg-gray-100 border border-gray-300 rounded-lg p-3 mt-3">
                   <p className="text-sm text-gray-700 italic">
