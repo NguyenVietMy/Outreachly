@@ -16,13 +16,15 @@ import {
   TrendingDown,
   RefreshCw,
 } from "lucide-react";
-import { useImportHistory } from "@/hooks/useImportHistory";
+import { useActivityFeed } from "@/hooks/useActivityFeed";
 
 interface ActivityItem {
   id: string;
   type:
-    | "import"
+    | "csv_import"
     | "campaign"
+    | "domain"
+    | "checkpoint"
     | "bounce"
     | "reply"
     | "verification"
@@ -50,49 +52,45 @@ export default function RecentActivityFeed({
   activities,
   onViewDetails,
 }: RecentActivityFeedProps) {
-  const { importJobs, loading, error, refetch } = useImportHistory();
+  const { activities: activityFeedData, loading, error, refetch } = useActivityFeed();
 
-  // Convert import jobs to activity items
-  const convertImportJobsToActivities = (jobs: any[]): ActivityItem[] => {
-    return jobs.map((job) => {
-      const status = job.status?.toLowerCase();
-      let title = "";
-      let description = "";
-      let type: ActivityItem["type"] = "import";
-      let metadata: any = { count: job.processedRows };
+  // Convert activity feed data to activity items
+  const convertActivityFeedToActivities = (feedData: any[]): ActivityItem[] => {
+    return feedData.map((activity) => {
+      let type: ActivityItem["type"] = activity.activityType;
+      let metadata: any = { status: activity.status };
 
-      switch (status) {
-        case "completed":
-          title = "CSV import completed";
-          description = `Successfully processed ${job.processedRows} leads from ${job.filename}`;
-          metadata = { count: job.processedRows, status: "success" };
+      // Add specific metadata based on activity type
+      switch (activity.activityType) {
+        case "csv_import":
+          // Extract count from description if available
+          const countMatch = activity.description.match(/(\d+)/);
+          if (countMatch) {
+            metadata.count = parseInt(countMatch[1]);
+          }
           break;
-        case "failed":
-          title = "CSV import failed";
-          description = `Failed to import ${job.filename}${job.errorMessage ? ` - ${job.errorMessage}` : ""}`;
-          metadata = { status: "error" };
+        case "campaign":
+          // Extract campaign name from title if available
+          const campaignMatch = activity.title.match(/Campaign "([^"]+)"/);
+          if (campaignMatch) {
+            metadata.campaignName = campaignMatch[1];
+          }
           break;
-        case "processing":
-          title = "CSV import in progress";
-          description = `Processing ${job.totalRows} leads from ${job.filename}`;
-          metadata = { count: job.totalRows, status: "processing" };
+        case "checkpoint":
+          // Extract checkpoint name from title if available
+          const checkpointMatch = activity.title.match(/Checkpoint "([^"]+)"/);
+          if (checkpointMatch) {
+            metadata.campaignName = checkpointMatch[1];
+          }
           break;
-        case "pending":
-          title = "CSV import queued";
-          description = `Queued ${job.totalRows} leads from ${job.filename} for processing`;
-          metadata = { count: job.totalRows, status: "pending" };
-          break;
-        default:
-          title = "CSV import";
-          description = `Import job for ${job.filename}`;
       }
 
       return {
-        id: job.id,
+        id: activity.id,
         type,
-        title,
-        description,
-        timestamp: formatTimestamp(job.createdAt),
+        title: activity.title,
+        description: activity.description,
+        timestamp: formatTimestamp(activity.createdAt),
         metadata,
       };
     });
@@ -120,15 +118,19 @@ export default function RecentActivityFeed({
     }
   };
 
-  // Use provided activities or convert import jobs to activities
-  const activityData = activities || convertImportJobsToActivities(importJobs);
+  // Use provided activities or convert activity feed data to activities
+  const activityData = activities || convertActivityFeedToActivities(activityFeedData);
 
   const getActivityIcon = (type: string) => {
     switch (type) {
-      case "import":
+      case "csv_import":
         return <Upload className="h-4 w-4" />;
       case "campaign":
         return <Mail className="h-4 w-4" />;
+      case "domain":
+        return <Settings className="h-4 w-4" />;
+      case "checkpoint":
+        return <CheckCircle className="h-4 w-4" />;
       case "bounce":
         return <AlertTriangle className="h-4 w-4" />;
       case "reply":
@@ -146,10 +148,14 @@ export default function RecentActivityFeed({
 
   const getActivityColor = (type: string) => {
     switch (type) {
-      case "import":
+      case "csv_import":
         return "text-blue-600 bg-blue-100";
       case "campaign":
         return "text-green-600 bg-green-100";
+      case "domain":
+        return "text-purple-600 bg-purple-100";
+      case "checkpoint":
+        return "text-indigo-600 bg-indigo-100";
       case "bounce":
         return "text-red-600 bg-red-100";
       case "reply":
