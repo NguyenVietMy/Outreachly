@@ -3,7 +3,7 @@
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Link, LinkOff } from "lucide-react";
+import { Link } from "lucide-react";
 
 interface ClickTrackerToggleProps {
   isEnabled: boolean;

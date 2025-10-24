@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "./ui/button";
 import { ArrowRight, BarChart3, Mail, Shield } from "lucide-react";
 
@@ -17,6 +18,7 @@ const HeroSection = ({
   primaryCTA = "Get Started Free",
   secondaryCTA = "Book Demo",
 }: HeroSectionProps) => {
+  const router = useRouter();
   return (
     <section className="w-full bg-gradient-to-b from-background to-background/80 py-20 md:py-28 lg:py-32 relative overflow-hidden">
       <div className="absolute inset-0 bg-grid-pattern opacity-[0.03] pointer-events-none"></div>
@@ -41,7 +43,11 @@ const HeroSection = ({
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
-            <Button size="lg" className="h-12 px-8 text-base font-medium">
+            <Button
+              size="lg"
+              className="h-12 px-8 text-base font-medium"
+              onClick={() => router.push("/auth")}
+            >
               {primaryCTA}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
@@ -52,25 +58,6 @@ const HeroSection = ({
             >
               {secondaryCTA}
             </Button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto">
-            <div className="flex items-center gap-3 justify-center bg-card/50 border border-border/50 rounded-lg p-4">
-              <Mail className="h-5 w-5 text-primary" />
-              <span className="text-sm font-medium">Bounce rate &lt;1%</span>
-            </div>
-            <div className="flex items-center gap-3 justify-center bg-card/50 border border-border/50 rounded-lg p-4">
-              <Shield className="h-5 w-5 text-primary" />
-              <span className="text-sm font-medium">
-                Onboarding &lt;30 minutes
-              </span>
-            </div>
-            <div className="flex items-center gap-3 justify-center bg-card/50 border border-border/50 rounded-lg p-4">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              <span className="text-sm font-medium">
-                70% personalization efficiency
-              </span>
-            </div>
           </div>
         </div>
 

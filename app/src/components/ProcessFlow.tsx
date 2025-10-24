@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  ArrowRight,
   Upload,
   CheckCircle,
   Database,
@@ -117,16 +116,6 @@ const ProcessFlow = () => {
 
           {/* Connection lines (visible on md screens and up) */}
           <div className="hidden md:block absolute top-1/2 left-0 w-full h-0.5 bg-border -translate-y-1/2 z-0" />
-
-          {/* Arrow indicators between steps (visible on md screens and up) */}
-          <div className="hidden md:flex justify-between absolute top-1/2 left-[10%] right-[10%] -translate-y-1/2 z-20 pointer-events-none">
-            {[1, 2, 3, 4].map((i) => (
-              <ArrowRight
-                key={i}
-                className={`w-5 h-5 ${activeStep > i ? "text-primary" : "text-muted-foreground"} transition-colors duration-300`}
-              />
-            ))}
-          </div>
         </div>
       </div>
     </section>

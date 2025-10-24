@@ -360,7 +360,7 @@ export default function CheckpointLeadsModal({
                   <SelectContent>
                     <SelectItem value="all">All Sources</SelectItem>
                     {sources.map((source) => (
-                      <SelectItem key={source} value={source}>
+                      <SelectItem key={source} value={source || ""}>
                         {source}
                       </SelectItem>
                     ))}
@@ -411,9 +411,15 @@ export default function CheckpointLeadsModal({
                   checked={allSelectableSelected}
                   onCheckedChange={handleSelectAll}
                   ref={(el) => {
-                    if (el)
-                      el.indeterminate =
-                        someSelectableSelected && !allSelectableSelected;
+                    if (el) {
+                      const input = el.querySelector(
+                        'input[type="checkbox"]'
+                      ) as HTMLInputElement;
+                      if (input) {
+                        input.indeterminate =
+                          someSelectableSelected && !allSelectableSelected;
+                      }
+                    }
                   }}
                 />
                 <label className="text-sm font-medium">
@@ -496,10 +502,9 @@ export default function CheckpointLeadsModal({
                               {lead.firstName} {lead.lastName}
                             </span>
                             {!lead.firstName && (
-                              <AlertTriangle
-                                className="h-4 w-4 text-red-500"
-                                title="Missing first name"
-                              />
+                              <div title="Missing first name">
+                                <AlertTriangle className="h-4 w-4 text-red-500" />
+                              </div>
                             )}
                           </div>
                         </TableCell>
@@ -507,10 +512,9 @@ export default function CheckpointLeadsModal({
                           <div className="flex items-center gap-2">
                             <span>{lead.email || "No email"}</span>
                             {!lead.email && (
-                              <AlertTriangle
-                                className="h-4 w-4 text-red-500"
-                                title="Missing email"
-                              />
+                              <div title="Missing email">
+                                <AlertTriangle className="h-4 w-4 text-red-500" />
+                              </div>
                             )}
                           </div>
                         </TableCell>

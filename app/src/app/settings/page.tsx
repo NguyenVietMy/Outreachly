@@ -700,6 +700,7 @@ export default function SettingsPage() {
                                           setVerificationSuccess(""); // Clear success message when user types
                                         }}
                                         placeholder="re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                        disabled={hasResendConfig}
                                       />
                                       <Button
                                         type="button"
@@ -749,6 +750,7 @@ export default function SettingsPage() {
                                           setVerificationSuccess(""); // Clear success message when user types
                                         }}
                                         placeholder="noreply@yourdomain.com"
+                                        disabled={hasResendConfig}
                                       />
                                     </div>
 
@@ -769,6 +771,7 @@ export default function SettingsPage() {
                                           setVerificationSuccess(""); // Clear success message when user types
                                         }}
                                         placeholder="Your Company"
+                                        disabled={hasResendConfig}
                                       />
                                     </div>
                                   </div>
@@ -789,6 +792,7 @@ export default function SettingsPage() {
                                         setVerificationError(""); // Clear error when user types
                                       }}
                                       placeholder="yourdomain.com"
+                                      disabled={hasResendConfig}
                                     />
                                     <p className="text-xs text-gray-500">
                                       Make sure to verify your domain in Resend

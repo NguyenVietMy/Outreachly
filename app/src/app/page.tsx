@@ -6,7 +6,6 @@ import Header from "@/components/Header";
 import HeroSection from "@/components/HeroSection";
 import FeatureGrid from "@/components/FeatureGrid";
 import ProcessFlow from "@/components/ProcessFlow";
-import PricingCards from "@/components/PricingCards";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
@@ -61,49 +60,6 @@ export default function Home() {
       {/* Hero Section */}
       <HeroSection />
 
-      {/* Social Proof Bar */}
-      <section className="w-full py-12 bg-muted/50">
-        <div className="container px-4 md:px-6">
-          <div className="flex flex-col items-center justify-center space-y-4">
-            <h3 className="text-center text-sm font-medium text-muted-foreground">
-              TRUSTED BY INNOVATIVE SALES TEAMS WORLDWIDE
-            </h3>
-            <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12 opacity-70">
-              <img
-                src="https://api.dicebear.com/7.x/initials/svg?seed=Acme"
-                alt="Acme Inc"
-                className="h-8 w-auto"
-              />
-              <img
-                src="https://api.dicebear.com/7.x/initials/svg?seed=Globex"
-                alt="Globex"
-                className="h-8 w-auto"
-              />
-              <img
-                src="https://api.dicebear.com/7.x/initials/svg?seed=Stark"
-                alt="Stark Industries"
-                className="h-8 w-auto"
-              />
-              <img
-                src="https://api.dicebear.com/7.x/initials/svg?seed=Wayne"
-                alt="Wayne Enterprises"
-                className="h-8 w-auto"
-              />
-              <img
-                src="https://api.dicebear.com/7.x/initials/svg?seed=Hooli"
-                alt="Hooli"
-                className="h-8 w-auto"
-              />
-              <img
-                src="https://api.dicebear.com/7.x/initials/svg?seed=Initech"
-                alt="Initech"
-                className="h-8 w-auto"
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Feature Grid */}
       <FeatureGrid />
 
@@ -136,9 +92,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Pricing Cards */}
-      <PricingCards />
-
       {/* CTA Section */}
       <section className="w-full py-20 bg-muted/30">
         <div className="container px-4 md:px-6">
@@ -151,12 +104,13 @@ export default function Home() {
               with Outreachly AI.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button size="lg" className="h-12 px-8">
+              <Button
+                size="lg"
+                className="h-12 px-8"
+                onClick={() => router.push("/auth")}
+              >
                 Get Started Free
                 <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-              <Button size="lg" variant="outline" className="h-12 px-8">
-                Book a Demo
               </Button>
             </div>
           </div>
@@ -269,7 +223,7 @@ export default function Home() {
           <Separator className="my-8" />
           <div className="flex flex-col md:flex-row items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              © 2023 Outreachly AI. All rights reserved.
+              © 2025 Outreachly AI. All rights reserved.
             </p>
             <div className="flex items-center space-x-4 mt-4 md:mt-0">
               <a

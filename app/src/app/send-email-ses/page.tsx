@@ -1371,24 +1371,17 @@ export default function SendEmailPage() {
             <div className="mb-6 md:mb-8">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div>
+                  <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2">
+                    <Mail className="h-8 w-8 text-orange-500" />
+                    Send Email using your own Domain!
+                  </h1>
                   <p className="mt-2 text-base md:text-lg text-gray-600">
-                    Create, send, and track professional email campaigns
+                    Send emails using Resend services with high deliverability
                   </p>
                 </div>
+                <div className="flex flex-wrap items-center gap-2 md:gap-3"></div>
               </div>
             </div>
-
-            {/* Sandbox Mode Warning */}
-            {verificationStatus.sandboxMode && (
-              <Alert className="mb-6 border-orange-200 bg-orange-50">
-                <AlertCircle className="h-4 w-4 text-orange-600" />
-                <AlertDescription className="text-orange-800">
-                  <div className="font-medium mb-2">AWS SES Sandbox Mode</div>
-                  <p className="text-sm mb-2">{verificationStatus.message}</p>
-                  <p className="text-xs">{verificationStatus.instructions}</p>
-                </AlertDescription>
-              </Alert>
-            )}
 
             {/* Main Content */}
             <div className="space-y-4 md:space-y-6">
