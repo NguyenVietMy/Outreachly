@@ -219,6 +219,7 @@ resource "aws_ecs_task_definition" "api" {
       environment = [
         { name = "JAVA_OPTS", value = "-XX:+ExitOnOutOfMemoryError" },
         { name = "GOOGLE_REDIRECT_URI", value = "https://api.outreach-ly.com/login/oauth2/code/google" },
+        { name = "GOOGLE_GMAIL_REDIRECT_URI", value = "https://api.outreach-ly.com/login/oauth2/code/google-gmail" },
         { name = "FRONTEND_URL", value = "https://www.outreach-ly.com" },
         { name = "AWS_FROM_EMAIL", value = "noreply@outreach-ly.com" },
         { name = "AWS_FROM_NAME", value = "Outreachly" },
