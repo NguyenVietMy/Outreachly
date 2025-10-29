@@ -117,6 +117,12 @@ yarn-error.log*
 application-local.properties
 application-dev.properties
 application-prod.properties
+.env.local.properties
+
+# Secrets and credentials (DO NOT COMMIT)
+**/secrets/**
+**/*secret*.tf
+**/*credentials*.tf
 
 # Logs
 logs/

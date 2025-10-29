@@ -55,3 +55,14 @@ variable "hunter_acc_1_secret_arn" {
 variable "hunter_acc_2_secret_arn" {
   type = string
 }
+
+# OAuth2 Secrets (Secrets Manager)
+variable "google_client_id_secret_arn" {
+  type        = string
+  description = "ARN of Secrets Manager secret containing Google OAuth2 Client ID"
+}
+
+variable "google_client_secret_secret_arn" {
+  type        = string
+  description = "ARN of Secrets Manager secret containing Google OAuth2 Client Secret"
+}

@@ -163,7 +163,9 @@ resource "aws_iam_role_policy" "secrets_access" {
           var.db_password_secret_arn,
           var.openai_api_key_secret_arn,
           var.hunter_acc_1_secret_arn,
-          var.hunter_acc_2_secret_arn
+          var.hunter_acc_2_secret_arn,
+          var.google_client_id_secret_arn,
+          var.google_client_secret_secret_arn
         ]
       }
     ]
@@ -216,8 +218,6 @@ resource "aws_ecs_task_definition" "api" {
       }
       environment = [
         { name = "JAVA_OPTS", value = "-XX:+ExitOnOutOfMemoryError" },
-        { name = "GOOGLE_CLIENT_ID", value = "11164249925-1d31lg1eibv43f910rs068aq4f3a30tu.apps.googleusercontent.com" },
-        { name = "GOOGLE_CLIENT_SECRET", value = "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" },
         { name = "GOOGLE_REDIRECT_URI", value = "https://api.outreach-ly.com/login/oauth2/code/google" },
         { name = "FRONTEND_URL", value = "https://www.outreach-ly.com" },
         { name = "AWS_FROM_EMAIL", value = "noreply@outreach-ly.com" },
@@ -232,7 +232,9 @@ resource "aws_ecs_task_definition" "api" {
         { name = "DB_PASSWORD", valueFrom = var.db_password_secret_arn },
         { name = "OPENAI_API_KEY", valueFrom = var.openai_api_key_secret_arn },
         { name = "HUNTER_ACC_1", valueFrom = var.hunter_acc_1_secret_arn },
-        { name = "HUNTER_ACC_2", valueFrom = var.hunter_acc_2_secret_arn }
+        { name = "HUNTER_ACC_2", valueFrom = var.hunter_acc_2_secret_arn },
+        { name = "GOOGLE_CLIENT_ID", valueFrom = var.google_client_id_secret_arn },
+        { name = "GOOGLE_CLIENT_SECRET", valueFrom = var.google_client_secret_secret_arn }
       ]
     }
   ])

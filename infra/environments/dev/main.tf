@@ -41,6 +41,8 @@ module "ecs_api" {
   openai_api_key_secret_arn          = aws_secretsmanager_secret.openai_api_key.arn
   hunter_acc_1_secret_arn            = aws_secretsmanager_secret.hunter_acc_1.arn
   hunter_acc_2_secret_arn            = aws_secretsmanager_secret.hunter_acc_2.arn
+  google_client_id_secret_arn        = aws_secretsmanager_secret.google_client_id.arn
+  google_client_secret_secret_arn    = aws_secretsmanager_secret.google_client_secret.arn
 }
 
 # Secrets Manager for database credentials
@@ -71,6 +73,17 @@ resource "aws_secretsmanager_secret" "hunter_acc_1" {
 
 resource "aws_secretsmanager_secret" "hunter_acc_2" {
   name                    = "outreachly/dev/HUNTER_ACC_2"
+  recovery_window_in_days = 0
+}
+
+# OAuth2 Secrets
+resource "aws_secretsmanager_secret" "google_client_id" {
+  name                    = "outreachly/dev/GOOGLE_CLIENT_ID"
+  recovery_window_in_days = 0
+}
+
+resource "aws_secretsmanager_secret" "google_client_secret" {
+  name                    = "outreachly/dev/GOOGLE_CLIENT_SECRET"
   recovery_window_in_days = 0
 }
 
