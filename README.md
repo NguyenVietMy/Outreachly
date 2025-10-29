@@ -31,7 +31,6 @@ _AI-powered, multi-tenant SaaS solution for lead enrichment, email verification,
 - [Deployment](#deployment)
 - [Development Guidelines](#development-guidelines)
 - [Contributing](#contributing)
-- [License](#license)
 
 ---
 
@@ -44,7 +43,6 @@ _AI-powered, multi-tenant SaaS solution for lead enrichment, email verification,
 - 🤖 **AI-Powered Personalization**: Leverages OpenAI to generate personalized email templates and improve outreach messaging
 - 📊 **Multi-Provider Email Delivery**: Abstracted email provider system supporting AWS SES, Resend, and Gmail with seamless switching
 - 🔍 **Advanced Lead Enrichment**: Integrates with Hunter.io to automatically enrich lead data with verified contact information
-- ✅ **Email Verification**: Built-in validation system that reduces bounce rates to under 1%
 - 🎯 **Campaign Management**: Multi-step campaign workflows with checkpoints, scheduling, and automation
 - 📈 **Real-Time Analytics**: Comprehensive dashboard with engagement metrics, delivery tracking, and performance insights
 - 🔐 **Enterprise Security**: OAuth2 authentication, Row-Level Security (RLS), multi-tenancy support
@@ -789,12 +787,6 @@ Contributions are welcome! Please follow these steps:
 - ⚡ Performance optimizations
 - 🔒 Security improvements
 - 🧪 Test coverage
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
