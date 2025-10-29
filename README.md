@@ -802,9 +802,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Your Name**
 
-- GitHub: [@yourusername](https://github.com/yourusername)
-- Email: your.email@example.com
-- LinkedIn: [Your LinkedIn](https://linkedin.com/in/yourprofile)
+- GitHub: [@MiloNguyen](https://github.com/NguyenVietMy)
+- Email: vietmynguyen@umass.edu
+- LinkedIn: [Viet My Nguyen](https://www.linkedin.com/in/viet-my-nguyen-92b2b5324/)
 
 ---
 
