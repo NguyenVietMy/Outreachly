@@ -43,7 +43,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#FDFDF7]">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
@@ -54,7 +54,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Sidebar */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-[#FDFDF7] shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -62,11 +62,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
             <Link href="/dashboard" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-sm">
-                  O
-                </span>
-              </div>
               <span className="text-xl font-bold text-gray-900">
                 Outreachly
               </span>
@@ -136,7 +131,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* Main content */}
       <div className="lg:pl-64">
         {/* Mobile header */}
-        <div className="lg:hidden flex items-center justify-between h-16 px-4 bg-white border-b border-gray-200">
+        <div className="lg:hidden flex items-center justify-between h-16 px-4 bg-[#FDFDF7] border-b border-gray-200">
           <button
             onClick={() => setSidebarOpen(true)}
             className="p-2 rounded-md text-gray-400 hover:text-gray-600"
@@ -144,11 +139,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <Menu className="h-6 w-6" />
           </button>
           <Link href="/dashboard" className="flex items-center space-x-2">
-            <div className="w-6 h-6 bg-primary rounded flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-xs">
-                O
-              </span>
-            </div>
             <span className="text-lg font-bold text-gray-900">Outreachly</span>
           </Link>
           <div className="w-10" /> {/* Spacer for centering */}

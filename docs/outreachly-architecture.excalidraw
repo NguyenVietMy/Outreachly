@@ -1,0 +1,232 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "https://excalidraw.com",
+  "elements": [
+    {
+      "id": "r1", "type": "rectangle", "x": 380, "y": 20, "width": 240, "height": 55,
+      "angle": 0, "strokeColor": "#1e1e1e", "backgroundColor": "#dbe4ff",
+      "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid",
+      "roughness": 1, "opacity": 100, "groupIds": [], "frameId": null,
+      "roundness": {"type": 3}, "isDeleted": false, "boundElements": []
+    },
+    {
+      "id": "t1", "type": "text", "x": 380, "y": 36, "width": 240, "height": 25,
+      "angle": 0, "strokeColor": "#1e1e1e", "backgroundColor": "transparent",
+      "fillStyle": "hachure", "strokeWidth": 1, "strokeStyle": "solid",
+      "roughness": 1, "opacity": 100, "text": "BROWSER  (outreach-ly.com)",
+      "fontSize": 15, "fontFamily": 1, "textAlign": "center", "verticalAlign": "top",
+      "containerId": null, "originalText": "BROWSER  (outreach-ly.com)",
+      "lineHeight": 1.25, "groupIds": [], "frameId": null, "roundness": null,
+      "isDeleted": false, "boundElements": []
+    },
+    {
+      "id": "r2", "type": "rectangle", "x": 220, "y": 135, "width": 560, "height": 85,
+      "angle": 0, "strokeColor": "#1e1e1e", "backgroundColor": "#e7f5ff",
+      "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid",
+      "roughness": 1, "opacity": 100, "groupIds": [], "frameId": null,
+      "roundness": {"type": 3}, "isDeleted": false, "boundElements": []
+    },
+    {
+      "id": "t2", "type": "text", "x": 220, "y": 155, "width": 560, "height": 45,
+      "angle": 0, "strokeColor": "#1e1e1e", "backgroundColor": "transparent",
+      "fillStyle": "hachure", "strokeWidth": 1, "strokeStyle": "solid",
+      "roughness": 1, "opacity": 100, "text": "Next.js Frontend  (Vercel)\nLeads \u00b7 Campaigns \u00b7 Templates \u00b7 Import \u00b7 Dashboard \u00b7 Settings",
+      "fontSize": 14, "fontFamily": 1, "textAlign": "center", "verticalAlign": "top",
+      "containerId": null, "originalText": "Next.js Frontend  (Vercel)\nLeads \u00b7 Campaigns \u00b7 Templates \u00b7 Import \u00b7 Dashboard \u00b7 Settings",
+      "lineHeight": 1.25, "groupIds": [], "frameId": null, "roundness": null,
+      "isDeleted": false, "boundElements": []
+    },
+    {
+      "id": "r3", "type": "rectangle", "x": 220, "y": 290, "width": 560, "height": 130,
+      "angle": 0, "strokeColor": "#1e1e1e", "backgroundColor": "#ebfbee",
+      "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid",
+      "roughness": 1, "opacity": 100, "groupIds": [], "frameId": null,
+      "roundness": {"type": 3}, "isDeleted": false, "boundElements": []
+    },
+    {
+      "id": "t3", "type": "text", "x": 230, "y": 298, "width": 540, "height": 114,
+      "angle": 0, "strokeColor": "#1e1e1e", "backgroundColor": "transparent",
+      "fillStyle": "hachure", "strokeWidth": 1, "strokeStyle": "solid",
+      "roughness": 1, "opacity": 100, "text": "Spring Boot API  (Java 17 \u00b7 ECS Fargate \u00b7 api.outreach-ly.com)\n\nGoogle OAuth2 \u00b7 Campaign + Lead + Template REST\nCheckpoint Scheduler (@Scheduled \u00b7 60s)\nEnrichment Service (poll 5s) \u00b7 Rate Limit (100/day) \u00b7 AI Template (GPT-4o)",
+      "fontSize": 13, "fontFamily": 1, "textAlign": "center", "verticalAlign": "top",
+      "containerId": null, "originalText": "Spring Boot API  (Java 17 \u00b7 ECS Fargate \u00b7 api.outreach-ly.com)\n\nGoogle OAuth2 \u00b7 Campaign + Lead + Template REST\nCheckpoint Scheduler (@Scheduled \u00b7 60s)\nEnrichment Service (poll 5s) \u00b7 Rate Limit (100/day) \u00b7 AI Template (GPT-4o)",
+      "lineHeight": 1.25, "groupIds": [], "frameId": null, "roundness": null,
+      "isDeleted": false, "boundElements": []
+    },
+    {
+      "id": "r4", "type": "rectangle", "x": 20, "y": 510, "width": 210, "height": 80,
+      "angle": 0, "strokeColor": "#1e1e1e", "backgroundColor": "#f3f0ff",
+      "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid",
+      "roughness": 1, "opacity": 100, "groupIds": [], "frameId": null,
+      "roundness": {"type": 3}, "isDeleted": false, "boundElements": []
+    },
+    {
+      "id": "t4", "type": "text", "x": 20, "y": 522, "width": 210, "height": 56,
+      "angle": 0, "strokeColor": "#1e1e1e", "backgroundColor": "transparent",
+      "fillStyle": "hachure", "strokeWidth": 1, "strokeStyle": "solid",
+      "roughness": 1, "opacity": 100, "text": "PostgreSQL\n(Supabase)\nusers \u00b7 leads \u00b7 campaigns\nemails \u00b7 enrichment_cache",
+      "fontSize": 12, "fontFamily": 1, "textAlign": "center", "verticalAlign": "top",
+      "containerId": null, "originalText": "PostgreSQL\n(Supabase)\nusers \u00b7 leads \u00b7 campaigns\nemails \u00b7 enrichment_cache",
+      "lineHeight": 1.25, "groupIds": [], "frameId": null, "roundness": null,
+      "isDeleted": false, "boundElements": []
+    },
+    {
+      "id": "r5", "type": "rectangle", "x": 280, "y": 510, "width": 200, "height": 80,
+      "angle": 0, "strokeColor": "#1e1e1e", "backgroundColor": "#fff0f6",
+      "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid",
+      "roughness": 1, "opacity": 100, "groupIds": [], "frameId": null,
+      "roundness": {"type": 3}, "isDeleted": false, "boundElements": []
+    },
+    {
+      "id": "t5", "type": "text", "x": 280, "y": 524, "width": 200, "height": 52,
+      "angle": 0, "strokeColor": "#1e1e1e", "backgroundColor": "transparent",
+      "fillStyle": "hachure", "strokeWidth": 1, "strokeStyle": "solid",
+      "roughness": 1, "opacity": 100, "text": "Email Providers\nGmail API (OAuth)\nAWS SES\nResend",
+      "fontSize": 13, "fontFamily": 1, "textAlign": "center", "verticalAlign": "top",
+      "containerId": null, "originalText": "Email Providers\nGmail API (OAuth)\nAWS SES\nResend",
+      "lineHeight": 1.25, "groupIds": [], "frameId": null, "roundness": null,
+      "isDeleted": false, "boundElements": []
+    },
+    {
+      "id": "r6", "type": "rectangle", "x": 530, "y": 510, "width": 200, "height": 80,
+      "angle": 0, "strokeColor": "#1e1e1e", "backgroundColor": "#fff9db",
+      "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid",
+      "roughness": 1, "opacity": 100, "groupIds": [], "frameId": null,
+      "roundness": {"type": 3}, "isDeleted": false, "boundElements": []
+    },
+    {
+      "id": "t6", "type": "text", "x": 530, "y": 522, "width": 200, "height": 56,
+      "angle": 0, "strokeColor": "#1e1e1e", "backgroundColor": "transparent",
+      "fillStyle": "hachure", "strokeWidth": 1, "strokeStyle": "solid",
+      "roughness": 1, "opacity": 100, "text": "External APIs\nHunter.io\n(find + verify)\nOpenAI GPT-4o",
+      "fontSize": 13, "fontFamily": 1, "textAlign": "center", "verticalAlign": "top",
+      "containerId": null, "originalText": "External APIs\nHunter.io\n(find + verify)\nOpenAI GPT-4o",
+      "lineHeight": 1.25, "groupIds": [], "frameId": null, "roundness": null,
+      "isDeleted": false, "boundElements": []
+    },
+    {
+      "id": "r7", "type": "rectangle", "x": 770, "y": 510, "width": 200, "height": 80,
+      "angle": 0, "strokeColor": "#1e1e1e", "backgroundColor": "#fff4e6",
+      "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid",
+      "roughness": 1, "opacity": 100, "groupIds": [], "frameId": null,
+      "roundness": {"type": 3}, "isDeleted": false, "boundElements": []
+    },
+    {
+      "id": "t7", "type": "text", "x": 770, "y": 524, "width": 200, "height": 52,
+      "angle": 0, "strokeColor": "#1e1e1e", "backgroundColor": "transparent",
+      "fillStyle": "hachure", "strokeWidth": 1, "strokeStyle": "solid",
+      "roughness": 1, "opacity": 100, "text": "AWS SES\n+ SNS webhooks\nDELIVERY \u00b7 BOUNCE\nCOMPLAINT",
+      "fontSize": 13, "fontFamily": 1, "textAlign": "center", "verticalAlign": "top",
+      "containerId": null, "originalText": "AWS SES\n+ SNS webhooks\nDELIVERY \u00b7 BOUNCE\nCOMPLAINT",
+      "lineHeight": 1.25, "groupIds": [], "frameId": null, "roundness": null,
+      "isDeleted": false, "boundElements": []
+    },
+    {
+      "id": "r8", "type": "rectangle", "x": 80, "y": 680, "width": 640, "height": 55,
+      "angle": 0, "strokeColor": "#868e96", "backgroundColor": "#f8f9fa",
+      "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "dashed",
+      "roughness": 1, "opacity": 100, "groupIds": [], "frameId": null,
+      "roundness": {"type": 3}, "isDeleted": false, "boundElements": []
+    },
+    {
+      "id": "t8", "type": "text", "x": 80, "y": 695, "width": 640, "height": 25,
+      "angle": 0, "strokeColor": "#495057", "backgroundColor": "transparent",
+      "fillStyle": "hachure", "strokeWidth": 1, "strokeStyle": "solid",
+      "roughness": 1, "opacity": 100, "text": "AWS ECS Fargate \u00b7 ALB \u00b7 Secrets Manager \u00b7 VPC \u00b7 Terraform \u00b7 CloudWatch Logs",
+      "fontSize": 13, "fontFamily": 1, "textAlign": "center", "verticalAlign": "top",
+      "containerId": null, "originalText": "AWS ECS Fargate \u00b7 ALB \u00b7 Secrets Manager \u00b7 VPC \u00b7 Terraform \u00b7 CloudWatch Logs",
+      "lineHeight": 1.25, "groupIds": [], "frameId": null, "roundness": null,
+      "isDeleted": false, "boundElements": []
+    },
+    {
+      "id": "a1", "type": "arrow",
+      "x": 500, "y": 75, "width": 0, "height": 60,
+      "angle": 0, "strokeColor": "#1e1e1e", "backgroundColor": "transparent",
+      "fillStyle": "hachure", "strokeWidth": 2, "strokeStyle": "solid",
+      "roughness": 1, "opacity": 100,
+      "points": [[0, 0], [0, 60]],
+      "startArrowhead": null, "endArrowhead": "arrow",
+      "startBinding": null, "endBinding": null,
+      "groupIds": [], "frameId": null, "roundness": {"type": 2},
+      "isDeleted": false, "boundElements": []
+    },
+    {
+      "id": "a2", "type": "arrow",
+      "x": 500, "y": 220, "width": 0, "height": 70,
+      "angle": 0, "strokeColor": "#1e1e1e", "backgroundColor": "transparent",
+      "fillStyle": "hachure", "strokeWidth": 2, "strokeStyle": "solid",
+      "roughness": 1, "opacity": 100,
+      "points": [[0, 0], [0, 70]],
+      "startArrowhead": null, "endArrowhead": "arrow",
+      "startBinding": null, "endBinding": null,
+      "groupIds": [], "frameId": null, "roundness": {"type": 2},
+      "isDeleted": false, "boundElements": []
+    },
+    {
+      "id": "a3", "type": "arrow",
+      "x": 350, "y": 420, "width": -225, "height": 90,
+      "angle": 0, "strokeColor": "#1e1e1e", "backgroundColor": "transparent",
+      "fillStyle": "hachure", "strokeWidth": 2, "strokeStyle": "solid",
+      "roughness": 1, "opacity": 100,
+      "points": [[0, 0], [-225, 90]],
+      "startArrowhead": null, "endArrowhead": "arrow",
+      "startBinding": null, "endBinding": null,
+      "groupIds": [], "frameId": null, "roundness": {"type": 2},
+      "isDeleted": false, "boundElements": []
+    },
+    {
+      "id": "a4", "type": "arrow",
+      "x": 500, "y": 420, "width": -120, "height": 90,
+      "angle": 0, "strokeColor": "#1e1e1e", "backgroundColor": "transparent",
+      "fillStyle": "hachure", "strokeWidth": 2, "strokeStyle": "solid",
+      "roughness": 1, "opacity": 100,
+      "points": [[0, 0], [-120, 90]],
+      "startArrowhead": null, "endArrowhead": "arrow",
+      "startBinding": null, "endBinding": null,
+      "groupIds": [], "frameId": null, "roundness": {"type": 2},
+      "isDeleted": false, "boundElements": []
+    },
+    {
+      "id": "a5", "type": "arrow",
+      "x": 650, "y": 420, "width": 0, "height": 90,
+      "angle": 0, "strokeColor": "#1e1e1e", "backgroundColor": "transparent",
+      "fillStyle": "hachure", "strokeWidth": 2, "strokeStyle": "solid",
+      "roughness": 1, "opacity": 100,
+      "points": [[0, 0], [0, 90]],
+      "startArrowhead": null, "endArrowhead": "arrow",
+      "startBinding": null, "endBinding": null,
+      "groupIds": [], "frameId": null, "roundness": {"type": 2},
+      "isDeleted": false, "boundElements": []
+    },
+    {
+      "id": "a6", "type": "arrow",
+      "x": 760, "y": 420, "width": 110, "height": 90,
+      "angle": 0, "strokeColor": "#1e1e1e", "backgroundColor": "transparent",
+      "fillStyle": "hachure", "strokeWidth": 2, "strokeStyle": "solid",
+      "roughness": 1, "opacity": 100,
+      "points": [[0, 0], [110, 90]],
+      "startArrowhead": null, "endArrowhead": "arrow",
+      "startBinding": null, "endBinding": null,
+      "groupIds": [], "frameId": null, "roundness": {"type": 2},
+      "isDeleted": false, "boundElements": []
+    },
+    {
+      "id": "a7", "type": "arrow",
+      "x": 870, "y": 590, "width": -500, "height": 45,
+      "angle": 0, "strokeColor": "#868e96", "backgroundColor": "transparent",
+      "fillStyle": "hachure", "strokeWidth": 1, "strokeStyle": "dashed",
+      "roughness": 1, "opacity": 80,
+      "points": [[0, 0], [-500, 45]],
+      "startArrowhead": null, "endArrowhead": "arrow",
+      "startBinding": null, "endBinding": null,
+      "groupIds": [], "frameId": null, "roundness": {"type": 2},
+      "isDeleted": false, "boundElements": []
+    }
+  ],
+  "appState": {
+    "gridSize": null,
+    "viewBackgroundColor": "#ffffff"
+  },
+  "files": {}
+}
