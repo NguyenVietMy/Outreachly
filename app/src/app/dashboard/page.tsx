@@ -18,11 +18,11 @@ export default function Dashboard() {
   };
 
   const handleViewAllCampaigns = () => {
-    router.push("/campaigns");
+    router.push("/workspace?tab=campaigns");
   };
 
   const handleCreateCampaign = () => {
-    router.push("/campaigns");
+    router.push("/workspace?tab=campaigns");
   };
 
   const handleConfigureDomain = (profileId: string) => {

@@ -4,18 +4,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   BarChart3,
-  Users,
-  Mail,
   Settings,
   LogOut,
   Menu,
   X,
-  Upload,
-  FileText,
-  Search,
-  Send,
-  Mailbox,
-  Target,
+  Layers,
 } from "lucide-react";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
@@ -32,13 +25,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
-    { name: "Lead Discovery", href: "/lead-discovery", icon: Search },
-    { name: "Domain Sending", href: "/send-email-ses", icon: Send },
-    { name: "Send Gmail", href: "/send-gmail", icon: Mailbox },
-    { name: "Campaigns", href: "/campaigns", icon: Target },
-    { name: "Leads", href: "/leads", icon: Users },
-    { name: "Import Leads", href: "/import", icon: Upload },
-    { name: "Templates", href: "/templates", icon: FileText },
+    { name: "Workspace", href: "/workspace", icon: Layers },
     { name: "Settings", href: "/settings", icon: Settings },
   ];
 
@@ -79,7 +66,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             {navigation.map((item) => {
               const Icon = item.icon;
               const isActive =
-                pathname === item.href || pathname?.startsWith(`${item.href}/`);
+                pathname === item.href ||
+                pathname?.startsWith(`${item.href}/`) ||
+                (item.href === "/workspace" && pathname === "/leads/modify");
               return (
                 <Link
                   key={item.name}

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,10 +48,12 @@ import {
   Eye,
   EyeOff,
   Clock,
+  FileText,
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import DashboardLayout from "@/components/DashboardLayout";
 import AuthGuard from "@/components/AuthGuard";
+import TemplatesTab from "@/components/templates/TemplatesTab";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "https://api.outreach-ly.com";
@@ -72,10 +74,21 @@ interface EmailProvider {
   };
 }
 
-export default function SettingsPage() {
+const VALID_TABS = ["email", "timezone", "account", "templates"] as const;
+type SettingsTab = (typeof VALID_TABS)[number];
+
+function SettingsContent() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
+
+  const tabParam = searchParams.get("tab") as SettingsTab | null;
+  const activeTab: SettingsTab = tabParam && VALID_TABS.includes(tabParam) ? tabParam : "email";
+
+  const handleTabChange = (value: string) => {
+    router.replace(`/settings?tab=${value}`, { scroll: false });
+  };
   const [isLoading, setIsLoading] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
 
@@ -569,8 +582,8 @@ export default function SettingsPage() {
               </p>
             </div>
 
-            <Tabs defaultValue="email" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-3">
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="email" className="flex items-center gap-2">
                   <Mail className="h-4 w-4" />
                   Email
@@ -588,6 +601,13 @@ export default function SettingsPage() {
                 >
                   <Shield className="h-4 w-4" />
                   Account
+                </TabsTrigger>
+                <TabsTrigger
+                  value="templates"
+                  className="flex items-center gap-2"
+                >
+                  <FileText className="h-4 w-4" />
+                  Templates
                 </TabsTrigger>
               </TabsList>
 
@@ -1226,10 +1246,29 @@ export default function SettingsPage() {
                   </CardContent>
                 </Card>
               </TabsContent>
+
+              {/* Templates */}
+              <TabsContent value="templates">
+                <TemplatesTab />
+              </TabsContent>
             </Tabs>
           </div>
         </div>
       </DashboardLayout>
     </AuthGuard>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-accent"></div>
+        </div>
+      }
+    >
+      <SettingsContent />
+    </Suspense>
   );
 }

@@ -171,7 +171,7 @@ export default function ModifyLeadsPage() {
                 Create and edit your leads. This view always shows all leads.
               </p>
             </div>
-            <Link href="/leads">
+            <Link href="/workspace?tab=leads">
               <Button variant="outline">Back to Leads</Button>
             </Link>
           </div>
