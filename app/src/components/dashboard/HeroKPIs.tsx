@@ -70,7 +70,7 @@ export default function HeroKPIs({ data }: HeroKPIsProps) {
       {/* Leads Imported */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-gray-600">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
             Leads Imported
           </CardTitle>
           <Users className="h-4 w-4 text-muted-foreground" />
@@ -88,7 +88,7 @@ export default function HeroKPIs({ data }: HeroKPIsProps) {
       {/* Active Campaigns */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-gray-600">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
             Active Campaigns
           </CardTitle>
           <Mail className="h-4 w-4 text-muted-foreground" />
@@ -106,7 +106,7 @@ export default function HeroKPIs({ data }: HeroKPIsProps) {
       {/* Engagement Rate */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-gray-600">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
             Engagement Rate
           </CardTitle>
           <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -124,7 +124,7 @@ export default function HeroKPIs({ data }: HeroKPIsProps) {
       {/* Deliverability Health */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-gray-600">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
             Deliverability
           </CardTitle>
           <Shield className="h-4 w-4 text-muted-foreground" />
@@ -147,7 +147,7 @@ export default function HeroKPIs({ data }: HeroKPIsProps) {
       {/* Quota Usage */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-gray-600">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
             Quota Usage
           </CardTitle>
           <Zap className="h-4 w-4 text-muted-foreground" />

@@ -112,7 +112,7 @@ export default function TemplateBrowserModal({
                     className={`hover:shadow-md transition-all cursor-pointer ${
                       isSelected
                         ? "ring-2 ring-blue-500 bg-blue-50"
-                        : "hover:bg-gray-50"
+                        : "hover:bg-secondary"
                     }`}
                     onClick={() => handleClick(t)}
                   >
@@ -125,13 +125,13 @@ export default function TemplateBrowserModal({
                       </Badge>
                     </CardHeader>
                     <CardContent className="pt-0 pb-3">
-                      <div className="text-xs text-gray-600 space-y-1">
+                      <div className="text-xs text-muted-foreground space-y-1">
                         {t.platform === "EMAIL" && content?.subject && (
                           <div>
                             <strong>Subject:</strong> {content.subject}
                           </div>
                         )}
-                        <div className="text-xs text-gray-500 line-clamp-3">
+                        <div className="text-xs text-muted-foreground line-clamp-3">
                           {(() => {
                             const body = content?.body || "";
                             return body.length > 100
@@ -139,7 +139,7 @@ export default function TemplateBrowserModal({
                               : body;
                           })()}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-muted-foreground">
                           Platform: {t.platform}
                         </div>
                       </div>

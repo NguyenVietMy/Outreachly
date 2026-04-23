@@ -309,6 +309,7 @@ export function EmailResultsModal({
                           variant={getVerificationBadgeVariant(
                             email.verification.status
                           )}
+                          className="font-mono uppercase tracking-wider"
                         >
                           {mapVerificationStatus(email.verification.status)}
                         </Badge>
@@ -316,6 +317,7 @@ export function EmailResultsModal({
                       <TableCell>
                         <Badge
                           variant={getConfidenceBadgeVariant(email.confidence)}
+                          className="font-mono uppercase tracking-wider"
                         >
                           {email.confidence}%
                         </Badge>

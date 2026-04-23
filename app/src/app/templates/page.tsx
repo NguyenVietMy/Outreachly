@@ -426,16 +426,16 @@ export default function TemplatesPage() {
   return (
     <AuthGuard>
       <DashboardLayout>
-        <div className="min-h-screen bg-[#FDFDF7]">
+        <div className="min-h-screen bg-background">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {/* Header */}
             <div className="mb-6 md:mb-8">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div>
-                  <h1 className="text-2xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                  <h1 className="text-2xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-500 dark:to-indigo-500 bg-clip-text text-transparent">
                     AI Template Studio
                   </h1>
-                  <p className="mt-2 text-base md:text-lg text-gray-600">
+                  <p className="mt-2 text-base md:text-lg text-muted-foreground">
                     Create, optimize, and manage professional email and LinkedIn
                     templates with AI
                   </p>
@@ -586,7 +586,7 @@ export default function TemplatesPage() {
                     <div className="flex flex-col md:flex-row gap-4">
                       <div className="flex-1">
                         <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                           <Input
                             placeholder="Search templates..."
                             className="pl-9"
@@ -635,7 +635,7 @@ export default function TemplatesPage() {
                   <Card className="shadow-lg border-0">
                     <CardContent className="p-6 text-center">
                       <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-                      <p className="text-gray-600">Loading templates...</p>
+                      <p className="text-muted-foreground">Loading templates...</p>
                     </CardContent>
                   </Card>
                 ) : filtered.length > 0 ? (
@@ -667,7 +667,7 @@ export default function TemplatesPage() {
                                       {template.category}
                                     </Badge>
                                   )}
-                                  <Badge variant="outline" className="text-xs">
+                                  <Badge variant="outline" className="text-xs font-mono uppercase tracking-wider">
                                     {template.platform}
                                   </Badge>
                                 </div>
@@ -699,19 +699,19 @@ export default function TemplatesPage() {
                               {template.platform === "EMAIL" &&
                                 content.subject && (
                                   <div>
-                                    <Label className="text-xs font-medium text-gray-500">
+                                    <Label className="text-xs font-medium text-muted-foreground">
                                       Subject
                                     </Label>
-                                    <p className="text-sm text-gray-700 line-clamp-1">
+                                    <p className="text-sm text-muted-foreground line-clamp-1">
                                       {content.subject}
                                     </p>
                                   </div>
                                 )}
                               <div>
-                                <Label className="text-xs font-medium text-gray-500">
+                                <Label className="text-xs font-medium text-muted-foreground">
                                   Content
                                 </Label>
-                                <p className="text-sm text-gray-700 line-clamp-3">
+                                <p className="text-sm text-muted-foreground line-clamp-3">
                                   {content.body}
                                 </p>
                               </div>
@@ -738,7 +738,7 @@ export default function TemplatesPage() {
                                     )
                                   )}
                                 </div>
-                                <div className="text-xs text-gray-500">
+                                <div className="text-xs text-muted-foreground">
                                   {countWords(content.body || "")} words
                                 </div>
                               </div>
@@ -751,8 +751,8 @@ export default function TemplatesPage() {
                 ) : (
                   <Card className="shadow-lg border-0">
                     <CardContent className="p-6 text-center">
-                      <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-500 mb-4">No templates found</p>
+                      <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground mb-4">No templates found</p>
                       <Button onClick={() => setActiveTab("ai-generate")}>
                         <Sparkles className="h-4 w-4 mr-2" />
                         Generate with AI
@@ -875,7 +875,7 @@ export default function TemplatesPage() {
 
                   {/* AI Generated Result */}
                   <Card className="shadow-lg border-0">
-                    <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50">
+                    <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30">
                       <CardTitle className="flex items-center gap-2 text-xl">
                         <Lightbulb className="h-6 w-6 text-green-600" />
                         Generated Template
@@ -890,19 +890,19 @@ export default function TemplatesPage() {
                           {aiPlatform === "EMAIL" &&
                             aiGeneratedContent.subject && (
                               <div>
-                                <Label className="text-sm font-medium text-gray-700">
+                                <Label className="text-sm font-medium text-muted-foreground">
                                   Subject
                                 </Label>
-                                <div className="p-3 bg-gray-50 rounded-lg text-sm">
+                                <div className="p-3 bg-secondary rounded-lg text-sm">
                                   {aiGeneratedContent.subject}
                                 </div>
                               </div>
                             )}
                           <div>
-                            <Label className="text-sm font-medium text-gray-700">
+                            <Label className="text-sm font-medium text-muted-foreground">
                               Content
                             </Label>
-                            <div className="p-3 bg-gray-50 rounded-lg text-sm whitespace-pre-wrap">
+                            <div className="p-3 bg-secondary rounded-lg text-sm whitespace-pre-wrap">
                               {aiGeneratedContent.body}
                             </div>
                           </div>
@@ -925,8 +925,8 @@ export default function TemplatesPage() {
                         </div>
                       ) : (
                         <div className="text-center py-8">
-                          <Brain className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                          <p className="text-gray-500">
+                          <Brain className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                          <p className="text-muted-foreground">
                             Generate a template to see it here
                           </p>
                         </div>
@@ -939,7 +939,7 @@ export default function TemplatesPage() {
               {/* Analytics Tab */}
               <TabsContent value="analytics" className="space-y-4 md:space-y-6">
                 <Card className="shadow-lg border-0">
-                  <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
+                  <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
                     <CardTitle className="flex items-center gap-2 text-xl">
                       <BarChart3 className="h-6 w-6 text-blue-600" />
                       Template Analytics
@@ -954,7 +954,7 @@ export default function TemplatesPage() {
                         <div className="text-3xl font-bold text-blue-600">
                           {templates.length}
                         </div>
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm text-muted-foreground">
                           Total Templates
                         </div>
                       </div>
@@ -965,7 +965,7 @@ export default function TemplatesPage() {
                               .length
                           }
                         </div>
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm text-muted-foreground">
                           Email Templates
                         </div>
                       </div>
@@ -976,7 +976,7 @@ export default function TemplatesPage() {
                               .length
                           }
                         </div>
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm text-muted-foreground">
                           LinkedIn Templates
                         </div>
                       </div>
@@ -1114,7 +1114,7 @@ export default function TemplatesPage() {
                   </DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-muted-foreground">
                     You have an unsaved AI-generated template. What would you
                     like to do?
                   </p>

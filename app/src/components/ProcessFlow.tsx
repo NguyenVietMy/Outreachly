@@ -29,16 +29,16 @@ const ProcessStep = ({
 }: ProcessStepProps) => {
   return (
     <Card
-      className={`relative cursor-pointer transition-all duration-300 ${isActive ? "border-primary shadow-md" : "border-border"} bg-background`}
+      className={`relative cursor-pointer transition-all duration-300 ${isActive ? "border-brand-accent shadow-card" : "border-border"} bg-background`}
       onClick={onClick}
     >
       <CardContent className="p-6">
-        <div className="absolute -top-3 -left-3 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
+        <div className="absolute -top-3 -left-3 w-6 h-6 rounded-full bg-foreground text-background flex items-center justify-center text-xs font-bold">
           {step}
         </div>
         <div className="flex flex-col items-center text-center gap-3">
           <div
-            className={`p-3 rounded-full ${isActive ? "bg-primary/10" : "bg-muted"} transition-colors duration-300`}
+            className={`p-3 rounded-full ${isActive ? "bg-brand-light dark:bg-brand-deep/20" : "bg-muted"} transition-colors duration-300`}
           >
             {icon}
           </div>
@@ -88,10 +88,10 @@ const ProcessFlow = () => {
   ];
 
   return (
-    <section className="py-16 px-4 bg-background">
+    <section className="py-20 px-4 bg-background">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-4">How Outreachly Works</h2>
+          <h2 className="text-[40px] font-semibold tracking-[-0.02em] leading-[1.10] mb-4">How Outreachly Works</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
             Our streamlined process helps you go from raw lead lists to
             personalized outreach campaigns in minutes

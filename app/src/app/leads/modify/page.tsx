@@ -164,7 +164,7 @@ export default function ModifyLeadsPage() {
     <AuthGuard>
       <DashboardLayout>
         <div className="p-6 max-w-7xl mx-auto">
-          <div className="mb-6 mt-[100px] flex items-center justify-between">
+          <div className="mb-6 mt-8 flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold">Modify Leads</h1>
               <p className="text-sm text-muted-foreground mt-1">
@@ -434,7 +434,7 @@ export default function ModifyLeadsPage() {
                       {filteredLeads.map((lead) => (
                         <TableRow
                           key={lead.id}
-                          className="cursor-pointer hover:bg-gray-50"
+                          className="cursor-pointer hover:bg-secondary"
                         >
                           <TableCell
                             onClick={() => {
@@ -528,6 +528,7 @@ export default function ModifyLeadsPage() {
                                       ? "destructive"
                                       : "outline"
                               }
+                              className="font-mono uppercase tracking-wider"
                             >
                               {lead.verifiedStatus}
                             </Badge>

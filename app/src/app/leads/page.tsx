@@ -379,7 +379,7 @@ export default function LeadsPage() {
       <DashboardLayout>
         <div className="p-6 max-w-7xl mx-auto">
           {/* Header with Campaign Switcher and Create Campaign Button */}
-          <div className="mb-6 mt-[100px]">
+          <div className="mb-6 mt-8">
             <div className="flex justify-between items-center mb-4">
               <div>
                 <h1 className="text-3xl font-bold">Leads</h1>
@@ -398,12 +398,12 @@ export default function LeadsPage() {
                   Refresh
                 </Button>
                 <Link href="/leads/modify">
-                  <Button className="bg-gray-700 hover:bg-gray-800">
+                  <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
                     Modify Leads
                   </Button>
                 </Link>
                 <Button
-                  className="bg-blue-600 hover:bg-blue-700"
+                  className="bg-brand-accent text-[#0d0d0d] hover:bg-brand-deep hover:text-white"
                   onClick={() => setShowCreateCampaign(true)}
                 >
                   <Plus className="w-4 h-4 mr-2" />
@@ -474,7 +474,7 @@ export default function LeadsPage() {
 
             {/* Filter Panel */}
             {showFilters && (
-              <div className="px-6 py-4 border-b bg-gray-50">
+              <div className="px-6 py-4 border-b bg-secondary">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Verified Status Filter */}
                   <div>
@@ -631,7 +631,7 @@ export default function LeadsPage() {
                           onClick={() =>
                             handleFilterChange("verifiedStatus", "all")
                           }
-                          className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
+                          className="ml-1 hover:bg-brand-light rounded-full p-0.5"
                         >
                           ×
                         </button>
@@ -645,7 +645,7 @@ export default function LeadsPage() {
                         Position: {filters.position}
                         <button
                           onClick={() => handleFilterChange("position", "")}
-                          className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
+                          className="ml-1 hover:bg-brand-light rounded-full p-0.5"
                         >
                           ×
                         </button>
@@ -659,7 +659,7 @@ export default function LeadsPage() {
                         Source: {filters.source}
                         <button
                           onClick={() => handleFilterChange("source", "")}
-                          className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
+                          className="ml-1 hover:bg-brand-light rounded-full p-0.5"
                         >
                           ×
                         </button>
@@ -673,7 +673,7 @@ export default function LeadsPage() {
                         Date: {filters.dateRange}
                         <button
                           onClick={() => handleFilterChange("dateRange", "all")}
-                          className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
+                          className="ml-1 hover:bg-brand-light rounded-full p-0.5"
                         >
                           ×
                         </button>
@@ -687,7 +687,7 @@ export default function LeadsPage() {
                         Has Email
                         <button
                           onClick={() => handleFilterChange("hasEmail", false)}
-                          className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
+                          className="ml-1 hover:bg-brand-light rounded-full p-0.5"
                         >
                           ×
                         </button>
@@ -701,7 +701,7 @@ export default function LeadsPage() {
                         Has Phone
                         <button
                           onClick={() => handleFilterChange("hasPhone", false)}
-                          className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
+                          className="ml-1 hover:bg-brand-light rounded-full p-0.5"
                         >
                           ×
                         </button>
@@ -717,7 +717,7 @@ export default function LeadsPage() {
                           onClick={() =>
                             handleFilterChange("hasLinkedIn", false)
                           }
-                          className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
+                          className="ml-1 hover:bg-brand-light rounded-full p-0.5"
                         >
                           ×
                         </button>
@@ -795,8 +795,8 @@ export default function LeadsPage() {
               ) : filteredLeads.length === 0 ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="text-center">
-                    <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600 mb-2">
+                    <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground mb-2">
                       {searchTerm || getActiveFiltersCount() > 0
                         ? "No leads match your search or filters"
                         : "No leads found"}
@@ -832,7 +832,7 @@ export default function LeadsPage() {
                     <Table className="min-w-full">
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-12 sticky left-0 bg-white z-10">
+                          <TableHead className="w-12 sticky left-0 bg-background z-10">
                             <Checkbox
                               checked={
                                 selectedLeads.length === filteredLeads.length &&
@@ -874,7 +874,7 @@ export default function LeadsPage() {
                           <TableHead className="min-w-[100px]">
                             Created At
                           </TableHead>
-                          <TableHead className="min-w-[120px] sticky right-0 bg-white z-10">
+                          <TableHead className="min-w-[120px] sticky right-0 bg-background z-10">
                             Actions
                           </TableHead>
                         </TableRow>
@@ -883,9 +883,9 @@ export default function LeadsPage() {
                         {filteredLeads.map((lead) => (
                           <TableRow
                             key={lead.id}
-                            className="cursor-pointer hover:bg-gray-50"
+                            className="cursor-pointer hover:bg-secondary"
                           >
-                            <TableCell className="sticky left-0 bg-white z-10">
+                            <TableCell className="sticky left-0 bg-background z-10">
                               <Checkbox
                                 checked={selectedLeads.includes(lead.id)}
                                 onCheckedChange={(checked) =>
@@ -919,6 +919,7 @@ export default function LeadsPage() {
                                         ? "destructive"
                                         : "outline"
                                 }
+                                className="font-mono uppercase tracking-wider"
                               >
                                 {lead.verifiedStatus}
                               </Badge>
@@ -956,7 +957,7 @@ export default function LeadsPage() {
                                 ? new Date(lead.createdAt).toLocaleDateString()
                                 : "-"}
                             </TableCell>
-                            <TableCell className="sticky right-0 bg-white z-10">
+                            <TableCell className="sticky right-0 bg-background z-10">
                               <div className="flex gap-1">
                                 <Button size="sm" variant="ghost">
                                   <Eye className="w-4 h-4" />
@@ -1009,12 +1010,12 @@ export default function LeadsPage() {
                     return (
                       <div
                         key={t.id}
-                        className="p-4 border rounded-lg cursor-pointer hover:bg-gray-50"
+                        className="p-4 border rounded-lg cursor-pointer hover:bg-secondary"
                         onClick={() => handleTemplatePreview(t)}
                       >
                         <h3 className="font-medium">{t.name}</h3>
                         {t.platform === "EMAIL" && content?.subject && (
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             {content.subject}
                           </p>
                         )}
@@ -1134,6 +1135,7 @@ export default function LeadsPage() {
                                 ? "destructive"
                                 : "outline"
                         }
+                        className="font-mono uppercase tracking-wider"
                       >
                         {selectedLead?.verifiedStatus || "unknown"}
                       </Badge>
@@ -1204,16 +1206,16 @@ export default function LeadsPage() {
                 <div className="space-y-2">
                   {selectedTemplate.platform === "EMAIL" && (
                     <div>
-                      <p className="text-xs text-gray-500">Subject</p>
-                      <div className="p-3 bg-gray-50 rounded text-sm">
+                      <p className="text-xs text-muted-foreground">Subject</p>
+                      <div className="p-3 bg-secondary rounded text-sm">
                         {parseContent<any>(selectedTemplate.contentJson)
                           ?.subject || ""}
                       </div>
                     </div>
                   )}
                   <div>
-                    <p className="text-xs text-gray-500">Content</p>
-                    <div className="p-3 bg-gray-50 rounded text-sm whitespace-pre-wrap">
+                    <p className="text-xs text-muted-foreground">Content</p>
+                    <div className="p-3 bg-secondary rounded text-sm whitespace-pre-wrap">
                       {parseContent<any>(selectedTemplate.contentJson)?.body ||
                         ""}
                     </div>

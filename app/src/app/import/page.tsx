@@ -391,14 +391,14 @@ export default function ImportPage() {
 
                 {isDetectingColumns && (
                   <div className="mt-4 flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-brand-accent"></div>
                     <span>Detecting columns...</span>
                   </div>
                 )}
 
                 {isValidating && (
                   <div className="mt-4 flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-brand-accent"></div>
                     <span>Validating file...</span>
                   </div>
                 )}

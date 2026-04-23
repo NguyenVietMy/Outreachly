@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx next *)",
+      "Bash(npm ls *)",
+      "Bash(npm install *)",
+      "Bash(sed -i 's/from-red-50 to-orange-50\"/from-red-50 to-orange-50 dark:from-red-950\\\\/30 dark:to-orange-950\\\\/30\"/g' app/send-gmail/page.tsx)",
+      "Bash(sed -i 's/from-blue-50 to-indigo-50\"/from-blue-50 to-indigo-50 dark:from-blue-950\\\\/30 dark:to-indigo-950\\\\/30\"/g' app/send-gmail/page.tsx app/send-email-ses/page.tsx app/templates/page.tsx)",
+      "Bash(sed -i 's/from-orange-50 to-yellow-50\"/from-orange-50 to-yellow-50 dark:from-orange-950\\\\/30 dark:to-yellow-950\\\\/30\"/g' app/send-gmail/page.tsx app/send-email-ses/page.tsx)",
+      "Bash(sed -i 's/from-green-50 to-emerald-50\"/from-green-50 to-emerald-50 dark:from-green-950\\\\/30 dark:to-emerald-950\\\\/30\"/g' app/send-email-ses/page.tsx app/templates/page.tsx)",
+      "Bash(sed -i 's/from-blue-600 to-indigo-600/from-blue-600 to-indigo-600 dark:from-blue-500 dark:to-indigo-500/g' app/send-email-ses/page.tsx app/templates/page.tsx)",
+      "Bash(sed -i 's/bg-green-100 text-green-800/bg-green-100 text-green-800 dark:bg-green-900\\\\/30 dark:text-green-400/g' app/campaigns/page.tsx components/dashboard/CampaignSnapshot.tsx components/campaigns/CampaignCheckpointsCard.tsx components/dashboard/LeadListOverview.tsx components/dashboard/RecentActivityFeed.tsx components/dashboard/SendingProfileHealth.tsx components/email/ClickTrackerToggle.tsx components/email/EmailValidationModal.tsx components/import/ColumnMappingModal.tsx app/send-gmail/page.tsx)",
+      "Bash(sed -i 's/bg-yellow-100 text-yellow-800/bg-yellow-100 text-yellow-800 dark:bg-yellow-900\\\\/30 dark:text-yellow-400/g' app/campaigns/page.tsx components/campaigns/CampaignCheckpointsCard.tsx components/dashboard/CampaignSnapshot.tsx components/dashboard/LeadListOverview.tsx)",
+      "Bash(sed -i 's/bg-red-100 text-red-800/bg-red-100 text-red-800 dark:bg-red-900\\\\/30 dark:text-red-400/g' app/campaigns/page.tsx components/campaigns/CampaignCheckpointsCard.tsx components/dashboard/RecentActivityFeed.tsx)",
+      "Bash(sed -i 's/bg-blue-100 text-blue-800/bg-blue-100 text-blue-800 dark:bg-blue-900\\\\/30 dark:text-blue-400/g' app/campaigns/page.tsx components/dashboard/RecentActivityFeed.tsx)",
+      "Bash(sed -i 's/bg-green-50\"/bg-green-50 dark:bg-green-950\\\\/20\"/g' app/send-gmail/page.tsx app/settings/page.tsx components/dashboard/OnboardingChecklist.tsx components/email/EmailValidationModal.tsx components/import/ColumnMappingModal.tsx)",
+      "Bash(sed -i 's/bg-red-50\"/bg-red-50 dark:bg-red-950\\\\/20\"/g' app/settings/page.tsx app/send-gmail/page.tsx app/send-email-ses/page.tsx)",
+      "Bash(sed -i 's/bg-blue-50\"/bg-blue-50 dark:bg-blue-950\\\\/20\"/g' app/campaigns/page.tsx app/send-gmail/page.tsx app/send-email-ses/page.tsx app/settings/page.tsx)",
+      "Bash(sed -i 's/border-green-200\"/border-green-200 dark:border-green-800\"/g' app/send-gmail/page.tsx app/settings/page.tsx components/dashboard/OnboardingChecklist.tsx components/import/ColumnMappingModal.tsx)",
+      "Bash(sed -i 's/border-red-200\"/border-red-200 dark:border-red-800\"/g' app/settings/page.tsx app/send-gmail/page.tsx)",
+      "Bash(curl *)"
+    ]
+  }
+}

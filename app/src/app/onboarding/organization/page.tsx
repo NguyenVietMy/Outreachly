@@ -69,7 +69,7 @@ export default function OrganizationOnboarding() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+    <div className="min-h-screen flex items-center justify-center bg-secondary p-6">
       <div className="w-full max-w-2xl">
         <Card>
           <CardHeader>
@@ -104,7 +104,7 @@ export default function OrganizationOnboarding() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                   />
-                  <div className="flex items-center text-sm text-gray-500 gap-2">
+                  <div className="flex items-center text-sm text-muted-foreground gap-2">
                     <Info className="w-4 h-4" />
                     <span>2–30 characters. You can change details later.</span>
                   </div>
@@ -121,7 +121,7 @@ export default function OrganizationOnboarding() {
                 </Button>
               </TabsContent>
               <TabsContent value="join" className="mt-4">
-                <div className="text-gray-500">
+                <div className="text-muted-foreground">
                   Joining via invite will be available soon.
                 </div>
               </TabsContent>

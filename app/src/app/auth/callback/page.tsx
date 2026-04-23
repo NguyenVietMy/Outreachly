@@ -53,13 +53,13 @@ function AuthCallbackContent() {
   }, [user, status, router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-secondary">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           {status === "loading" && (
             <>
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-              <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-accent mx-auto"></div>
+              <h2 className="mt-6 text-3xl font-extrabold text-foreground">
                 Authenticating...
               </h2>
             </>
@@ -82,10 +82,10 @@ function AuthCallbackContent() {
                   />
                 </svg>
               </div>
-              <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
+              <h2 className="mt-6 text-3xl font-extrabold text-foreground">
                 Success!
               </h2>
-              <p className="mt-2 text-sm text-gray-600">{message}</p>
+              <p className="mt-2 text-sm text-muted-foreground">{message}</p>
             </>
           )}
 
@@ -106,14 +106,14 @@ function AuthCallbackContent() {
                   />
                 </svg>
               </div>
-              <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
+              <h2 className="mt-6 text-3xl font-extrabold text-foreground">
                 Authentication Failed
               </h2>
-              <p className="mt-2 text-sm text-gray-600">{message}</p>
+              <p className="mt-2 text-sm text-muted-foreground">{message}</p>
               <div className="mt-6">
                 <button
                   onClick={() => router.push("/auth")}
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-full shadow-button text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
                 >
                   Try Again
                 </button>
@@ -130,8 +130,8 @@ export default function AuthCallback() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="min-h-screen flex items-center justify-center bg-secondary">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-accent"></div>
         </div>
       }
     >

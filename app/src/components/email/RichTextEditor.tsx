@@ -124,7 +124,7 @@ export function RichTextEditor({
                     dangerouslySetInnerHTML={{
                       __html:
                         renderPreview() ||
-                        "<p class='text-gray-400'>No content to preview</p>",
+                        "<p class='text-muted-foreground'>No content to preview</p>",
                     }}
                   />
                 </div>
@@ -172,7 +172,7 @@ export function RichTextEditor({
             maxLength={maxLength}
           />
 
-          <div className="flex justify-between text-xs text-gray-500">
+          <div className="flex justify-between text-xs text-muted-foreground">
             <span>{error || ""}</span>
             <span>
               {value.length}/{maxLength}

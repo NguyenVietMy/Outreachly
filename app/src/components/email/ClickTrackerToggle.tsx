@@ -37,17 +37,17 @@ function ClickTrackerToggle({
       {/* Simplified badges to isolate the issue */}
       {hasUrls && (
         <div className="flex items-center space-x-2">
-          <div className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded">
+          <div className="text-sm bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 px-2 py-1 rounded font-mono uppercase tracking-wider">
             {isEnabled ? "Click Tracker ON" : "Click Tracker OFF"}
           </div>
-          <div className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+          <div className="text-xs bg-secondary text-muted-foreground px-2 py-1 rounded">
             {detectedUrls.length} links detected
           </div>
         </div>
       )}
 
       {!hasUrls && (
-        <div className="text-xs text-gray-500 px-2 py-1 rounded">
+        <div className="text-xs text-muted-foreground px-2 py-1 rounded">
           No links detected
         </div>
       )}

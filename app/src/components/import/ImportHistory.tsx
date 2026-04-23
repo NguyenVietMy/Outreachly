@@ -97,8 +97,9 @@ export function ImportHistory() {
         variant={
           variants[normalizedStatus as keyof typeof variants] || "secondary"
         }
+        className="font-mono uppercase tracking-wider"
       >
-        {normalizedStatus?.charAt(0).toUpperCase() + normalizedStatus?.slice(1)}
+        {normalizedStatus}
       </Badge>
     );
   };

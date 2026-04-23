@@ -73,15 +73,15 @@ export function EmailValidationModal({
           <div className="grid grid-cols-3 gap-4">
             <div className="text-center p-4 bg-blue-50 rounded-lg">
               <div className="text-2xl font-bold text-blue-600">{totalLeads}</div>
-              <div className="text-sm text-gray-600">Total Leads</div>
+              <div className="text-sm text-muted-foreground">Total Leads</div>
             </div>
             <div className="text-center p-4 bg-green-50 rounded-lg">
               <div className="text-2xl font-bold text-green-600">{validCount}</div>
-              <div className="text-sm text-gray-600">Valid</div>
+              <div className="text-sm text-muted-foreground">Valid</div>
             </div>
             <div className="text-center p-4 bg-red-50 rounded-lg">
               <div className="text-2xl font-bold text-red-600">{invalidCount}</div>
-              <div className="text-sm text-gray-600">Invalid</div>
+              <div className="text-sm text-muted-foreground">Invalid</div>
             </div>
           </div>
 
@@ -122,7 +122,7 @@ export function EmailValidationModal({
                         <TableCell>{lead.email}</TableCell>
                         <TableCell>{lead.companyName}</TableCell>
                         <TableCell>
-                          <Badge variant="default" className="bg-green-100 text-green-800">
+                          <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 font-mono uppercase tracking-wider">
                             <CheckCircle className="h-3 w-3 mr-1" />
                             Ready
                           </Badge>
@@ -167,7 +167,7 @@ export function EmailValidationModal({
                           </span>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="destructive">
+                          <Badge variant="destructive" className="font-mono uppercase tracking-wider">
                             <XCircle className="h-3 w-3 mr-1" />
                             Missing Data
                           </Badge>
@@ -182,8 +182,8 @@ export function EmailValidationModal({
 
           {/* No leads selected */}
           {totalLeads === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              <Users className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+            <div className="text-center py-8 text-muted-foreground">
+              <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
               <p className="text-lg font-medium">No leads selected</p>
               <p className="text-sm">Please select leads to send emails to.</p>
             </div>

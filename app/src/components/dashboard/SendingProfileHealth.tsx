@@ -84,7 +84,7 @@ export default function SendingProfileHealth({
       case "gmail":
         return <Mail className="h-4 w-4 text-red-600" />;
       default:
-        return <Globe className="h-4 w-4 text-gray-600" />;
+        return <Globe className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
@@ -92,9 +92,9 @@ export default function SendingProfileHealth({
     return (
       <Badge
         variant={isActive ? "default" : "secondary"}
-        className={
-          isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
-        }
+        className={`${
+          isActive ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : "bg-secondary text-foreground"
+        } font-mono uppercase tracking-wider`}
       >
         {isActive ? "Active" : "Inactive"}
       </Badge>
@@ -129,10 +129,10 @@ export default function SendingProfileHealth({
         </CardHeader>
         <CardContent>
           <div className="text-center py-8">
-            <div className="text-gray-400 mb-2">
+            <div className="text-muted-foreground mb-2">
               <Shield className="h-12 w-12 mx-auto animate-pulse" />
             </div>
-            <p className="text-sm text-gray-500">Loading domains...</p>
+            <p className="text-sm text-muted-foreground">Loading domains...</p>
           </div>
         </CardContent>
       </Card>
@@ -153,29 +153,29 @@ export default function SendingProfileHealth({
             domains.map((domain) => (
               <div
                 key={domain.id}
-                className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                className="border border-border rounded-lg p-4 hover:bg-secondary transition-colors"
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center space-x-3">
                     {getProviderIcon(domain.provider)}
                     <div>
-                      <h3 className="font-medium text-gray-900">
+                      <h3 className="font-medium text-foreground">
                         {domain.domain}
                       </h3>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-muted-foreground">
                         {domain.fromName} &lt;{domain.fromEmail}&gt;
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
                     {getStatusBadge(domain.isActive)}
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-xs font-mono uppercase tracking-wider">
                       {domain.provider}
                     </Badge>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-xs text-gray-500">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>
                     Last updated: {formatLastUpdated(domain.lastUpdated)}
                   </span>
@@ -194,13 +194,13 @@ export default function SendingProfileHealth({
             ))
           ) : (
             <div className="text-center py-8">
-              <div className="text-gray-400 mb-2">
+              <div className="text-muted-foreground mb-2">
                 <Globe className="h-12 w-12 mx-auto" />
               </div>
-              <h3 className="font-medium text-gray-900 mb-1">
+              <h3 className="font-medium text-foreground mb-1">
                 No sending domains configured
               </h3>
-              <p className="text-sm text-gray-500 mb-4">
+              <p className="text-sm text-muted-foreground mb-4">
                 Set up your domain to start sending emails with better
                 deliverability
               </p>

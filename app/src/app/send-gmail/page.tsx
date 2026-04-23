@@ -677,8 +677,8 @@ export default function SendGmailPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FDFDF7]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-accent"></div>
       </div>
     );
   }
@@ -690,17 +690,17 @@ export default function SendGmailPage() {
   return (
     <AuthGuard>
       <DashboardLayout>
-        <div className="min-h-screen bg-[#FDFDF7]">
+        <div className="min-h-screen bg-background">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {/* Header */}
             <div className="mb-6 md:mb-8">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div>
-                  <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2">
+                  <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
                     <Mail className="h-8 w-8 text-red-500" />
                     Send Email via Gmail
                   </h1>
-                  <p className="mt-2 text-base md:text-lg text-gray-600">
+                  <p className="mt-2 text-base md:text-lg text-muted-foreground">
                     Send emails using your own Gmail account with OAuth2
                     authentication
                   </p>
@@ -711,7 +711,7 @@ export default function SendGmailPage() {
 
             {/* Gmail Status Success */}
             {gmailStatus && gmailStatus.hasGmailAccess && (
-              <Alert className="mb-6 border-green-200 bg-green-50">
+              <Alert className="mb-6 border-green-200 bg-green-50 dark:bg-green-950/20">
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 <AlertDescription className="text-green-800">
                   <div className="font-medium mb-2">Gmail API Connected</div>
@@ -794,7 +794,7 @@ export default function SendGmailPage() {
                         </div>
 
                         {showLeadSelection && (
-                          <div className="border rounded-lg p-4 bg-gray-50 max-h-60 overflow-y-auto">
+                          <div className="border rounded-lg p-4 bg-secondary max-h-60 overflow-y-auto">
                             {leadsLoading ? (
                               <div className="flex items-center justify-center py-4">
                                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -812,7 +812,7 @@ export default function SendGmailPage() {
                                       className={`flex items-center justify-between p-2 rounded border ${
                                         isSelected
                                           ? "bg-blue-50 border-blue-200"
-                                          : "bg-white border-gray-200"
+                                          : "bg-card border-border"
                                       }`}
                                     >
                                       <div className="flex-1 min-w-0">
@@ -829,11 +829,11 @@ export default function SendGmailPage() {
                                             </Badge>
                                           )}
                                         </div>
-                                        <div className="text-xs text-gray-500 truncate">
+                                        <div className="text-xs text-muted-foreground truncate">
                                           {lead.email}
                                         </div>
                                         {lead.domain && (
-                                          <div className="text-xs text-gray-400 truncate">
+                                          <div className="text-xs text-muted-foreground truncate">
                                             {lead.domain}
                                           </div>
                                         )}
@@ -858,8 +858,8 @@ export default function SendGmailPage() {
                                 })}
                               </div>
                             ) : (
-                              <div className="text-center py-4 text-gray-500">
-                                <Users className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                              <div className="text-center py-4 text-muted-foreground">
+                                <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                                 <p>No leads available</p>
                                 <p className="text-sm">
                                   Import leads from the Leads page first
@@ -871,7 +871,7 @@ export default function SendGmailPage() {
 
                         {selectedLeads.length > 0 && (
                           <div className="mt-2">
-                            <div className="text-sm text-gray-600 mb-2">
+                            <div className="text-sm text-muted-foreground mb-2">
                               Selected leads ({selectedLeads.length}):
                             </div>
                             <div className="flex flex-wrap gap-1">
@@ -934,7 +934,7 @@ export default function SendGmailPage() {
                           className={`h-11 ${errors.subject ? "border-red-500" : ""}`}
                           maxLength={200}
                         />
-                        <div className="flex justify-between text-xs text-gray-500">
+                        <div className="flex justify-between text-xs text-muted-foreground">
                           <span>{errors.subject || ""}</span>
                           <span>{formData.subject?.length || 0}/200</span>
                         </div>
@@ -1007,8 +1007,8 @@ export default function SendGmailPage() {
                       })()}
 
                       {/* Advanced Options */}
-                      <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
-                        <h4 className="font-medium text-sm text-gray-700">
+                      <div className="space-y-4 p-4 bg-secondary rounded-lg">
+                        <h4 className="font-medium text-sm text-muted-foreground">
                           Advanced Options (Coming soon)
                         </h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1060,7 +1060,7 @@ export default function SendGmailPage() {
                       <Button
                         type="submit"
                         disabled={isSending || !gmailStatus?.hasGmailAccess}
-                        className="w-full h-12 text-lg font-medium bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700"
+                        className="w-full h-12 text-lg font-medium bg-gradient-to-r from-red-600 to-orange-600 dark:from-red-500 dark:to-orange-500 hover:from-red-700 hover:to-orange-700"
                       >
                         {isSending ? (
                           <>
@@ -1118,7 +1118,7 @@ export default function SendGmailPage() {
               <div className="space-y-4 md:space-y-6">
                 {/* Gmail Status */}
                 <Card className="shadow-lg border-0">
-                  <CardHeader className="pb-3 bg-gradient-to-r from-red-50 to-orange-50">
+                  <CardHeader className="pb-3 bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-950/30">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
                       <Mail className="h-4 w-4 text-red-600" />
                       Gmail API Status
@@ -1134,7 +1134,7 @@ export default function SendGmailPage() {
                               ? "default"
                               : "destructive"
                           }
-                          className="text-sm"
+                          className="text-sm font-mono uppercase tracking-wider"
                         >
                           {gmailStatus?.hasGmailAccess
                             ? "Connected"
@@ -1143,11 +1143,11 @@ export default function SendGmailPage() {
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-medium">Provider:</span>
-                        <span className="text-sm text-gray-600">Gmail API</span>
+                        <span className="text-sm text-muted-foreground">Gmail API</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-medium">Account:</span>
-                        <span className="text-sm text-gray-600 truncate">
+                        <span className="text-sm text-muted-foreground truncate">
                           {gmailStatus?.user || "Unknown"}
                         </span>
                       </div>
@@ -1181,7 +1181,7 @@ export default function SendGmailPage() {
                 {/* Last Response */}
                 {lastResponse && (
                   <Card className="shadow-lg border-0">
-                    <CardHeader className="pb-3 bg-gradient-to-r from-blue-50 to-indigo-50">
+                    <CardHeader className="pb-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
                       <CardTitle className="text-sm font-medium flex items-center gap-2">
                         {lastResponse.success ? (
                           <CheckCircle className="h-4 w-4 text-green-600" />
@@ -1199,6 +1199,7 @@ export default function SendGmailPage() {
                             variant={
                               lastResponse.success ? "default" : "destructive"
                             }
+                            className="font-mono uppercase tracking-wider"
                           >
                             {lastResponse.success ? "Success" : "Failed"}
                           </Badge>
@@ -1286,14 +1287,14 @@ export default function SendGmailPage() {
 
                 {/* Gmail Tips */}
                 <Card className="shadow-lg border-0">
-                  <CardHeader className="pb-3 bg-gradient-to-r from-orange-50 to-yellow-50">
+                  <CardHeader className="pb-3 bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-950/30 dark:to-yellow-950/30">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
                       <Mail className="h-4 w-4 text-orange-600" />
                       Gmail API Tips
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="pt-4">
-                    <ul className="space-y-2 text-xs text-gray-600">
+                    <ul className="space-y-2 text-xs text-muted-foreground">
                       <li className="flex items-start gap-2">
                         <CheckCircle className="h-3 w-3 text-green-500 mt-0.5 flex-shrink-0" />
                         Uses your own Gmail account
@@ -1324,7 +1325,7 @@ export default function SendGmailPage() {
 
         {/* Bulk Email Results */}
         {lastBulkResponse && (
-          <div className="mt-6 p-6 bg-white rounded-lg shadow-sm border">
+          <div className="mt-6 p-6 bg-card rounded-lg shadow-sm border">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <MailCheck className="h-5 w-5 text-blue-600" />
               Bulk Email Results
@@ -1335,32 +1336,32 @@ export default function SendGmailPage() {
                 <div className="text-2xl font-bold text-blue-600">
                   {lastBulkResponse.totalRecipients || 0}
                 </div>
-                <div className="text-sm text-gray-600">Total Recipients</div>
+                <div className="text-sm text-muted-foreground">Total Recipients</div>
               </div>
               <div className="text-center p-3 bg-green-50 rounded-lg">
                 <div className="text-2xl font-bold text-green-600">
                   {lastBulkResponse.successfulSends || 0}
                 </div>
-                <div className="text-sm text-gray-600">Successful</div>
+                <div className="text-sm text-muted-foreground">Successful</div>
               </div>
               <div className="text-center p-3 bg-red-50 rounded-lg">
                 <div className="text-2xl font-bold text-red-600">
                   {lastBulkResponse.failedSends || 0}
                 </div>
-                <div className="text-sm text-gray-600">Failed</div>
+                <div className="text-sm text-muted-foreground">Failed</div>
               </div>
             </div>
 
             {lastBulkResponse.results &&
               lastBulkResponse.results.length > 0 && (
                 <div className="space-y-2 max-h-60 overflow-y-auto">
-                  <h4 className="font-medium text-gray-700">
+                  <h4 className="font-medium text-muted-foreground">
                     Individual Results:
                   </h4>
                   {lastBulkResponse.results.map((result, index) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between p-2 bg-gray-50 rounded"
+                      className="flex items-center justify-between p-2 bg-secondary rounded"
                     >
                       <span className="text-sm font-medium">
                         {result.email}
@@ -1369,13 +1370,13 @@ export default function SendGmailPage() {
                         {result.success ? (
                           <Badge
                             variant="default"
-                            className="bg-green-100 text-green-800"
+                            className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 font-mono uppercase tracking-wider"
                           >
                             <CheckCircle className="h-3 w-3 mr-1" />
                             Success
                           </Badge>
                         ) : (
-                          <Badge variant="destructive">
+                          <Badge variant="destructive" className="font-mono uppercase tracking-wider">
                             <XCircle className="h-3 w-3 mr-1" />
                             Failed
                           </Badge>
@@ -1425,8 +1426,8 @@ export default function SendGmailPage() {
                   password, and you can revoke access anytime in your Google
                   Account settings.
                 </DialogDescription>
-                <div className="bg-gray-100 border border-gray-300 rounded-lg p-3 mt-3">
-                  <p className="text-sm text-gray-700 italic">
+                <div className="bg-secondary border border-border rounded-lg p-3 mt-3">
+                  <p className="text-sm text-muted-foreground italic">
                     <strong>Note:</strong> Due to Google's strict verification
                     requirements, I'm actively working on app verification. Any
                     "unverified app" warnings can be safely ignored by following
@@ -1483,8 +1484,8 @@ export default function SendGmailPage() {
                   password, and you can revoke access anytime in your Google
                   Account settings.
                 </DialogDescription>
-                <div className="bg-gray-100 border border-gray-300 rounded-lg p-3 mt-3">
-                  <p className="text-sm text-gray-700 italic">
+                <div className="bg-secondary border border-border rounded-lg p-3 mt-3">
+                  <p className="text-sm text-muted-foreground italic">
                     <strong>Note:</strong> Due to Google's strict verification
                     requirements, I am actively working on app verification. Any
                     "unverified app" warnings can be safely ignored by following

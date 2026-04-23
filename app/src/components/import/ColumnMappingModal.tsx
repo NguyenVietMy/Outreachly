@@ -176,7 +176,7 @@ export function ColumnMappingModal({
       case "company":
         return "bg-purple-100 text-purple-800 border-purple-200";
       case "location":
-        return "bg-green-100 text-green-800 border-green-200";
+        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800";
       case "social":
         return "bg-pink-100 text-pink-800 border-pink-200";
       case "technical":
@@ -188,9 +188,9 @@ export function ColumnMappingModal({
       case "custom":
         return "bg-emerald-100 text-emerald-800 border-emerald-200";
       case "skip":
-        return "bg-gray-100 text-gray-800 border-gray-200";
+        return "bg-secondary text-foreground border-border";
       default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
+        return "bg-secondary text-foreground border-border";
     }
   };
 
@@ -325,7 +325,7 @@ export function ColumnMappingModal({
                       >
                         <SelectTrigger
                           className={
-                            isMapped ? "border-green-500 bg-green-50" : ""
+                            isMapped ? "border-green-500 bg-green-50 dark:bg-green-950/20" : ""
                           }
                         >
                           <SelectValue placeholder="Select field..." />
@@ -384,14 +384,14 @@ export function ColumnMappingModal({
                                     <div className="flex items-center gap-2">
                                       <span
                                         className={
-                                          isDisabled ? "text-gray-400" : ""
+                                          isDisabled ? "text-muted-foreground" : ""
                                         }
                                       >
                                         {field.label}
                                       </span>
                                       <Badge
                                         variant="outline"
-                                        className={`text-xs ${getCategoryColor(field.category)}`}
+                                        className={`text-xs font-mono uppercase tracking-wider ${getCategoryColor(field.category)}`}
                                       >
                                         {field.category}
                                       </Badge>

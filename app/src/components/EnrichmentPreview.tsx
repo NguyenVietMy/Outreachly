@@ -209,7 +209,7 @@ export default function EnrichmentPreview({
                                     ? "default"
                                     : "secondary"
                               }
-                              className="ml-2"
+                              className="ml-2 font-mono uppercase tracking-wider"
                             >
                               {value}
                               {previewData.suggestedChanges.emailRisk ===

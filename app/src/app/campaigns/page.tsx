@@ -59,12 +59,12 @@ interface GmailStatus {
 
 function StatusBadge({ status }: { status: CampaignStatus }) {
   const style = {
-    active: "bg-green-100 text-green-800",
-    paused: "bg-yellow-100 text-yellow-800",
-    completed: "bg-blue-100 text-blue-800",
-    inactive: "bg-gray-100 text-gray-800",
+    active: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+    paused: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+    completed: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+    inactive: "bg-secondary text-foreground",
   }[status];
-  return <Badge className={style}>{status}</Badge>;
+  return <Badge className={`${style} font-mono uppercase tracking-wider`}>{status}</Badge>;
 }
 
 export default function CampaignsPage() {
@@ -237,7 +237,7 @@ export default function CampaignsPage() {
     <AuthGuard>
       <DashboardLayout>
         <div className="p-6 max-w-7xl mx-auto">
-          <div className="mb-6 mt-[100px] flex items-center justify-between">
+          <div className="mb-6 mt-8 flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-semibold">Campaigns</h1>
               <p className="text-sm text-muted-foreground">
@@ -386,7 +386,7 @@ export default function CampaignsPage() {
           {/* Gmail Status Notification */}
           {gmailStatus && !gmailStatus.hasGmailAccess && (
             <Card className="mb-6 shadow-lg border-0 mt-6">
-              <CardHeader className="pb-3 bg-gradient-to-r from-red-50 to-orange-50">
+              <CardHeader className="pb-3 bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-950/30">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <Mail className="h-4 w-4 text-red-600" />
                   Gmail API Status
@@ -396,17 +396,17 @@ export default function CampaignsPage() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium">Status:</span>
-                    <Badge variant="destructive" className="text-sm">
+                    <Badge variant="destructive" className="text-sm font-mono uppercase tracking-wider">
                       Not Connected
                     </Badge>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium">Provider:</span>
-                    <span className="text-sm text-gray-600">Gmail API</span>
+                    <span className="text-sm text-muted-foreground">Gmail API</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium">Account:</span>
-                    <span className="text-sm text-gray-600 truncate">
+                    <span className="text-sm text-muted-foreground truncate">
                       {gmailStatus?.user || "Unknown"}
                     </span>
                   </div>
@@ -425,7 +425,7 @@ export default function CampaignsPage() {
                         </p>
                         <Button
                           onClick={() => setShowGmailModal(true)}
-                          className="bg-black text-white hover:bg-gray-800"
+                          className="bg-primary text-primary-foreground hover:bg-primary/90"
                         >
                           Connect Gmail
                         </Button>
@@ -614,8 +614,8 @@ export default function CampaignsPage() {
                     your password, and you can revoke access anytime in your
                     Google Account settings.
                   </DialogDescription>
-                  <div className="bg-gray-100 border border-gray-300 rounded-lg p-3 mt-3">
-                    <p className="text-sm text-gray-700 italic">
+                  <div className="bg-secondary border border-border rounded-lg p-3 mt-3">
+                    <p className="text-sm text-muted-foreground italic">
                       <strong>Note:</strong> Due to Google's strict verification
                       requirements, I am actively working on app verification.
                       Any "unverified app" warnings can be safely ignored by

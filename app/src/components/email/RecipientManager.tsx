@@ -429,7 +429,7 @@ export function RecipientManager({
 
           <div className="flex items-center gap-2">
             <div className="relative">
-              <Search className="h-4 w-4 absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <Search className="h-4 w-4 absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search recipients..."
                 value={searchTerm}
@@ -462,7 +462,7 @@ export function RecipientManager({
               {filteredRecipients.map((recipient, index) => (
                 <div
                   key={index}
-                  className="flex items-center justify-between p-2 rounded-lg border hover:bg-gray-50"
+                  className="flex items-center justify-between p-2 rounded-lg border hover:bg-secondary"
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
@@ -471,14 +471,14 @@ export function RecipientManager({
                       ) : (
                         <AlertCircle className="h-4 w-4 text-red-500" />
                       )}
-                      <Mail className="h-4 w-4 text-gray-400" />
+                      <Mail className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div>
                       <div className="font-medium text-sm">
                         {recipient.email}
                       </div>
                       {recipient.name && (
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-muted-foreground">
                           {recipient.name}
                         </div>
                       )}
@@ -516,9 +516,9 @@ export function RecipientManager({
       ) : recipientList.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center">
-            <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500 mb-2">No recipients added yet</p>
-            <p className="text-sm text-gray-400">
+            <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground mb-2">No recipients added yet</p>
+            <p className="text-sm text-muted-foreground">
               Add email addresses above or import from a file
             </p>
           </CardContent>
@@ -526,8 +526,8 @@ export function RecipientManager({
       ) : (
         <Card>
           <CardContent className="p-8 text-center">
-            <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500">No recipients match your search</p>
+            <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">No recipients match your search</p>
           </CardContent>
         </Card>
       )}
@@ -558,7 +558,7 @@ export function RecipientManager({
                 id="modal-email"
                 value={pendingEmail}
                 disabled
-                className="bg-gray-50"
+                className="bg-secondary"
               />
             </div>
 

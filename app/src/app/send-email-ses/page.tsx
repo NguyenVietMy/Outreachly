@@ -1352,8 +1352,8 @@ export default function SendEmailPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FDFDF7]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-accent"></div>
       </div>
     );
   }
@@ -1365,17 +1365,17 @@ export default function SendEmailPage() {
   return (
     <AuthGuard>
       <DashboardLayout>
-        <div className="min-h-screen bg-[#FDFDF7]">
+        <div className="min-h-screen bg-background">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {/* Header */}
             <div className="mb-6 md:mb-8">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div>
-                  <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2">
+                  <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
                     <Mail className="h-8 w-8 text-orange-500" />
                     Send Email using your own Domain!
                   </h1>
-                  <p className="mt-2 text-base md:text-lg text-gray-600">
+                  <p className="mt-2 text-base md:text-lg text-muted-foreground">
                     Send emails using Resend services with high deliverability
                   </p>
                 </div>
@@ -1447,7 +1447,7 @@ export default function SendEmailPage() {
                           </div>
 
                           {showLeadSelection && (
-                            <div className="border rounded-lg p-4 bg-gray-50 max-h-60 overflow-y-auto">
+                            <div className="border rounded-lg p-4 bg-secondary max-h-60 overflow-y-auto">
                               {leadsLoading ? (
                                 <div className="flex items-center justify-center py-4">
                                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -1465,7 +1465,7 @@ export default function SendEmailPage() {
                                         className={`flex items-center justify-between p-2 rounded border ${
                                           isSelected
                                             ? "bg-blue-50 border-blue-200"
-                                            : "bg-white border-gray-200"
+                                            : "bg-card border-border"
                                         }`}
                                       >
                                         <div className="flex-1 min-w-0">
@@ -1482,11 +1482,11 @@ export default function SendEmailPage() {
                                               </Badge>
                                             )}
                                           </div>
-                                          <div className="text-xs text-gray-500 truncate">
+                                          <div className="text-xs text-muted-foreground truncate">
                                             {lead.email}
                                           </div>
                                           {lead.domain && (
-                                            <div className="text-xs text-gray-400 truncate">
+                                            <div className="text-xs text-muted-foreground truncate">
                                               {lead.domain}
                                             </div>
                                           )}
@@ -1513,8 +1513,8 @@ export default function SendEmailPage() {
                                   })}
                                 </div>
                               ) : (
-                                <div className="text-center py-4 text-gray-500">
-                                  <Users className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                                <div className="text-center py-4 text-muted-foreground">
+                                  <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                                   <p>No leads available</p>
                                   <p className="text-sm">
                                     Import leads from the Leads page first
@@ -1526,7 +1526,7 @@ export default function SendEmailPage() {
 
                           {selectedLeads.length > 0 && (
                             <div className="mt-2">
-                              <div className="text-sm text-gray-600 mb-2">
+                              <div className="text-sm text-muted-foreground mb-2">
                                 Selected leads ({selectedLeads.length}):
                               </div>
                               <div className="flex flex-wrap gap-1">
@@ -1589,7 +1589,7 @@ export default function SendEmailPage() {
                             className={`h-11 ${errors.subject ? "border-red-500" : ""}`}
                             maxLength={200}
                           />
-                          <div className="flex justify-between text-xs text-gray-500">
+                          <div className="flex justify-between text-xs text-muted-foreground">
                             <span>{errors.subject || ""}</span>
                             <span>{formData.subject?.length || 0}/200</span>
                           </div>
@@ -1616,7 +1616,7 @@ export default function SendEmailPage() {
                         <Button
                           type="submit"
                           disabled={isSending || rateLimitInfo.remaining === 0}
-                          className="w-full h-12 text-lg font-medium bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                          className="w-full h-12 text-lg font-medium bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-500 dark:to-indigo-500 hover:from-blue-700 hover:to-indigo-700"
                         >
                           {isSending ? (
                             <>
@@ -1654,8 +1654,8 @@ export default function SendEmailPage() {
                     <CardHeader
                       className={`pb-3 ${
                         rateLimitInfo.remaining > 10
-                          ? "bg-gradient-to-r from-green-50 to-emerald-50"
-                          : "bg-gradient-to-r from-orange-50 to-red-50"
+                          ? "bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30"
+                          : "bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30"
                       }`}
                     >
                       <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -1690,13 +1690,13 @@ export default function SendEmailPage() {
                           className="h-2 [&>div]:bg-green-500"
                         />
                         <div
-                          className={`text-xs ${rateLimitInfo.remaining > 10 ? "text-gray-500" : "text-orange-600 font-medium"}`}
+                          className={`text-xs ${rateLimitInfo.remaining > 10 ? "text-muted-foreground" : "text-orange-600 font-medium"}`}
                         >
                           {rateLimitInfo.remaining > 10 ? "Good" : "Low"}{" "}
                           remaining
                         </div>
                         {rateLimitInfo.resetTimeSeconds > 0 && (
-                          <div className="text-xs text-gray-400">
+                          <div className="text-xs text-muted-foreground">
                             Resets in{" "}
                             {Math.floor(rateLimitInfo.resetTimeSeconds / 3600)}h{" "}
                             {Math.floor(
@@ -1712,7 +1712,7 @@ export default function SendEmailPage() {
                   {/* Last Response */}
                   {lastResponse && (
                     <Card className="shadow-lg border-0">
-                      <CardHeader className="pb-3 bg-gradient-to-r from-blue-50 to-indigo-50">
+                      <CardHeader className="pb-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
                         <CardTitle className="text-sm font-medium flex items-center gap-2">
                           {lastResponse.success ? (
                             <CheckCircle className="h-4 w-4 text-green-600" />
@@ -1730,6 +1730,7 @@ export default function SendEmailPage() {
                               variant={
                                 lastResponse.success ? "default" : "destructive"
                               }
+                              className="font-mono uppercase tracking-wider"
                             >
                               {lastResponse.success ? "Success" : "Failed"}
                             </Badge>
@@ -1754,7 +1755,7 @@ export default function SendEmailPage() {
                           </div>
                           {lastResponse.messageId && (
                             <div className="pt-3 border-t">
-                              <p className="text-xs text-gray-500 break-all">
+                              <p className="text-xs text-muted-foreground break-all">
                                 ID: {lastResponse.messageId}
                               </p>
                             </div>

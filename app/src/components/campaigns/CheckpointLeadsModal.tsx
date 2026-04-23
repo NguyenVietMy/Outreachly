@@ -277,7 +277,7 @@ export default function CheckpointLeadsModal({
           {/* Search and Filters */}
           <div className="flex items-center gap-4 mb-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 placeholder="Search leads by name, email, position, or domain..."
                 value={searchTerm}
@@ -297,7 +297,7 @@ export default function CheckpointLeadsModal({
 
           {/* Filters Panel */}
           {showFilters && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-4 bg-secondary rounded-lg">
               <div>
                 <label className="text-sm font-medium mb-2 block">
                   Verified Status
@@ -470,7 +470,7 @@ export default function CheckpointLeadsModal({
                   <TableRow>
                     <TableCell
                       colSpan={8}
-                      className="text-center py-8 text-gray-500"
+                      className="text-center py-8 text-muted-foreground"
                     >
                       No leads found matching your criteria.
                     </TableCell>
@@ -485,7 +485,7 @@ export default function CheckpointLeadsModal({
                     return (
                       <TableRow
                         key={lead.id}
-                        className={isAssigned ? "bg-gray-50" : ""}
+                        className={isAssigned ? "bg-secondary" : ""}
                       >
                         <TableCell>
                           <Checkbox
@@ -531,6 +531,7 @@ export default function CheckpointLeadsModal({
                                     ? "destructive"
                                     : "outline"
                             }
+                            className="font-mono uppercase tracking-wider"
                           >
                             {lead.verifiedStatus}
                           </Badge>
@@ -538,11 +539,11 @@ export default function CheckpointLeadsModal({
                         <TableCell>{lead.source || "-"}</TableCell>
                         <TableCell>
                           {isAssigned ? (
-                            <Badge variant="outline" className="text-green-600">
+                            <Badge variant="outline" className="text-green-600 font-mono uppercase tracking-wider">
                               Already Assigned
                             </Badge>
                           ) : !isSelectable ? (
-                            <Badge variant="outline" className="text-red-600">
+                            <Badge variant="outline" className="text-red-600 font-mono uppercase tracking-wider">
                               Missing Required Fields
                             </Badge>
                           ) : null}

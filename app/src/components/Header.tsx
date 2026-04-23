@@ -8,15 +8,15 @@ export default function Header() {
 
   if (loading) {
     return (
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-background/80 backdrop-blur-md border-b border-border sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <Link href="/" className="text-xl font-bold text-gray-900">
+              <Link href="/" className="text-lg font-semibold text-foreground tracking-tight">
                 Outreachly
               </Link>
             </div>
-            <div className="animate-pulse bg-gray-200 h-8 w-24 rounded"></div>
+            <div className="animate-pulse bg-muted h-8 w-24 rounded-full"></div>
           </div>
         </div>
       </header>
@@ -24,11 +24,11 @@ export default function Header() {
   }
 
   return (
-    <header className="bg-white shadow-sm border-b">
+    <header className="bg-background/80 backdrop-blur-md border-b border-border sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
-            <Link href="/" className="text-xl font-bold text-gray-900">
+            <Link href="/" className="text-lg font-semibold text-foreground tracking-tight">
               Outreachly
             </Link>
           </div>
@@ -44,25 +44,33 @@ export default function Header() {
                       className="h-8 w-8 rounded-full"
                     />
                   )}
-                  <span className="text-sm font-medium text-gray-700">
+                  <span className="text-sm font-medium text-foreground">
                     {user.firstName} {user.lastName}
                   </span>
                 </div>
                 <button
                   onClick={logout}
                   disabled={loading}
-                  className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="text-sm text-muted-foreground hover:text-foreground px-4 py-2 rounded-full hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? "Signing out..." : "Logout"}
                 </button>
               </>
             ) : (
-              <Link
-                href="/auth"
-                className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md hover:bg-gray-100"
-              >
-                Sign In
-              </Link>
+              <div className="flex items-center space-x-3">
+                <Link
+                  href="/auth"
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground px-4 py-2 rounded-full hover:bg-secondary"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/auth"
+                  className="text-sm font-medium bg-primary text-primary-foreground rounded-full px-5 py-2 shadow-button hover:bg-primary/90"
+                >
+                  Get Started
+                </Link>
+              </div>
             )}
           </div>
         </div>

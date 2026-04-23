@@ -94,7 +94,7 @@ export default function LeadListOverview({
       case "error":
         return <AlertCircle className="h-4 w-4 text-red-600" />;
       default:
-        return <Clock className="h-4 w-4 text-gray-600" />;
+        return <Clock className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
@@ -102,11 +102,11 @@ export default function LeadListOverview({
     const variants = {
       active: {
         variant: "default" as const,
-        className: "bg-green-100 text-green-800",
+        className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
       },
       processing: {
         variant: "secondary" as const,
-        className: "bg-yellow-100 text-yellow-800",
+        className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
       },
       error: {
         variant: "destructive" as const,
@@ -117,8 +117,8 @@ export default function LeadListOverview({
     const config = variants[status as keyof typeof variants] || variants.active;
 
     return (
-      <Badge variant={config.variant} className={config.className}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+      <Badge variant={config.variant} className={`${config.className} font-mono uppercase tracking-wider`}>
+        {status}
       </Badge>
     );
   };
@@ -161,22 +161,22 @@ export default function LeadListOverview({
         </div>
         <div className="grid grid-cols-3 gap-4 text-sm">
           <div>
-            <span className="font-medium text-gray-900">
+            <span className="font-medium text-foreground">
               {totalLeads.toLocaleString()}
             </span>
-            <span className="text-gray-500"> total leads</span>
+            <span className="text-muted-foreground"> total leads</span>
           </div>
           <div>
             <span className="font-medium text-green-600">
               {totalVerified.toLocaleString()}
             </span>
-            <span className="text-gray-500"> verified</span>
+            <span className="text-muted-foreground"> verified</span>
           </div>
           <div>
             <span className="font-medium text-blue-600">
               {totalEnriched.toLocaleString()}
             </span>
-            <span className="text-gray-500"> enriched</span>
+            <span className="text-muted-foreground"> enriched</span>
           </div>
         </div>
       </CardHeader>
@@ -195,7 +195,7 @@ export default function LeadListOverview({
             return (
               <div
                 key={list.id}
-                className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-secondary transition-colors cursor-pointer"
                 onClick={() => onViewList?.(list.id)}
               >
                 <div className="flex items-center space-x-3 flex-1 min-w-0">
@@ -205,38 +205,38 @@ export default function LeadListOverview({
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center space-x-2 mb-1">
-                      <h3 className="font-medium text-gray-900 truncate">
+                      <h3 className="font-medium text-foreground truncate">
                         {list.name}
                       </h3>
                       {getStatusBadge(list.status)}
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4 text-sm text-gray-600">
+                    <div className="grid grid-cols-3 gap-4 text-sm text-muted-foreground">
                       <div>
                         <span className="font-medium">
                           {list.totalLeads.toLocaleString()}
                         </span>
-                        <span className="text-gray-500"> leads</span>
+                        <span className="text-muted-foreground"> leads</span>
                       </div>
                       <div className="flex items-center space-x-1">
                         <span className="font-medium text-green-600">
                           {verificationRate}%
                         </span>
-                        <span className="text-gray-500">verified</span>
+                        <span className="text-muted-foreground">verified</span>
                       </div>
                       <div className="flex items-center space-x-1">
                         <span className="font-medium text-blue-600">
                           {enrichmentRate}%
                         </span>
-                        <span className="text-gray-500">enriched</span>
+                        <span className="text-muted-foreground">enriched</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 <div className="flex-shrink-0 text-right">
-                  <p className="text-xs text-gray-500 mb-1">Last updated</p>
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-xs text-muted-foreground mb-1">Last updated</p>
+                  <p className="text-sm font-medium text-foreground">
                     {list.lastUpdated}
                   </p>
                 </div>
@@ -247,13 +247,13 @@ export default function LeadListOverview({
 
         {leadLists.length === 0 && (
           <div className="text-center py-8">
-            <div className="text-gray-400 mb-2">
+            <div className="text-muted-foreground mb-2">
               <Users className="h-12 w-12 mx-auto" />
             </div>
-            <h3 className="font-medium text-gray-900 mb-1">
+            <h3 className="font-medium text-foreground mb-1">
               No lead lists yet
             </h3>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               Import your first CSV to start building your outreach database
             </p>
             <Button
@@ -267,7 +267,7 @@ export default function LeadListOverview({
         )}
 
         {/* Quick Actions */}
-        <div className="mt-6 pt-4 border-t border-gray-200">
+        <div className="mt-6 pt-4 border-t border-border">
           <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"

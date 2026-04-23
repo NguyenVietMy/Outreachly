@@ -76,18 +76,18 @@ export default function TimeDisplay() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-blue-600" />
-            <span className="text-sm font-medium text-gray-700">
+            <span className="text-sm font-medium text-muted-foreground">
               Current Time
             </span>
           </div>
           <div className="text-right">
-            <div className="text-lg font-mono font-bold text-gray-900">
+            <div className="text-lg font-mono font-bold text-foreground">
               {currentTime}
             </div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-muted-foreground">
               {user?.timezone || "UTC±0"}
             </div>
-            <div className="text-xs text-gray-400">UTC: {utcTime}</div>
+            <div className="text-xs text-muted-foreground">UTC: {utcTime}</div>
           </div>
         </div>
       </CardContent>

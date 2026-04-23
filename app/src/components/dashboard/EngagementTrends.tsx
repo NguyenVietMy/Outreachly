@@ -130,7 +130,7 @@ export default function EngagementTrends({ data }: EngagementTrendsProps) {
               <div className="text-2xl font-bold text-blue-600">
                 {avgDelivered}
               </div>
-              <div className="text-xs text-gray-500">Avg Delivered</div>
+              <div className="text-xs text-muted-foreground">Avg Delivered</div>
               <div
                 className={`flex items-center justify-center space-x-1 mt-1 ${getTrendColor(deliveryTrend)}`}
               >
@@ -142,30 +142,30 @@ export default function EngagementTrends({ data }: EngagementTrendsProps) {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-red-600">{avgFailed}</div>
-              <div className="text-xs text-gray-500">Avg Failed</div>
+              <div className="text-xs text-muted-foreground">Avg Failed</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">
                 {avgTotalSent}
               </div>
-              <div className="text-xs text-gray-500">Avg Total Sent</div>
+              <div className="text-xs text-muted-foreground">Avg Total Sent</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-purple-600">
                 {avgDeliveryRate.toFixed(1)}%
               </div>
-              <div className="text-xs text-gray-500">Avg Delivery Rate</div>
+              <div className="text-xs text-muted-foreground">Avg Delivery Rate</div>
             </div>
           </div>
 
           {/* Simple Bar Chart Visualization */}
           <div className="space-y-2">
-            <h4 className="font-medium text-gray-900">
+            <h4 className="font-medium text-foreground">
               Daily Delivery Metrics (
               {getTimezoneString(user?.timezone || "UTC±0")})
             </h4>
             {loading && (
-              <div className="text-center py-4 text-gray-500">
+              <div className="text-center py-4 text-muted-foreground">
                 Loading delivery metrics...
               </div>
             )}
@@ -175,7 +175,7 @@ export default function EngagementTrends({ data }: EngagementTrendsProps) {
               </div>
             )}
             {!loading && !error && trendData.length === 0 && (
-              <div className="text-center py-4 text-gray-500">
+              <div className="text-center py-4 text-muted-foreground">
                 No delivery data available for the selected period.
               </div>
             )}
@@ -206,55 +206,55 @@ export default function EngagementTrends({ data }: EngagementTrendsProps) {
                       key={day.date}
                       className="flex items-center space-x-2 p-3"
                     >
-                      <div className="w-16 text-xs text-gray-500">
+                      <div className="w-16 text-xs text-muted-foreground">
                         {formattedDate}
                       </div>
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center space-x-1">
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          <div className="text-xs text-gray-600">Delivered</div>
-                          <div className="flex-1 bg-gray-200 rounded-full h-2">
+                          <div className="text-xs text-muted-foreground">Delivered</div>
+                          <div className="flex-1 bg-muted rounded-full h-2">
                             <div
                               className="bg-green-500 h-2 rounded-full"
                               style={{ width: `${deliveredWidth}%` }}
                             ></div>
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-muted-foreground">
                             {day.delivered}
                           </div>
                         </div>
                         <div className="flex items-center space-x-1">
                           <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                          <div className="text-xs text-gray-600">Failed</div>
-                          <div className="flex-1 bg-gray-200 rounded-full h-2">
+                          <div className="text-xs text-muted-foreground">Failed</div>
+                          <div className="flex-1 bg-muted rounded-full h-2">
                             <div
                               className="bg-red-500 h-2 rounded-full"
                               style={{ width: `${failedWidth}%` }}
                             ></div>
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-muted-foreground">
                             {day.failed}
                           </div>
                         </div>
                         <div className="flex items-center space-x-1">
                           <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                          <div className="text-xs text-gray-600">
+                          <div className="text-xs text-muted-foreground">
                             Total Sent
                           </div>
-                          <div className="flex-1 bg-gray-200 rounded-full h-2">
+                          <div className="flex-1 bg-muted rounded-full h-2">
                             <div
                               className="bg-blue-500 h-2 rounded-full"
                               style={{ width: `${totalWidth}%` }}
                             ></div>
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-muted-foreground">
                             {day.totalSent}
                           </div>
                         </div>
                         <div className="flex items-center space-x-1">
                           <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                          <div className="text-xs text-gray-600">Rate</div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-muted-foreground">Rate</div>
+                          <div className="text-xs text-muted-foreground">
                             {day.deliveryRate.toFixed(1)}%
                           </div>
                         </div>

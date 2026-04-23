@@ -9,13 +9,13 @@ export const metadata: Metadata = {
 export default function PrivacyPolicyPage() {
   return (
     <DashboardLayout>
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-background">
         <div className="mx-auto max-w-3xl px-6 py-12 sm:py-16">
           <header className="mb-10">
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
               Outreachly Privacy Policy
             </h1>
-            <p className="mt-2 text-sm text-gray-500">
+            <p className="mt-2 text-sm text-muted-foreground">
               Effective date: October 9, 2025
             </p>
           </header>

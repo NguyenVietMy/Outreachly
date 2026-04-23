@@ -24,7 +24,7 @@ export default function ComplianceTrustCues({
           <div className="flex flex-col md:flex-row md:items-center justify-between space-y-3 md:space-y-0">
             <div className="flex items-center space-x-2">
               <Shield className="h-5 w-5 text-blue-600" />
-              <span className="text-sm font-medium text-gray-900">
+              <span className="text-sm font-medium text-foreground">
                 Trust & Compliance
               </span>
             </div>

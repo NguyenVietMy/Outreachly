@@ -50,13 +50,13 @@ export default function Dashboard() {
       <DashboardLayout>
         <div className="p-6">
           {/* Header */}
-          <div className="mb-8 mt-[100px]">
+          <div className="mb-8 mt-8">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">
+                <h1 className="text-3xl font-bold text-foreground">
                   Welcome back!
                 </h1>
-                <p className="text-gray-600 mt-2">
+                <p className="text-muted-foreground mt-2">
                   Here's what's happening with your outreach campaigns.
                 </p>
               </div>

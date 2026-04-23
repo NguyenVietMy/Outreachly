@@ -33,7 +33,7 @@ export default function Home() {
       <div className="min-h-screen bg-background">
         <Header />
         <div className="flex items-center justify-center min-h-[50vh]">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-brand-accent"></div>
         </div>
       </div>
     );
@@ -46,8 +46,8 @@ export default function Home() {
         <Header />
         <div className="flex items-center justify-center min-h-[50vh]">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-gray-600">Redirecting to dashboard...</p>
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-brand-accent mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Redirecting to dashboard...</p>
           </div>
         </div>
       </div>
@@ -67,24 +67,24 @@ export default function Home() {
       <ProcessFlow />
 
       {/* Metrics Highlight */}
-      <section className="w-full py-20 bg-primary text-primary-foreground">
+      <section className="w-full py-20 bg-foreground text-background">
         <div className="container px-4 md:px-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
             <div className="space-y-2">
               <h3 className="text-4xl font-bold">{"<1%"}</h3>
-              <p className="text-lg text-primary-foreground/80">
+              <p className="text-lg text-background/80">
                 Bounce rate with our verified emails
               </p>
             </div>
             <div className="space-y-2">
               <h3 className="text-4xl font-bold">{"<30"}</h3>
-              <p className="text-lg text-primary-foreground/80">
+              <p className="text-lg text-background/80">
                 Minutes to fully onboard your team
               </p>
             </div>
             <div className="space-y-2">
               <h3 className="text-4xl font-bold">70%</h3>
-              <p className="text-lg text-primary-foreground/80">
+              <p className="text-lg text-background/80">
                 Personalization efficiency with AI
               </p>
             </div>
@@ -93,10 +93,10 @@ export default function Home() {
       </section>
 
       {/* CTA Section */}
-      <section className="w-full py-20 bg-muted/30">
+      <section className="w-full py-20 bg-background">
         <div className="container px-4 md:px-6">
           <div className="flex flex-col items-center justify-center space-y-6 text-center">
-            <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">
+            <h2 className="text-[40px] font-semibold tracking-[-0.02em] leading-[1.10] sm:text-4xl md:text-5xl">
               Ready to transform your outreach?
             </h2>
             <p className="max-w-[700px] text-muted-foreground md:text-xl/relaxed">
@@ -106,6 +106,7 @@ export default function Home() {
             <div className="flex flex-col sm:flex-row gap-4">
               <Button
                 size="lg"
+                variant="brand"
                 className="h-12 px-8"
                 onClick={() => router.push("/auth")}
               >

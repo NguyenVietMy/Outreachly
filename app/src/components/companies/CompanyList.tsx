@@ -222,7 +222,7 @@ export function CompanyList({
                             disabled={
                               findingEmails === company.id || !company.domain
                             }
-                            className="bg-black hover:bg-gray-800 text-white"
+                            className="bg-primary text-primary-foreground hover:bg-primary/90"
                           >
                             <Mail className="w-4 h-4 mr-2" />
                             {findingEmails === company.id

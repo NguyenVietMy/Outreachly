@@ -20,20 +20,20 @@ export default function AuthPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-accent"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex items-center justify-center bg-background py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8 rounded-xl border bg-card p-8 shadow-card">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          <h2 className="mt-2 text-center text-3xl font-semibold text-foreground tracking-tight">
             Sign in to Outreachly
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-2 text-center text-sm text-muted-foreground">
             Choose your preferred sign-in method
           </p>
         </div>
@@ -41,9 +41,9 @@ export default function AuthPage() {
         <div className="mt-8 space-y-4">
           <button
             onClick={handleGoogleLogin}
-            className="group relative w-full flex justify-center py-3 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+            className="group relative w-full flex justify-center py-3 px-4 border border-border text-sm font-medium rounded-full text-foreground bg-background hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring transition-colors"
           >
-            <span className="absolute left-0 inset-y-0 flex items-center pl-3">
+            <span className="absolute left-4 inset-y-0 flex items-center">
               <svg className="h-5 w-5 text-red-500" viewBox="0 0 24 24">
                 <path
                   fill="currentColor"
@@ -70,10 +70,10 @@ export default function AuthPage() {
         <div className="mt-6">
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300" />
+              <div className="w-full border-t border-border" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-gray-50 text-gray-500">
+              <span className="px-2 bg-card text-muted-foreground">
                 Secure OAuth2 Authentication
               </span>
             </div>
@@ -81,7 +81,7 @@ export default function AuthPage() {
         </div>
 
         <div className="text-center">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-muted-foreground">
             By signing in, you agree to our Terms of Service and Privacy Policy
           </p>
         </div>

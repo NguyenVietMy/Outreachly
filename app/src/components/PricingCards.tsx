@@ -67,10 +67,10 @@ export default function PricingCards() {
   ];
 
   return (
-    <section className="w-full py-16 bg-background">
+    <section className="w-full py-20 bg-background">
       <div className="container px-4 md:px-6">
         <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
-          <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">
+          <h2 className="text-[40px] font-semibold tracking-[-0.02em] leading-[1.10]">
             Simple, Transparent Pricing
           </h2>
           <p className="max-w-[700px] text-muted-foreground md:text-xl/relaxed">
@@ -83,11 +83,11 @@ export default function PricingCards() {
           {pricingTiers.map((tier, index) => (
             <Card
               key={index}
-              className={`flex flex-col h-full ${tier.popular ? "border-primary shadow-lg relative" : ""}`}
+              className={`flex flex-col h-full ${tier.popular ? "border-brand-accent shadow-md rounded-2xl relative" : ""}`}
             >
               {tier.popular && (
                 <div className="absolute -top-4 left-0 right-0 flex justify-center">
-                  <span className="bg-primary text-primary-foreground text-xs font-medium px-3 py-1 rounded-full">
+                  <span className="bg-brand-accent text-[#0d0d0d] text-xs font-medium px-3 py-1 rounded-full">
                     Most Popular
                   </span>
                 </div>
@@ -112,7 +112,7 @@ export default function PricingCards() {
                 <ul className="space-y-3">
                   {tier.features.map((feature, i) => (
                     <li key={i} className="flex items-start">
-                      <Check className="h-5 w-5 text-primary flex-shrink-0 mr-2" />
+                      <Check className="h-5 w-5 text-brand-deep flex-shrink-0 mr-2" />
                       <span>{feature}</span>
                     </li>
                   ))}
@@ -121,8 +121,8 @@ export default function PricingCards() {
 
               <CardFooter>
                 <Button
-                  className={`w-full ${tier.popular ? "bg-primary hover:bg-primary/90" : ""}`}
-                  variant={tier.popular ? "default" : "outline"}
+                  className="w-full"
+                  variant={tier.popular ? "brand" : "outline"}
                 >
                   {tier.cta}
                 </Button>
@@ -134,7 +134,7 @@ export default function PricingCards() {
         <div className="mt-10 text-center">
           <p className="text-muted-foreground">
             Need a custom solution?{" "}
-            <a href="#" className="font-medium text-primary hover:underline">
+            <a href="#" className="font-medium text-brand-deep hover:text-brand-accent hover:underline">
               Contact our sales team
             </a>{" "}
             for a tailored plan.

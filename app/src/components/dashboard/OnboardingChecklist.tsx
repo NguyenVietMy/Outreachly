@@ -104,9 +104,9 @@ export default function OnboardingChecklist({
             {completedCount}/{totalCount} Complete
           </Badge>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-2">
+        <div className="w-full bg-muted rounded-full h-2">
           <div
-            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+            className="bg-brand-accent h-2 rounded-full transition-all duration-300"
             style={{ width: `${progressPercentage}%` }}
           />
         </div>
@@ -120,24 +120,24 @@ export default function OnboardingChecklist({
                 key={item.id}
                 className={`flex items-center space-x-4 p-4 rounded-lg border transition-all ${
                   item.completed
-                    ? "bg-green-50 border-green-200"
-                    : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+                    ? "bg-green-50 border-green-200 dark:border-green-800"
+                    : "bg-secondary border-border hover:bg-secondary"
                 }`}
               >
                 <div className="flex-shrink-0">
                   {item.completed ? (
                     <CheckCircle className="h-6 w-6 text-green-600" />
                   ) : (
-                    <Circle className="h-6 w-6 text-gray-400" />
+                    <Circle className="h-6 w-6 text-muted-foreground" />
                   )}
                 </div>
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-2">
-                    <Icon className="h-5 w-5 text-gray-500" />
+                    <Icon className="h-5 w-5 text-muted-foreground" />
                     <h3
                       className={`font-medium ${
-                        item.completed ? "text-green-800" : "text-gray-900"
+                        item.completed ? "text-green-800" : "text-foreground"
                       }`}
                     >
                       {item.title}
@@ -145,7 +145,7 @@ export default function OnboardingChecklist({
                     {item.completed && (
                       <Badge
                         variant="outline"
-                        className="text-xs text-green-600 border-green-300"
+                        className="text-xs text-green-600 border-green-300 font-mono uppercase tracking-wider"
                       >
                         Complete
                       </Badge>
@@ -153,7 +153,7 @@ export default function OnboardingChecklist({
                   </div>
                   <p
                     className={`text-sm mt-1 ${
-                      item.completed ? "text-green-600" : "text-gray-500"
+                      item.completed ? "text-green-600" : "text-muted-foreground"
                     }`}
                   >
                     {item.description}

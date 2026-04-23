@@ -81,9 +81,9 @@ export default function CampaignSnapshot({
       case "completed":
         return <CheckCircle className="h-4 w-4 text-blue-600" />;
       case "inactive":
-        return <Clock className="h-4 w-4 text-gray-600" />;
+        return <Clock className="h-4 w-4 text-muted-foreground" />;
       default:
-        return <Clock className="h-4 w-4 text-gray-600" />;
+        return <Clock className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
@@ -91,11 +91,11 @@ export default function CampaignSnapshot({
     const variants = {
       active: {
         variant: "default" as const,
-        className: "bg-green-100 text-green-800",
+        className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
       },
       paused: {
         variant: "secondary" as const,
-        className: "bg-yellow-100 text-yellow-800",
+        className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
       },
       completed: {
         variant: "outline" as const,
@@ -103,7 +103,7 @@ export default function CampaignSnapshot({
       },
       inactive: {
         variant: "secondary" as const,
-        className: "bg-gray-100 text-gray-800",
+        className: "bg-secondary text-foreground",
       },
     };
 
@@ -111,7 +111,7 @@ export default function CampaignSnapshot({
       variants[status as keyof typeof variants] || variants.inactive;
 
     return (
-      <Badge variant={config.variant} className={config.className}>
+      <Badge variant={config.variant} className={`${config.className} font-mono uppercase tracking-wider`}>
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </Badge>
     );
@@ -136,7 +136,7 @@ export default function CampaignSnapshot({
             {[...Array(3)].map((_, i) => (
               <div
                 key={i}
-                className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
+                className="flex items-center justify-between p-4 border border-border rounded-lg"
               >
                 <div className="flex items-center space-x-4 flex-1 min-w-0">
                   <Skeleton className="h-4 w-4" />
@@ -178,10 +178,10 @@ export default function CampaignSnapshot({
             <div className="text-red-400 mb-2">
               <AlertTriangle className="h-12 w-12 mx-auto" />
             </div>
-            <h3 className="font-medium text-gray-900 mb-1">
+            <h3 className="font-medium text-foreground mb-1">
               Error loading campaigns
             </h3>
-            <p className="text-sm text-gray-500 mb-4">{error}</p>
+            <p className="text-sm text-muted-foreground mb-4">{error}</p>
             <Button onClick={() => window.location.reload()}>Retry</Button>
           </div>
         </CardContent>
@@ -210,7 +210,7 @@ export default function CampaignSnapshot({
             return (
               <div
                 key={campaign.id}
-                className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-secondary transition-colors cursor-pointer"
                 onClick={() => onViewDetails?.(campaign.id)}
               >
                 <div className="flex items-center space-x-4 flex-1 min-w-0">
@@ -220,32 +220,32 @@ export default function CampaignSnapshot({
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center space-x-2 mb-1">
-                      <h3 className="font-medium text-gray-900 truncate">
+                      <h3 className="font-medium text-foreground truncate">
                         {campaign.name}
                       </h3>
                       {getStatusBadge(campaign.status)}
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground">
                       <div>
                         <span className="font-medium">
                           {metrics.sent.toLocaleString()}
                         </span>
-                        <span className="text-gray-500"> sent</span>
+                        <span className="text-muted-foreground"> sent</span>
                       </div>
                       <div>
                         <span className="font-medium">
                           {metrics.deliveryRate}%
                         </span>
-                        <span className="text-gray-500"> delivered</span>
+                        <span className="text-muted-foreground"> delivered</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 <div className="flex-shrink-0 text-right">
-                  <p className="text-xs text-gray-500 mb-1">Last activity</p>
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-xs text-muted-foreground mb-1">Last activity</p>
+                  <p className="text-sm font-medium text-foreground">
                     {getLastActivity(campaign)}
                   </p>
                 </div>
@@ -256,11 +256,11 @@ export default function CampaignSnapshot({
 
         {campaignsWithStats.length === 0 && (
           <div className="text-center py-8">
-            <div className="text-gray-400 mb-2">
+            <div className="text-muted-foreground mb-2">
               <Play className="h-12 w-12 mx-auto" />
             </div>
-            <h3 className="font-medium text-gray-900 mb-1">No campaigns yet</h3>
-            <p className="text-sm text-gray-500 mb-4">
+            <h3 className="font-medium text-foreground mb-1">No campaigns yet</h3>
+            <p className="text-sm text-muted-foreground mb-4">
               Create your first campaign to start reaching out to leads
             </p>
             <Button onClick={onCreate}>Create Campaign</Button>

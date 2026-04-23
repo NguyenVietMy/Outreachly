@@ -52,9 +52,9 @@ type CheckpointStatus = CampaignCheckpoint["status"];
 
 function StatusBadge({ status }: { status: CheckpointStatus }) {
   const style = {
-    pending: "bg-gray-100 text-gray-800",
-    active: "bg-green-100 text-green-800",
-    paused: "bg-yellow-100 text-yellow-800",
+    pending: "bg-secondary text-foreground",
+    active: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+    paused: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
     completed: "bg-blue-100 text-blue-800",
     partially_completed: "bg-orange-100 text-orange-800",
   }[status];
@@ -67,7 +67,7 @@ function StatusBadge({ status }: { status: CheckpointStatus }) {
     partially_completed: "Partial",
   }[status];
 
-  return <Badge className={style}>{displayText}</Badge>;
+  return <Badge className={`${style} font-mono uppercase tracking-wider`}>{displayText}</Badge>;
 }
 
 function formatTime(timeString: string): string {
@@ -267,7 +267,7 @@ export default function CampaignCheckpointsCard({
 
           {!loading && !error && checkpoints.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
-              <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+              <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
               <p className="font-medium">No checkpoints yet</p>
               <p className="text-sm">
                 Create your first checkpoint to start scheduling emails
@@ -320,7 +320,7 @@ export default function CampaignCheckpointsCard({
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <StatusBadge status={checkpoint.status} />
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-xs font-mono uppercase tracking-wider">
                               {checkpoint.emailProvider === "GMAIL"
                                 ? "Gmail"
                                 : "Resend"}

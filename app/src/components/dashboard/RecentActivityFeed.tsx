@@ -171,11 +171,11 @@ export default function RecentActivityFeed({
       case "verification":
         return "text-orange-600 bg-orange-100";
       case "configuration":
-        return "text-gray-600 bg-gray-100";
+        return "text-muted-foreground bg-secondary";
       case "warning":
         return "text-yellow-600 bg-yellow-100";
       default:
-        return "text-gray-600 bg-gray-100";
+        return "text-muted-foreground bg-secondary";
     }
   };
 
@@ -185,7 +185,7 @@ export default function RecentActivityFeed({
     const variants = {
       success: {
         variant: "default" as const,
-        className: "bg-green-100 text-green-800",
+        className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
       },
       warning: {
         variant: "secondary" as const,
@@ -193,11 +193,11 @@ export default function RecentActivityFeed({
       },
       error: {
         variant: "destructive" as const,
-        className: "bg-red-100 text-red-800",
+        className: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
       },
       paused: {
         variant: "outline" as const,
-        className: "bg-gray-100 text-gray-800",
+        className: "bg-secondary text-foreground",
       },
     };
 
@@ -205,8 +205,8 @@ export default function RecentActivityFeed({
       variants[metadata.status as keyof typeof variants] || variants.success;
 
     return (
-      <Badge variant={config.variant} className={config.className}>
-        {metadata.status.charAt(0).toUpperCase() + metadata.status.slice(1)}
+      <Badge variant={config.variant} className={`${config.className} font-mono uppercase tracking-wider`}>
+        {metadata.status}
       </Badge>
     );
   };
@@ -265,11 +265,11 @@ export default function RecentActivityFeed({
                 <div key={activity.id} className="relative">
                   {/* Timeline line */}
                   {!isLast && (
-                    <div className="absolute left-4 top-8 w-px h-8 bg-gray-200"></div>
+                    <div className="absolute left-4 top-8 w-px h-8 bg-muted"></div>
                   )}
 
                   <div
-                    className="flex items-start space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+                    className="flex items-start space-x-3 cursor-pointer hover:bg-secondary p-2 rounded-lg transition-colors"
                     onClick={() => onViewDetails?.(activity.id)}
                   >
                     {/* Icon */}
@@ -282,24 +282,24 @@ export default function RecentActivityFeed({
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <h3 className="text-sm font-medium text-gray-900">
+                        <h3 className="text-sm font-medium text-foreground">
                           {activity.title}
                         </h3>
                         <div className="flex items-center space-x-2">
                           {getStatusBadge(activity.metadata)}
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-muted-foreground">
                             {activity.timestamp}
                           </span>
                         </div>
                       </div>
 
-                      <p className="text-sm text-gray-600 mb-2">
+                      <p className="text-sm text-muted-foreground mb-2">
                         {activity.description}
                       </p>
 
                       {/* Metadata */}
                       {activity.metadata && (
-                        <div className="flex items-center space-x-4 text-xs text-gray-500">
+                        <div className="flex items-center space-x-4 text-xs text-muted-foreground">
                           {activity.metadata.count && (
                             <span className="flex items-center space-x-1">
                               <span className="font-medium">
@@ -341,13 +341,13 @@ export default function RecentActivityFeed({
 
         {!loading && !error && activityData.length === 0 && (
           <div className="text-center py-8">
-            <div className="text-gray-400 mb-2">
+            <div className="text-muted-foreground mb-2">
               <Clock className="h-12 w-12 mx-auto" />
             </div>
-            <h3 className="font-medium text-gray-900 mb-1">
+            <h3 className="font-medium text-foreground mb-1">
               No recent activity
             </h3>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               Activity will appear here as you use Outreachly
             </p>
           </div>
@@ -355,7 +355,7 @@ export default function RecentActivityFeed({
 
         {/* View All Activities */}
         {!loading && !error && activityData.length > 0 && (
-          <div className="mt-6 pt-4 border-t border-gray-200">
+          <div className="mt-6 pt-4 border-t border-border">
             <button className="text-sm text-blue-600 hover:text-blue-800 font-medium">
               View all activity →
             </button>

@@ -452,8 +452,8 @@ export default function SettingsPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FDFDF7]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-accent"></div>
       </div>
     );
   }
@@ -556,15 +556,15 @@ export default function SettingsPage() {
   return (
     <AuthGuard>
       <DashboardLayout>
-        <div className="min-h-screen bg-[#FDFDF7]">
+        <div className="min-h-screen bg-background">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {/* Header */}
             <div className="mb-8">
               <div className="flex items-center gap-3 mb-2">
                 <Settings className="h-8 w-8 text-blue-600" />
-                <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+                <h1 className="text-3xl font-bold text-foreground">Settings</h1>
               </div>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 Manage your account preferences and email configuration
               </p>
             </div>
@@ -621,12 +621,12 @@ export default function SettingsPage() {
                                 className={`w-3 h-3 rounded-full ${
                                   provider.isActive
                                     ? "bg-green-500"
-                                    : "bg-gray-300"
+                                    : "bg-brand-light"
                                 }`}
                               />
                               <h3 className="font-medium">{provider.name}</h3>
                               {provider.isActive && (
-                                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                                <span className="text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 px-2 py-1 rounded font-mono uppercase tracking-wider">
                                   Active
                                 </span>
                               )}
@@ -666,7 +666,7 @@ export default function SettingsPage() {
                                 // Enhanced Resend Configuration
                                 <>
                                   {hasResendConfig && (
-                                    <Alert className="border-green-200 bg-green-50">
+                                    <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
                                       <CheckCircle className="h-4 w-4 text-green-600" />
                                       <AlertDescription className="text-green-800">
                                         <div className="font-medium mb-1">
@@ -717,7 +717,7 @@ export default function SettingsPage() {
                                         )}
                                       </Button>
                                     </div>
-                                    <p className="text-xs text-gray-500">
+                                    <p className="text-xs text-muted-foreground">
                                       Get your API key from{" "}
                                       <a
                                         href="https://resend.com/api-keys"
@@ -794,7 +794,7 @@ export default function SettingsPage() {
                                       placeholder="yourdomain.com"
                                       disabled={hasResendConfig}
                                     />
-                                    <p className="text-xs text-gray-500">
+                                    <p className="text-xs text-muted-foreground">
                                       Make sure to verify your domain in Resend
                                       first
                                     </p>
@@ -891,7 +891,7 @@ export default function SettingsPage() {
                                             </div>
                                           </div>
 
-                                          <Alert className="border-blue-200 bg-blue-50">
+                                          <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
                                             <AlertCircle className="h-4 w-4 text-blue-600" />
                                             <AlertDescription className="text-blue-800">
                                               <div className="font-medium mb-1">
@@ -988,7 +988,7 @@ export default function SettingsPage() {
                                     </div>
                                   )}
 
-                                  <Alert className="border-blue-200 bg-blue-50">
+                                  <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
                                     <AlertCircle className="h-4 w-4 text-blue-600" />
                                     <AlertDescription className="text-blue-800">
                                       <div className="font-medium mb-2">
@@ -1181,11 +1181,11 @@ export default function SettingsPage() {
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="space-y-4">
-                      <div className="p-4 border rounded-lg bg-gray-50">
+                      <div className="p-4 border rounded-lg bg-secondary">
                         <h4 className="font-medium mb-2">
                           Account Information
                         </h4>
-                        <div className="space-y-2 text-sm text-gray-600">
+                        <div className="space-y-2 text-sm text-muted-foreground">
                           <p>
                             <span className="font-medium">Email:</span>{" "}
                             {user.email}
@@ -1195,7 +1195,7 @@ export default function SettingsPage() {
                             {user.createdAt
                               ? new Date(user.createdAt).toLocaleDateString()
                               : "Unknown"}
-                            <span className="text-xs text-gray-400 ml-1">
+                            <span className="text-xs text-muted-foreground ml-1">
                               (MM/DD/YY)
                             </span>
                           </p>
@@ -1217,8 +1217,8 @@ export default function SettingsPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-center py-8 text-gray-500">
-                      <Zap className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Zap className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                       <p>
                         Third-party integrations and API management coming soon
                       </p>
