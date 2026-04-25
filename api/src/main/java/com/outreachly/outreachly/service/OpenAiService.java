@@ -95,6 +95,39 @@ public class OpenAiService {
         return prompt.toString();
     }
 
+    public Mono<String> generateDigest(String activityContext) {
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", "gpt-3.5-turbo");
+        requestBody.put("messages", new Object[] {
+                Map.of("role", "system", "content",
+                        "You are a personal productivity assistant for a CS student. " +
+                        "Write a 2-3 sentence plain-text daily digest summarizing the developer's recent activity. " +
+                        "Be concise, direct, and highlight the most significant work. " +
+                        "Start with the most impactful thing they did. " +
+                        "Do not use bullet points or markdown."),
+                Map.of("role", "user", "content", activityContext)
+        });
+        requestBody.put("max_tokens", 200);
+        requestBody.put("temperature", 0.6);
+
+        return webClient.post()
+                .uri("/chat/completions")
+                .bodyValue(requestBody)
+                .retrieve()
+                .bodyToMono(JsonNode.class)
+                .map(response -> {
+                    JsonNode choices = response.get("choices");
+                    if (choices != null && choices.isArray() && choices.size() > 0) {
+                        JsonNode message = choices.get(0).get("message");
+                        if (message != null) {
+                            return message.get("content").asText();
+                        }
+                    }
+                    throw new RuntimeException("No response from OpenAI");
+                })
+                .doOnError(error -> log.error("OpenAI digest error: ", error));
+    }
+
     public Mono<String> improveTemplate(String currentTemplate, String platform, String improvementType) {
         String systemPrompt = buildImprovementPrompt(platform, improvementType);
 
@@ -123,6 +156,40 @@ public class OpenAiService {
                     throw new RuntimeException("No response from OpenAI");
                 })
                 .doOnError(error -> log.error("OpenAI API error: ", error));
+    }
+
+    public Mono<String> generatePersonalInsights(String contextPrompt) {
+        String systemPrompt = "You are a personal CS career and study coach. " +
+                "Based on the student's profile, knowledge levels, goals, and recent activity, " +
+                "provide 3-5 actionable insights. Identify knowledge gaps, suggest focus areas, " +
+                "flag stale goals, and acknowledge progress. Be specific and reference their actual data. " +
+                "Format as a numbered list. Keep each item to 1-2 sentences.";
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", "gpt-4o-mini");
+        requestBody.put("messages", new Object[] {
+                Map.of("role", "system", "content", systemPrompt),
+                Map.of("role", "user", "content", contextPrompt)
+        });
+        requestBody.put("max_tokens", 500);
+        requestBody.put("temperature", 0.5);
+
+        return webClient.post()
+                .uri("/chat/completions")
+                .bodyValue(requestBody)
+                .retrieve()
+                .bodyToMono(JsonNode.class)
+                .map(response -> {
+                    JsonNode choices = response.get("choices");
+                    if (choices != null && choices.isArray() && choices.size() > 0) {
+                        JsonNode message = choices.get(0).get("message");
+                        if (message != null) {
+                            return message.get("content").asText();
+                        }
+                    }
+                    throw new RuntimeException("No response from OpenAI");
+                })
+                .doOnError(error -> log.error("OpenAI personal insights error: ", error));
     }
 
     private String buildImprovementPrompt(String platform, String improvementType) {
