@@ -39,7 +39,6 @@ import {
   Settings,
   Mail,
   Shield,
-  Zap,
   AlertCircle,
   CheckCircle,
   Loader2,
@@ -1225,26 +1224,6 @@ function SettingsContent() {
                   </CardContent>
                 </Card>
 
-                {/* Placeholder sections for future features */}
-                <Card className="opacity-60">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Zap className="h-5 w-5" />
-                      Integrations
-                    </CardTitle>
-                    <CardDescription>
-                      Coming soon - Connect with other tools
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Zap className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                      <p>
-                        Third-party integrations and API management coming soon
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
               </TabsContent>
 
               {/* Templates */}

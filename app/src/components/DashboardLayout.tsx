@@ -9,6 +9,8 @@ import {
   Menu,
   X,
   Layers,
+  User,
+  Zap,
 } from "lucide-react";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
@@ -25,8 +27,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
+    { name: "Personal", href: "/personal", icon: User },
     { name: "Workspace", href: "/workspace", icon: Layers },
     { name: "Settings", href: "/settings", icon: Settings },
+  ];
+  const integrationNavigation = [
+    { name: "Integrations", href: "/integrations", icon: Zap },
   ];
 
   return (
@@ -88,6 +94,37 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 </Link>
               );
             })}
+
+            <div className="pt-4">
+              <p className="px-3 text-xs font-medium uppercase tracking-wide text-muted-foreground/80">
+                Integrations
+              </p>
+              <div className="mt-2 space-y-1">
+                {integrationNavigation.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = pathname === "/integrations";
+
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      className={
+                        `flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ` +
+                        (isActive
+                          ? "bg-brand-light/60 dark:bg-brand-deep/20 text-foreground"
+                          : "text-muted-foreground hover:bg-secondary hover:text-foreground")
+                      }
+                    >
+                      <Icon className="h-5 w-5" />
+                      <span className="font-medium">{item.name}</span>
+                      {isActive && (
+                        <span className="ml-auto h-1.5 w-1.5 rounded-full bg-brand-accent" />
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
           </nav>
 
           {/* User section */}
