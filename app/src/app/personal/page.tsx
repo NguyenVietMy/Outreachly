@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import AuthGuard from "@/components/AuthGuard";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -9,12 +9,17 @@ import {
   Bot,
   ChevronDown,
   ChevronUp,
+  FileText,
   Loader2,
-  Plus,
+  RefreshCw,
   Save,
   Sparkles,
   Trash2,
+  Upload,
   X,
+  GraduationCap,
+  Briefcase,
+  Target,
 } from "lucide-react";
 import {
   Radar,
@@ -25,38 +30,246 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+// --- Level + Guidance Logic ---
+
+function computeLevel(graduationYear: number): string {
+  const now = new Date();
+  const month = now.getMonth(); // 0-indexed
+  const year = now.getFullYear();
+  const academicStartYear = month >= 7 ? year : year - 1; // Aug = new academic year
+  const yearsUntilGrad = graduationYear - academicStartYear - 1;
+  if (yearsUntilGrad >= 4) return "Freshman";
+  if (yearsUntilGrad === 3) return "Freshman";
+  if (yearsUntilGrad === 2) return "Sophomore";
+  if (yearsUntilGrad === 1) return "Junior";
+  if (yearsUntilGrad === 0) return "Senior";
+  return "New Grad";
+}
+
+function getGuidance(level: string, targetRole: string, month: number): string[] {
+  const isIntern = targetRole === "swe_intern";
+
+  if (level === "Freshman") {
+    if (month >= 0 && month <= 4) return [
+      "Build your first project — a personal site or CLI tool counts.",
+      "Start LeetCode Easy problems to build problem-solving habits.",
+      "Look into freshman/sophomore programs: Google STEP, Meta University, Explore Microsoft.",
+    ];
+    return [
+      "Summer = build time. Pick a project with real users or a tech you want to learn.",
+      "Start applying to freshman-specific internship programs (apps open Aug-Oct).",
+      "Aim for 50+ LC easy problems before fall semester.",
+    ];
+  }
+
+  if (level === "Sophomore") {
+    if (isIntern) {
+      if (month >= 7 && month <= 10) return [
+        "Internship apps are OPEN. Apply daily — big tech closes by October.",
+        "Aim to solve 100+ LC problems (mix of easy + medium) before interviews.",
+        "Your resume needs 1-2 projects with measurable impact. Polish it now.",
+      ];
+      if (month >= 0 && month <= 4) return [
+        "Late recruiting season — focus on mid-size companies and startups.",
+        "Keep grinding LC mediums. Target 150+ total by summer.",
+        "Build or ship a project you can demo in interviews.",
+      ];
+      return [
+        "Summer = grind time. Build your strongest project yet.",
+        "Start LC mediums and study common patterns (sliding window, two pointers, BFS/DFS).",
+        "Big tech apps open in August — have your resume ready.",
+      ];
+    }
+    return [
+      "Focus on building strong fundamentals and projects.",
+      "It's early for full-time, but internships now will set you up.",
+      "Start thinking about what kind of SWE role excites you (frontend, backend, infra, ML).",
+    ];
+  }
+
+  if (level === "Junior") {
+    if (isIntern) {
+      if (month >= 7 && month <= 10) return [
+        "CRITICAL: This is your key internship recruiting window. Apply to 50+ companies.",
+        "You should be solving LC mediums consistently. Target 200+ total.",
+        "Practice behavioral interviews — Amazon LPs, Google's Googleyness.",
+        "Junior summer internships often convert to full-time offers.",
+      ];
+      if (month >= 0 && month <= 4) return [
+        "Late season — keep applying, but also prepare for full-time recruiting in fall.",
+        "If you land an internship, prepare to convert. If not, double down on projects.",
+        "Study system design basics — you'll need it for full-time interviews.",
+      ];
+      return [
+        "Summer prep is critical. If interning, aim to convert.",
+        "If not interning, build a standout project and prep for fall full-time cycle.",
+        "Start studying system design — it's tested at senior-level internships and new grad roles.",
+      ];
+    }
+    // SWE job as junior
+    if (month >= 7 && month <= 11) return [
+      "New grad apps are opening. Start applying NOW — early is better.",
+      "LC mediums + hards. Target 200+ problems with strong medium consistency.",
+      "System design is tested in new grad rounds at many companies. Study it.",
+      "Practice mock interviews — Pramp, interviewing.io, or with friends.",
+    ];
+    if (month >= 0 && month <= 4) return [
+      "Spring recruiting = second wave. Keep applying.",
+      "Refine your behavioral answers. Have 3-4 strong project stories.",
+      "If you haven't started system design, start now.",
+    ];
+    return [
+      "Summer = final prep window before peak new grad season in August.",
+      "Solve 200+ LC problems. Focus on mediums and common patterns.",
+      "Have 2-3 strong projects on your resume. At least one deployed.",
+    ];
+  }
+
+  if (level === "Senior") {
+    if (isIntern) return [
+      "As a senior, consider pivoting to full-time roles instead.",
+      "If you need an internship for visa/experience, apply to companies with flexible timelines.",
+    ];
+    if (month >= 7 && month <= 11) return [
+      "Peak new grad season. Apply aggressively — aim for 10+ applications per week.",
+      "System design is critical. Study: load balancing, caching, databases, message queues.",
+      "You should be comfortable with LC mediums and solving some hards.",
+      "Negotiate offers — don't accept the first one immediately.",
+    ];
+    if (month >= 0 && month <= 4) return [
+      "Spring = last major recruiting push before graduation.",
+      "Apply broadly — startups, mid-size, and late-posting big tech roles.",
+      "Practice your pitch: why you, why this company, what you bring.",
+    ];
+    return [
+      "Post-graduation: keep applying, network actively, attend career fairs.",
+      "Consider contract roles or startup positions to get your foot in the door.",
+    ];
+  }
+
+  // New Grad
+  return [
+    "Focus on applying to new grad roles. Cast a wide net.",
+    "Network on LinkedIn — cold messages to recruiters do work.",
+    "Keep your skills sharp with LC practice and side projects.",
+    "Consider your first job as a stepping stone — growth matters more than prestige.",
+  ];
+}
+
+// --- Constants ---
+
 const DEFAULT_AREAS = [
-  "Algorithms",
-  "Data Structures",
-  "Operating Systems",
-  "Computer Networks",
-  "Databases",
-  "Systems Design",
-  "Web Development",
-  "Math & Discrete",
-  "Machine Learning",
-  "Security",
+  "Algorithms", "Data Structures", "Operating Systems", "Computer Networks",
+  "Databases", "Systems Design", "Web Development", "Math & Discrete",
+  "Machine Learning", "Security",
 ];
 
-const GOAL_CATEGORIES = [
-  { value: "leetcode", label: "Leetcode" },
-  { value: "project", label: "Project" },
-  { value: "study", label: "Study" },
-  { value: "school", label: "School" },
-  { value: "internship", label: "Internship" },
-  { value: "club", label: "Club" },
-  { value: "other", label: "Other" },
+const SYSTEM_DESIGN_QUESTIONS = [
+  { id: "api_design", q: "How comfortable are you designing REST APIs?", options: ["Never done it", "Can build basic CRUD", "Can design with auth, pagination, versioning", "Can design scalable APIs with rate limiting, caching"] },
+  { id: "databases", q: "SQL vs NoSQL — when would you pick each?", options: ["Not sure", "Know the basics", "Can reason about tradeoffs", "Can design schemas for complex systems"] },
+  { id: "caching", q: "How well do you understand caching strategies?", options: ["What's caching?", "Know Redis/Memcached basics", "Can design cache invalidation strategies", "Can design multi-layer caching"] },
+  { id: "scaling", q: "How would you scale a service to 10x traffic?", options: ["No idea", "Know about load balancers", "Can reason about horizontal vs vertical scaling", "Can design auto-scaling with queues, CDNs, sharding"] },
+  { id: "cloud", q: "Cloud infrastructure experience?", options: ["None", "Deployed to Vercel/Heroku", "Used AWS/GCP services (EC2, S3, etc.)", "Can architect with IaC (Terraform, CDK)"] },
+  { id: "tradeoffs", q: "Can you discuss CAP theorem / consistency vs availability?", options: ["Never heard of it", "Know the concept", "Can apply to real scenarios", "Can design systems with specific consistency guarantees"] },
 ];
 
-const CATEGORY_COLORS: Record<string, string> = {
-  leetcode: "bg-[#d4fae8] text-[#0fa76e]",
-  project: "bg-[#e7eefb] text-[#3772cf]",
-  study: "bg-[#f8ebd8] text-[#c37d0d]",
-  school: "bg-[#f7e5e5] text-[#d45656]",
-  internship: "bg-[#e8d8f8] text-[#7c3aed]",
-  club: "bg-[#d8f0f8] text-[#0d7c9c]",
-  other: "bg-[#f5f5f5] text-[#666666]",
-};
+const CORE_CS_QUESTIONS = [
+  { id: "os_processes", q: "Processes vs threads — what's the difference?", options: ["Not sure", "Know the basic difference", "Understand scheduling, context switching", "Can explain IPC, synchronization primitives"] },
+  { id: "os_memory", q: "Virtual memory and paging?", options: ["No idea", "Know what virtual memory is", "Understand page tables, TLB", "Can explain page replacement algorithms"] },
+  { id: "networking", q: "What happens when you type a URL in the browser?", options: ["Not sure", "DNS, HTTP basics", "Can explain TCP handshake, TLS, routing", "Full stack: DNS, TCP, TLS, HTTP/2, CDN"] },
+  { id: "concurrency", q: "Mutex vs semaphore vs condition variable?", options: ["No idea", "Know mutex basics", "Can use all three correctly", "Can design lock-free data structures"] },
+  { id: "db_internals", q: "How does a database index work?", options: ["No idea", "Know it makes queries faster", "Understand B-tree structure", "Can reason about index selection and query plans"] },
+  { id: "os_fs", q: "File systems — inodes, journaling?", options: ["Never studied", "Know basic file system concepts", "Understand inodes, directories, links", "Can compare ext4, ZFS, etc."] },
+];
+
+// --- Questionnaire Component ---
+
+function QuestionnaireModal({
+  title,
+  questions,
+  onSubmit,
+  onClose,
+}: {
+  title: string;
+  questions: typeof SYSTEM_DESIGN_QUESTIONS;
+  onSubmit: (answers: Record<string, unknown>) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  const allAnswered = questions.every((q) => answers[q.id] !== undefined);
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    try {
+      const payload = {
+        answers: questions.map((q) => ({
+          questionId: q.id,
+          value: answers[q.id] ?? 0,
+        })),
+      };
+      await onSubmit(payload);
+      onClose();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="mx-4 w-full max-w-[640px] max-h-[90vh] overflow-y-auto rounded-[20px] bg-white p-8 shadow-xl">
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-[22px] font-semibold tracking-[-0.2px] text-[#0d0d0d]">{title}</h2>
+          <button onClick={onClose} className="p-1 text-[#999] hover:text-[#333]">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-6">
+          {questions.map((q, qi) => (
+            <div key={q.id}>
+              <p className="mb-2 text-[15px] font-medium text-[#0d0d0d]">
+                {qi + 1}. {q.q}
+              </p>
+              <div className="space-y-1.5">
+                {q.options.map((opt, oi) => (
+                  <button
+                    key={oi}
+                    onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: oi }))}
+                    className={`w-full rounded-lg border px-3 py-2 text-left text-[14px] transition-colors ${
+                      answers[q.id] === oi
+                        ? "border-[#0d0d0d] bg-[#0d0d0d] text-white"
+                        : "border-[rgba(0,0,0,0.1)] text-[#333] hover:border-[#999]"
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose} className="h-auto rounded-full px-6 py-2">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={!allAnswered || submitting}
+            className="h-auto rounded-full bg-[#0d0d0d] px-6 py-2 text-white"
+          >
+            {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Submit
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Onboarding Modal ---
 
 function OnboardingModal({
   onComplete,
@@ -67,35 +280,17 @@ function OnboardingModal({
   const [areas, setAreas] = useState<KnowledgeArea[]>(
     DEFAULT_AREAS.map((a) => ({ area: a, level: 1 }))
   );
-  const [goals, setGoals] = useState<
-    { title: string; category: string; targetValue: number | null; unit: string }[]
-  >([]);
   const [bio, setBio] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [goalDraft, setGoalDraft] = useState({ title: "", category: "leetcode", target: "", unit: "problems" });
 
   const updateLevel = (index: number, level: number) => {
     setAreas((prev) => prev.map((a, i) => (i === index ? { ...a, level } : a)));
   };
 
-  const addGoal = () => {
-    if (!goalDraft.title.trim()) return;
-    setGoals((prev) => [
-      ...prev,
-      {
-        title: goalDraft.title,
-        category: goalDraft.category,
-        targetValue: goalDraft.target ? parseInt(goalDraft.target) : null,
-        unit: goalDraft.unit,
-      },
-    ]);
-    setGoalDraft({ title: "", category: "leetcode", target: "", unit: "problems" });
-  };
-
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      await onComplete({ knowledgeAreas: areas, goals, bio });
+      await onComplete({ knowledgeAreas: areas, goals: [], bio });
     } finally {
       setSubmitting(false);
     }
@@ -106,12 +301,11 @@ function OnboardingModal({
       <div className="mx-4 w-full max-w-[640px] rounded-[20px] bg-white p-8 shadow-xl">
         <div className="mb-6">
           <p className="font-mono text-[12px] font-medium uppercase tracking-[0.6px] text-[#666666]">
-            Step {step + 1} of 3
+            Step {step + 1} of 2
           </p>
           <h2 className="mt-1 text-[24px] font-semibold leading-[1.3] tracking-[-0.24px] text-[#0d0d0d]">
             {step === 0 && "Rate your knowledge"}
-            {step === 1 && "Set your goals"}
-            {step === 2 && "Tell us about yourself"}
+            {step === 1 && "Tell us about yourself"}
           </h2>
         </div>
 
@@ -141,66 +335,6 @@ function OnboardingModal({
         )}
 
         {step === 1 && (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              {goals.map((goal, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between rounded-lg border border-[rgba(0,0,0,0.05)] bg-[#fafafa] px-3 py-2"
-                >
-                  <div>
-                    <p className="text-[14px] font-medium text-[#0d0d0d]">{goal.title}</p>
-                    <p className="text-[12px] text-[#666666]">
-                      {goal.targetValue ? `Target: ${goal.targetValue} ${goal.unit}` : goal.category}
-                    </p>
-                  </div>
-                  <button onClick={() => setGoals((prev) => prev.filter((_, idx) => idx !== i))}>
-                    <X className="h-4 w-4 text-[#999999]" />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="space-y-2 rounded-lg border border-[rgba(0,0,0,0.1)] p-3">
-              <input
-                type="text"
-                placeholder="Goal title (e.g., Solve 200 Leetcode problems)"
-                value={goalDraft.title}
-                onChange={(e) => setGoalDraft((d) => ({ ...d, title: e.target.value }))}
-                className="w-full rounded-lg border border-[rgba(0,0,0,0.1)] px-3 py-2 text-[14px] outline-none focus:border-[#0d0d0d]"
-              />
-              <div className="flex gap-2">
-                <select
-                  value={goalDraft.category}
-                  onChange={(e) => setGoalDraft((d) => ({ ...d, category: e.target.value }))}
-                  className="rounded-lg border border-[rgba(0,0,0,0.1)] px-3 py-2 text-[14px] outline-none"
-                >
-                  {GOAL_CATEGORIES.map((c) => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  placeholder="Target"
-                  value={goalDraft.target}
-                  onChange={(e) => setGoalDraft((d) => ({ ...d, target: e.target.value }))}
-                  className="w-24 rounded-lg border border-[rgba(0,0,0,0.1)] px-3 py-2 text-[14px] outline-none"
-                />
-                <input
-                  type="text"
-                  placeholder="Unit"
-                  value={goalDraft.unit}
-                  onChange={(e) => setGoalDraft((d) => ({ ...d, unit: e.target.value }))}
-                  className="w-24 rounded-lg border border-[rgba(0,0,0,0.1)] px-3 py-2 text-[14px] outline-none"
-                />
-                <Button onClick={addGoal} disabled={!goalDraft.title.trim()} className="h-auto rounded-lg bg-[#0d0d0d] px-3 py-2 text-white">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {step === 2 && (
           <textarea
             placeholder="Tell us about yourself — your year, target companies, what you're working on, strengths, areas you want to improve..."
             value={bio}
@@ -219,7 +353,7 @@ function OnboardingModal({
           >
             Back
           </Button>
-          {step < 2 ? (
+          {step < 1 ? (
             <Button
               onClick={() => setStep((s) => s + 1)}
               className="h-auto rounded-full bg-[#0d0d0d] px-6 py-2 text-[15px] text-white"
@@ -241,6 +375,8 @@ function OnboardingModal({
     </div>
   );
 }
+
+// --- Activity Heatmap ---
 
 function ActivityHeatmap({ data }: { data: Record<string, number> }) {
   const today = new Date();
@@ -286,30 +422,84 @@ function ActivityHeatmap({ data }: { data: Record<string, number> }) {
   );
 }
 
+// --- Axis Card ---
+
+function AxisCard({
+  label,
+  score,
+  description,
+  connected,
+  children,
+}: {
+  label: string;
+  score: number;
+  description: string;
+  connected: boolean;
+  children?: React.ReactNode;
+}) {
+  const getScoreColor = (s: number) => {
+    if (s >= 70) return "text-[#0fa76e]";
+    if (s >= 40) return "text-[#c37d0d]";
+    if (s > 0) return "text-[#d45656]";
+    return "text-[#999]";
+  };
+
+  return (
+    <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-5 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
+      <div className="flex items-start justify-between">
+        <div>
+          <h3 className="text-[16px] font-semibold text-[#0d0d0d]">{label}</h3>
+          <p className="mt-0.5 text-[13px] text-[#666]">{description}</p>
+        </div>
+        <div className="text-right">
+          <p className={`text-[28px] font-bold leading-none ${getScoreColor(score)}`}>
+            {connected ? score : "—"}
+          </p>
+          {connected && <p className="mt-0.5 text-[11px] text-[#999]">/ 100</p>}
+        </div>
+      </div>
+      {children && <div className="mt-4 border-t border-[rgba(0,0,0,0.05)] pt-4">{children}</div>}
+    </article>
+  );
+}
+
+// --- Main Page ---
+
 export default function PersonalPage() {
   const {
     profile,
-    goals,
     heatmap,
     insights,
     loadingProfile,
-    loadingGoals,
     loadingInsights,
+    loadingLeetCode,
+    loadingResume,
     updateProfile,
     completeOnboarding,
-    createGoal,
-    updateGoal,
-    deleteGoal,
+    updateCareer,
+    connectLeetCode,
+    refreshLeetCode,
+    uploadResume,
+    deleteResume,
+    submitQuestionnaire,
     requestInsights,
   } = usePersonal();
 
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileDraft, setProfileDraft] = useState("");
   const [knowledgeDraft, setKnowledgeDraft] = useState<KnowledgeArea[]>([]);
-  const [showAddGoal, setShowAddGoal] = useState(false);
-  const [newGoal, setNewGoal] = useState({ title: "", category: "leetcode", targetValue: "", unit: "items", deadline: "" });
   const [profileExpanded, setProfileExpanded] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [lcUsername, setLcUsername] = useState("");
+  const [lcError, setLcError] = useState("");
+  const [showSDQuiz, setShowSDQuiz] = useState(false);
+  const [showCSQuiz, setShowCSQuiz] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Career editing
+  const [editingCareer, setEditingCareer] = useState(false);
+  const [careerDraft, setCareerDraft] = useState({ targetRole: "swe_intern", graduationYear: new Date().getFullYear() + 2 });
+  const [savingCareer, setSavingCareer] = useState(false);
 
   const startEditProfile = () => {
     if (profile) {
@@ -329,25 +519,53 @@ export default function PersonalPage() {
     }
   };
 
-  const handleAddGoal = async () => {
-    await createGoal({
-      title: newGoal.title,
-      category: newGoal.category,
-      targetValue: newGoal.targetValue ? parseInt(newGoal.targetValue) : null,
-      currentValue: 0,
-      unit: newGoal.unit,
-      deadline: newGoal.deadline || null,
-    });
-    setNewGoal({ title: "", category: "leetcode", targetValue: "", unit: "items", deadline: "" });
-    setShowAddGoal(false);
+  const handleSaveCareer = async () => {
+    setSavingCareer(true);
+    try {
+      await updateCareer(careerDraft.targetRole, careerDraft.graduationYear);
+      setEditingCareer(false);
+    } finally {
+      setSavingCareer(false);
+    }
   };
 
-  const radarData =
-    profile?.knowledgeAreas.map((a) => ({
-      area: a.area,
-      level: a.level,
-      fullMark: 5,
-    })) || [];
+  const handleConnectLC = async () => {
+    if (!lcUsername.trim()) return;
+    setLcError("");
+    try {
+      await connectLeetCode(lcUsername.trim());
+      setLcUsername("");
+    } catch (e) {
+      setLcError(e instanceof Error ? e.message : "Failed to connect");
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      await uploadResume(file);
+    } catch {
+      // handled by hook
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const axes = profile?.axisScores;
+  const radarData = axes
+    ? [
+        { axis: "DSA", score: axes.dsa, fullMark: 100 },
+        { axis: "Projects", score: axes.projects, fullMark: 100 },
+        { axis: "Sys Design", score: axes.systemDesign, fullMark: 100 },
+        { axis: "Core CS", score: axes.coreCs, fullMark: 100 },
+        { axis: "Resume", score: axes.resume, fullMark: 100 },
+      ]
+    : [];
+
+  const level = profile?.graduationYear ? computeLevel(profile.graduationYear) : null;
+  const guidance = level && profile?.targetRole
+    ? getGuidance(level, profile.targetRole, new Date().getMonth())
+    : null;
 
   if (loadingProfile) {
     return (
@@ -367,68 +585,181 @@ export default function PersonalPage() {
         {profile && !profile.onboardingCompleted && (
           <OnboardingModal onComplete={completeOnboarding} />
         )}
+        {showSDQuiz && (
+          <QuestionnaireModal
+            title="System Design Assessment"
+            questions={SYSTEM_DESIGN_QUESTIONS}
+            onSubmit={(answers) => submitQuestionnaire("systemDesign", answers)}
+            onClose={() => setShowSDQuiz(false)}
+          />
+        )}
+        {showCSQuiz && (
+          <QuestionnaireModal
+            title="Core CS Assessment"
+            questions={CORE_CS_QUESTIONS}
+            onSubmit={(answers) => submitQuestionnaire("coreCs", answers)}
+            onClose={() => setShowCSQuiz(false)}
+          />
+        )}
 
         <div className="min-h-[calc(100vh-64px)] bg-[#ffffff] px-6 py-12 text-[#0d0d0d] md:px-8 md:py-16">
           <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-10">
-            {/* Header */}
-            <section className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p className="font-mono text-[12px] font-medium uppercase tracking-[0.6px] text-[#666666]">
-                  Personal
-                </p>
-                <h1 className="mt-2 font-mono text-[40px] font-semibold leading-[1.1] tracking-[-0.8px] text-[#0d0d0d]">
-                  Your stats
-                </h1>
-                <p className="mt-3 max-w-2xl text-[18px] leading-[1.5] text-[#333333]">
-                  Track your knowledge, set goals, and get AI-powered insights.
-                </p>
+            {/* Header + Career Target */}
+            <section>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="font-mono text-[12px] font-medium uppercase tracking-[0.6px] text-[#666666]">
+                    SWE Readiness
+                  </p>
+                  <h1 className="mt-2 font-mono text-[40px] font-semibold leading-[1.1] tracking-[-0.8px] text-[#0d0d0d]">
+                    Personal
+                  </h1>
+                </div>
+                <Button
+                  onClick={requestInsights}
+                  disabled={loadingInsights}
+                  className="h-auto rounded-full bg-primary px-4 py-2 text-[15px] font-medium text-primary-foreground hover:bg-primary/90"
+                >
+                  {loadingInsights ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-2 h-4 w-4" />
+                  )}
+                  Get AI Insights
+                </Button>
               </div>
-              <Button
-                onClick={requestInsights}
-                disabled={loadingInsights}
-                className="h-auto rounded-full bg-primary px-4 py-2 text-[15px] font-medium text-primary-foreground hover:bg-primary/90"
-              >
-                {loadingInsights ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+
+              {/* Career target bar */}
+              <div className="mt-5 flex flex-wrap items-center gap-3 rounded-[14px] border border-[rgba(0,0,0,0.05)] bg-[#fafafa] px-5 py-4">
+                {editingCareer ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Target className="h-4 w-4 text-[#666]" />
+                      <select
+                        value={careerDraft.targetRole}
+                        onChange={(e) => setCareerDraft((d) => ({ ...d, targetRole: e.target.value }))}
+                        className="rounded-lg border border-[rgba(0,0,0,0.1)] bg-white px-3 py-1.5 text-[14px] outline-none"
+                      >
+                        <option value="swe_intern">SWE Intern</option>
+                        <option value="swe_job">SWE Full-Time</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <GraduationCap className="h-4 w-4 text-[#666]" />
+                      <input
+                        type="number"
+                        value={careerDraft.graduationYear}
+                        onChange={(e) => setCareerDraft((d) => ({ ...d, graduationYear: parseInt(e.target.value) || 2028 }))}
+                        className="w-20 rounded-lg border border-[rgba(0,0,0,0.1)] bg-white px-3 py-1.5 text-[14px] outline-none"
+                        min={2024}
+                        max={2032}
+                      />
+                    </div>
+                    <div className="ml-auto flex gap-2">
+                      <Button variant="outline" onClick={() => setEditingCareer(false)} className="h-auto rounded-lg px-3 py-1.5 text-[13px]">
+                        Cancel
+                      </Button>
+                      <Button onClick={handleSaveCareer} disabled={savingCareer} className="h-auto rounded-lg bg-[#0d0d0d] px-3 py-1.5 text-[13px] text-white">
+                        {savingCareer && <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />}
+                        Save
+                      </Button>
+                    </div>
+                  </>
                 ) : (
-                  <Sparkles className="mr-2 h-4 w-4" />
+                  <>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        {profile?.targetRole === "swe_job" ? (
+                          <Briefcase className="h-4 w-4 text-[#3772cf]" />
+                        ) : (
+                          <Target className="h-4 w-4 text-[#0fa76e]" />
+                        )}
+                        <span className="text-[15px] font-medium text-[#0d0d0d]">
+                          {profile?.targetRole === "swe_job" ? "SWE Full-Time" : "SWE Intern"}
+                        </span>
+                      </div>
+                      {profile?.graduationYear && (
+                        <>
+                          <span className="text-[#ccc]">|</span>
+                          <div className="flex items-center gap-2">
+                            <GraduationCap className="h-4 w-4 text-[#666]" />
+                            <span className="text-[15px] text-[#333]">Class of {profile.graduationYear}</span>
+                          </div>
+                          <span className="text-[#ccc]">|</span>
+                          <span className={`rounded-full px-2.5 py-0.5 text-[12px] font-semibold ${
+                            level === "Freshman" ? "bg-[#e8d8f8] text-[#7c3aed]" :
+                            level === "Sophomore" ? "bg-[#d4fae8] text-[#0fa76e]" :
+                            level === "Junior" ? "bg-[#f8ebd8] text-[#c37d0d]" :
+                            level === "Senior" ? "bg-[#e7eefb] text-[#3772cf]" :
+                            "bg-[#f5f5f5] text-[#666]"
+                          }`}>
+                            {level}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => {
+                        setCareerDraft({
+                          targetRole: profile?.targetRole || "swe_intern",
+                          graduationYear: profile?.graduationYear || new Date().getFullYear() + 2,
+                        });
+                        setEditingCareer(true);
+                      }}
+                      className="ml-auto text-[13px] font-medium text-[#666] hover:text-[#0d0d0d]"
+                    >
+                      Edit
+                    </button>
+                  </>
                 )}
-                Get AI Insights
-              </Button>
+              </div>
             </section>
 
-            {/* Radar + Insights */}
+            {/* Guidance Banner */}
+            {guidance && (
+              <section className="rounded-[16px] border border-[#e7eefb] bg-gradient-to-r from-[#f8faff] to-[#f0f4ff] p-6">
+                <div className="mb-3 flex items-center gap-2">
+                  <Target className="h-4 w-4 text-[#3772cf]" />
+                  <h3 className="text-[15px] font-semibold text-[#0d0d0d]">
+                    What you should be doing right now
+                  </h3>
+                  <span className="text-[12px] text-[#666]">
+                    ({level} &middot; {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })})
+                  </span>
+                </div>
+                <ul className="space-y-2">
+                  {guidance.map((tip, i) => (
+                    <li key={i} className="flex items-start gap-2.5 text-[14px] leading-[1.6] text-[#333]">
+                      <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#3772cf]" />
+                      {tip}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {/* 5-Axis Radar + AI Insights */}
             <section className="grid gap-6 xl:grid-cols-2">
               <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-6 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
-                    Knowledge areas
-                  </h2>
-                  {!editingProfile && (
-                    <button
-                      onClick={startEditProfile}
-                      className="text-[14px] font-medium text-[#666666] hover:text-[#0d0d0d]"
-                    >
-                      Edit levels
-                    </button>
-                  )}
-                </div>
+                <h2 className="mb-4 text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
+                  SWE Readiness Radar
+                </h2>
                 {radarData.length > 0 ? (
                   <ResponsiveContainer width="100%" height={320}>
                     <RadarChart data={radarData} outerRadius="75%">
                       <PolarGrid stroke="#e5e5e5" />
                       <PolarAngleAxis
-                        dataKey="area"
-                        tick={{ fontSize: 11, fill: "#666666" }}
+                        dataKey="axis"
+                        tick={{ fontSize: 12, fill: "#333" }}
                       />
                       <PolarRadiusAxis
                         angle={90}
-                        domain={[0, 5]}
-                        tick={{ fontSize: 10, fill: "#999999" }}
-                        tickCount={6}
+                        domain={[0, 100]}
+                        tick={{ fontSize: 10, fill: "#999" }}
+                        tickCount={5}
                       />
                       <Radar
-                        dataKey="level"
+                        dataKey="score"
                         stroke="#18E299"
                         fill="#18E299"
                         fillOpacity={0.2}
@@ -438,56 +769,8 @@ export default function PersonalPage() {
                   </ResponsiveContainer>
                 ) : (
                   <p className="py-12 text-center text-[14px] text-[#666666]">
-                    Complete onboarding to see your knowledge chart.
+                    Complete assessments to see your radar chart.
                   </p>
-                )}
-
-                {editingProfile && (
-                  <div className="mt-4 space-y-2 border-t border-[rgba(0,0,0,0.05)] pt-4">
-                    {knowledgeDraft.map((area, i) => (
-                      <div key={area.area} className="flex items-center justify-between">
-                        <p className="text-[14px] text-[#333333]">{area.area}</p>
-                        <div className="flex gap-1">
-                          {[1, 2, 3, 4, 5].map((level) => (
-                            <button
-                              key={level}
-                              onClick={() =>
-                                setKnowledgeDraft((prev) =>
-                                  prev.map((a, idx) =>
-                                    idx === i ? { ...a, level } : a
-                                  )
-                                )
-                              }
-                              className={`h-7 w-7 rounded-md text-[12px] font-medium transition-colors ${
-                                area.level >= level
-                                  ? "bg-[#0d0d0d] text-white"
-                                  : "bg-[#f5f5f5] text-[#666666] hover:bg-[#e5e5e5]"
-                              }`}
-                            >
-                              {level}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                    <div className="flex justify-end gap-2 pt-2">
-                      <Button
-                        variant="outline"
-                        onClick={() => setEditingProfile(false)}
-                        className="h-auto rounded-lg px-4 py-1.5 text-[13px]"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={saveProfile}
-                        disabled={savingProfile}
-                        className="h-auto rounded-lg bg-[#0d0d0d] px-4 py-1.5 text-[13px] text-white"
-                      >
-                        {savingProfile && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
-                        Save
-                      </Button>
-                    </div>
-                  </div>
                 )}
               </article>
 
@@ -521,166 +804,183 @@ export default function PersonalPage() {
                   </ol>
                 ) : (
                   <p className="text-[16px] leading-[1.5] text-[#999999]">
-                    Click &quot;Get AI Insights&quot; to receive personalized study and career advice.
+                    Click &quot;Get AI Insights&quot; for personalized SWE career advice based on your scores.
                   </p>
                 )}
               </article>
             </section>
 
-            {/* Goals */}
+            {/* 5 Axis Cards */}
             <section>
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
-                  Goals
-                </h2>
-                <Button
-                  onClick={() => setShowAddGoal(true)}
-                  className="h-auto rounded-full bg-[#0d0d0d] px-4 py-1.5 text-[13px] text-white"
+              <h2 className="mb-4 text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
+                Assessment Axes
+              </h2>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {/* DSA */}
+                <AxisCard
+                  label="DSA"
+                  score={axes?.dsa ?? 0}
+                  description="LeetCode solved count, difficulty mix"
+                  connected={!!profile?.leetcodeUsername}
                 >
-                  <Plus className="mr-1.5 h-3.5 w-3.5" />
-                  Add goal
-                </Button>
-              </div>
-
-              {showAddGoal && (
-                <div className="mb-4 rounded-[16px] border border-[rgba(0,0,0,0.1)] bg-white p-5 shadow-sm">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <input
-                      type="text"
-                      placeholder="Goal title"
-                      value={newGoal.title}
-                      onChange={(e) => setNewGoal((g) => ({ ...g, title: e.target.value }))}
-                      className="col-span-full rounded-lg border border-[rgba(0,0,0,0.1)] px-3 py-2 text-[14px] outline-none focus:border-[#0d0d0d]"
-                    />
-                    <select
-                      value={newGoal.category}
-                      onChange={(e) => setNewGoal((g) => ({ ...g, category: e.target.value }))}
-                      className="rounded-lg border border-[rgba(0,0,0,0.1)] px-3 py-2 text-[14px] outline-none"
-                    >
-                      {GOAL_CATEGORIES.map((c) => (
-                        <option key={c.value} value={c.value}>{c.label}</option>
-                      ))}
-                    </select>
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        placeholder="Target"
-                        value={newGoal.targetValue}
-                        onChange={(e) => setNewGoal((g) => ({ ...g, targetValue: e.target.value }))}
-                        className="w-24 rounded-lg border border-[rgba(0,0,0,0.1)] px-3 py-2 text-[14px] outline-none"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Unit"
-                        value={newGoal.unit}
-                        onChange={(e) => setNewGoal((g) => ({ ...g, unit: e.target.value }))}
-                        className="flex-1 rounded-lg border border-[rgba(0,0,0,0.1)] px-3 py-2 text-[14px] outline-none"
-                      />
-                    </div>
-                    <input
-                      type="date"
-                      value={newGoal.deadline}
-                      onChange={(e) => setNewGoal((g) => ({ ...g, deadline: e.target.value }))}
-                      className="rounded-lg border border-[rgba(0,0,0,0.1)] px-3 py-2 text-[14px] outline-none"
-                    />
-                  </div>
-                  <div className="mt-3 flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => setShowAddGoal(false)} className="h-auto rounded-lg px-4 py-1.5 text-[13px]">
-                      Cancel
-                    </Button>
-                    <Button onClick={handleAddGoal} disabled={!newGoal.title.trim()} className="h-auto rounded-lg bg-[#0d0d0d] px-4 py-1.5 text-[13px] text-white">
-                      Add
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              <div className="grid gap-3 md:grid-cols-2">
-                {loadingGoals ? (
-                  Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="h-24 animate-pulse rounded-[16px] bg-[#f5f5f5]" />
-                  ))
-                ) : goals.length === 0 ? (
-                  <p className="col-span-full py-8 text-center text-[14px] text-[#666666]">
-                    No goals yet. Add one to start tracking your progress.
-                  </p>
-                ) : (
-                  goals.map((goal) => {
-                    const pct =
-                      goal.targetValue && goal.targetValue > 0
-                        ? Math.min((goal.currentValue / goal.targetValue) * 100, 100)
-                        : 0;
-                    const catColor = CATEGORY_COLORS[goal.category] || CATEGORY_COLORS.other;
-
-                    return (
-                      <article
-                        key={goal.id}
-                        className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-5 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <h3 className="truncate text-[16px] font-medium text-[#0d0d0d]">
-                                {goal.title}
-                              </h3>
-                              <span
-                                className={`shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold uppercase ${catColor}`}
-                              >
-                                {goal.category}
-                              </span>
-                            </div>
-                            {goal.targetValue ? (
-                              <div className="mt-3">
-                                <div className="flex items-center justify-between text-[13px] text-[#666666]">
-                                  <span>
-                                    {goal.currentValue} / {goal.targetValue} {goal.unit}
-                                  </span>
-                                  <span>{Math.round(pct)}%</span>
-                                </div>
-                                <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[#f5f5f5]">
-                                  <div
-                                    className="h-full rounded-full bg-[#18E299] transition-all duration-500"
-                                    style={{ width: `${pct}%` }}
-                                  />
-                                </div>
-                              </div>
-                            ) : (
-                              <p className="mt-2 text-[13px] text-[#666666]">No target set</p>
-                            )}
-                            {goal.deadline && (
-                              <p className="mt-2 text-[12px] text-[#999999]">
-                                Deadline: {goal.deadline}
-                              </p>
-                            )}
+                  {profile?.leetcodeUsername ? (
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <p className="text-[13px] text-[#666]">
+                          Connected as <span className="font-medium text-[#0d0d0d]">{profile.leetcodeUsername}</span>
+                        </p>
+                        <button
+                          onClick={refreshLeetCode}
+                          disabled={loadingLeetCode}
+                          className="text-[#666] hover:text-[#0d0d0d]"
+                        >
+                          <RefreshCw className={`h-4 w-4 ${loadingLeetCode ? "animate-spin" : ""}`} />
+                        </button>
+                      </div>
+                      {profile.leetcodeStats && (
+                        <div className="mt-3 grid grid-cols-4 gap-2">
+                          <div className="rounded-lg bg-[#f5f5f5] p-2 text-center">
+                            <p className="text-[18px] font-bold text-[#0d0d0d]">{profile.leetcodeStats.total}</p>
+                            <p className="text-[10px] text-[#999]">Total</p>
                           </div>
-                          <div className="ml-3 flex shrink-0 gap-1">
-                            {goal.targetValue && (
-                              <button
-                                onClick={() =>
-                                  updateGoal(goal.id, {
-                                    currentValue: goal.currentValue + 1,
-                                  })
-                                }
-                                className="rounded-lg p-1.5 text-[#666666] hover:bg-[#f5f5f5] hover:text-[#0d0d0d]"
-                                title="Increment"
-                              >
-                                <Plus className="h-4 w-4" />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => deleteGoal(goal.id)}
-                              className="rounded-lg p-1.5 text-[#666666] hover:bg-[#f5f5f5] hover:text-[#d45656]"
-                              title="Delete"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                          <div className="rounded-lg bg-[#d4fae8] p-2 text-center">
+                            <p className="text-[18px] font-bold text-[#0fa76e]">{profile.leetcodeStats.easy}</p>
+                            <p className="text-[10px] text-[#0fa76e]">Easy</p>
+                          </div>
+                          <div className="rounded-lg bg-[#f8ebd8] p-2 text-center">
+                            <p className="text-[18px] font-bold text-[#c37d0d]">{profile.leetcodeStats.medium}</p>
+                            <p className="text-[10px] text-[#c37d0d]">Med</p>
+                          </div>
+                          <div className="rounded-lg bg-[#f7e5e5] p-2 text-center">
+                            <p className="text-[18px] font-bold text-[#d45656]">{profile.leetcodeStats.hard}</p>
+                            <p className="text-[10px] text-[#d45656]">Hard</p>
                           </div>
                         </div>
-                      </article>
-                    );
-                  })
-                )}
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="LeetCode username"
+                          value={lcUsername}
+                          onChange={(e) => setLcUsername(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleConnectLC()}
+                          className="flex-1 rounded-lg border border-[rgba(0,0,0,0.1)] px-3 py-2 text-[14px] outline-none focus:border-[#0d0d0d]"
+                        />
+                        <Button
+                          onClick={handleConnectLC}
+                          disabled={loadingLeetCode || !lcUsername.trim()}
+                          className="h-auto rounded-lg bg-[#0d0d0d] px-4 py-2 text-[13px] text-white"
+                        >
+                          {loadingLeetCode ? <Loader2 className="h-4 w-4 animate-spin" /> : "Connect"}
+                        </Button>
+                      </div>
+                      {lcError && <p className="mt-2 text-[13px] text-[#d45656]">{lcError}</p>}
+                    </div>
+                  )}
+                </AxisCard>
+
+                {/* Projects */}
+                <AxisCard
+                  label="Projects"
+                  score={axes?.projects ?? 0}
+                  description="From resume — deployed status, tech depth, impact"
+                  connected={(axes?.projects ?? 0) > 0}
+                >
+                  <p className="text-[13px] text-[#999]">
+                    Upload your resume below to auto-extract project data. LLM scoring coming soon.
+                  </p>
+                </AxisCard>
+
+                {/* System Design */}
+                <AxisCard
+                  label="System Design"
+                  score={axes?.systemDesign ?? 0}
+                  description="APIs, scaling, caching, cloud, tradeoffs"
+                  connected={(axes?.systemDesign ?? 0) > 0}
+                >
+                  <Button
+                    onClick={() => setShowSDQuiz(true)}
+                    variant="outline"
+                    className="h-auto w-full rounded-lg px-4 py-2 text-[13px]"
+                  >
+                    {(axes?.systemDesign ?? 0) > 0 ? "Retake assessment" : "Take assessment"}
+                  </Button>
+                </AxisCard>
+
+                {/* Core CS */}
+                <AxisCard
+                  label="Core CS"
+                  score={axes?.coreCs ?? 0}
+                  description="OS, networking, concurrency, DB internals"
+                  connected={(axes?.coreCs ?? 0) > 0}
+                >
+                  <Button
+                    onClick={() => setShowCSQuiz(true)}
+                    variant="outline"
+                    className="h-auto w-full rounded-lg px-4 py-2 text-[13px]"
+                  >
+                    {(axes?.coreCs ?? 0) > 0 ? "Retake assessment" : "Take assessment"}
+                  </Button>
+                </AxisCard>
+
+                {/* Resume */}
+                <AxisCard
+                  label="Resume"
+                  score={axes?.resume ?? 0}
+                  description="Formatting, bullet quality, metrics, ATS readability"
+                  connected={!!profile?.hasResume}
+                >
+                  {profile?.hasResume ? (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-[#666]" />
+                        <p className="text-[13px] text-[#333]">{profile.resumeFilename}</p>
+                      </div>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          className="rounded-lg p-1.5 text-[#666] hover:bg-[#f5f5f5] hover:text-[#0d0d0d]"
+                          title="Replace"
+                        >
+                          <Upload className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={deleteResume}
+                          className="rounded-lg p-1.5 text-[#666] hover:bg-[#f5f5f5] hover:text-[#d45656]"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={loadingResume}
+                      variant="outline"
+                      className="h-auto w-full rounded-lg px-4 py-2 text-[13px]"
+                    >
+                      {loadingResume ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Upload className="mr-2 h-4 w-4" />
+                      )}
+                      Upload resume (PDF)
+                    </Button>
+                  )}
+                  <p className="mt-2 text-[12px] text-[#999]">LLM scoring coming soon.</p>
+                </AxisCard>
               </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
             </section>
 
             {/* Heatmap */}

@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -135,11 +136,96 @@ public class PersonalController {
         return ResponseEntity.ok(Map.of("insights", insights));
     }
 
+    @PostMapping("/leetcode/connect")
+    public ResponseEntity<UserProfileDto> connectLeetCode(
+            @RequestBody Map<String, String> request,
+            Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        String username = request.get("username");
+        if (username == null || username.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        UserProfile profile = personalService.connectLeetCode(user.getId(), username.trim());
+        return ResponseEntity.ok(toDto(profile));
+    }
+
+    @PostMapping("/leetcode/refresh")
+    public ResponseEntity<UserProfileDto> refreshLeetCode(Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        UserProfile profile = personalService.refreshLeetCode(user.getId());
+        return ResponseEntity.ok(toDto(profile));
+    }
+
+    @PostMapping("/resume/upload")
+    public ResponseEntity<UserProfileDto> uploadResume(
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        UserProfile profile = personalService.uploadResume(user.getId(), file);
+        return ResponseEntity.ok(toDto(profile));
+    }
+
+    @DeleteMapping("/resume")
+    public ResponseEntity<UserProfileDto> deleteResume(Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        UserProfile profile = personalService.deleteResume(user.getId());
+        return ResponseEntity.ok(toDto(profile));
+    }
+
+    @PostMapping("/questionnaire/{axis}")
+    public ResponseEntity<UserProfileDto> submitQuestionnaire(
+            @PathVariable String axis,
+            @RequestBody Map<String, Object> answers,
+            Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        if (!axis.equals("systemDesign") && !axis.equals("coreCs")) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        UserProfile profile = personalService.submitQuestionnaire(user.getId(), axis, answers);
+        return ResponseEntity.ok(toDto(profile));
+    }
+
+    @PutMapping("/career")
+    public ResponseEntity<UserProfileDto> updateCareer(
+            @RequestBody Map<String, Object> request,
+            Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        String targetRole = (String) request.get("targetRole");
+        Integer gradYear = request.get("graduationYear") != null
+                ? ((Number) request.get("graduationYear")).intValue() : null;
+
+        UserProfile profile = personalService.updateCareer(user.getId(), targetRole, gradYear);
+        return ResponseEntity.ok(toDto(profile));
+    }
+
     private UserProfileDto toDto(UserProfile profile) {
         return new UserProfileDto(
                 profile.getProfileMarkdown(),
                 profile.getKnowledgeAreas(),
-                profile.isOnboardingCompleted()
+                profile.isOnboardingCompleted(),
+                profile.getLeetcodeUsername(),
+                profile.getLeetcodeStats(),
+                profile.getResumeFilename(),
+                profile.getResumeText() != null && !profile.getResumeText().isBlank(),
+                profile.getSystemDesignAnswers(),
+                profile.getCoreCsAnswers(),
+                profile.getAxisScores(),
+                profile.getTargetRole(),
+                profile.getGraduationYear()
         );
     }
 

@@ -6,5 +6,14 @@ import java.util.Map;
 public record UserProfileDto(
         String profileMarkdown,
         List<Map<String, Object>> knowledgeAreas,
-        boolean onboardingCompleted
+        boolean onboardingCompleted,
+        String leetcodeUsername,
+        Map<String, Object> leetcodeStats,
+        String resumeFilename,
+        boolean hasResume,
+        Map<String, Object> systemDesignAnswers,
+        Map<String, Object> coreCsAnswers,
+        Map<String, Object> axisScores,
+        String targetRole,
+        Integer graduationYear
 ) {}

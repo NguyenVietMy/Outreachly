@@ -11,8 +11,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.*;
 
 @Service
@@ -24,6 +26,8 @@ public class PersonalService {
     private final UserGoalRepository goalRepo;
     private final IntegrationEventRepository eventRepo;
     private final OpenAiService openAiService;
+    private final LeetCodeService leetCodeService;
+    private final ResumeService resumeService;
 
     public UserProfile getOrCreateProfile(Long userId) {
         return profileRepo.findByUserId(userId)
@@ -122,6 +126,117 @@ public class PersonalService {
         return sb.toString();
     }
 
+    // --- Career Target ---
+
+    @Transactional
+    public UserProfile updateCareer(Long userId, String targetRole, Integer graduationYear) {
+        UserProfile profile = getOrCreateProfile(userId);
+        if (targetRole != null) {
+            profile.setTargetRole(targetRole);
+        }
+        if (graduationYear != null) {
+            profile.setGraduationYear(graduationYear);
+        }
+        return profileRepo.save(profile);
+    }
+
+    // --- LeetCode ---
+
+    @Transactional
+    public UserProfile connectLeetCode(Long userId, String username) {
+        Map<String, Object> stats = leetCodeService.fetchStats(username);
+        UserProfile profile = getOrCreateProfile(userId);
+        profile.setLeetcodeUsername(username);
+        profile.setLeetcodeStats(stats);
+        profile.setLeetcodeFetchedAt(OffsetDateTime.now());
+        updateAxisScore(profile, "dsa", ((Number) stats.get("dsaScore")).intValue());
+        return profileRepo.save(profile);
+    }
+
+    @Transactional
+    public UserProfile refreshLeetCode(Long userId) {
+        UserProfile profile = getOrCreateProfile(userId);
+        if (profile.getLeetcodeUsername() == null) {
+            throw new RuntimeException("LeetCode not connected");
+        }
+        Map<String, Object> stats = leetCodeService.fetchStats(profile.getLeetcodeUsername());
+        profile.setLeetcodeStats(stats);
+        profile.setLeetcodeFetchedAt(OffsetDateTime.now());
+        updateAxisScore(profile, "dsa", ((Number) stats.get("dsaScore")).intValue());
+        return profileRepo.save(profile);
+    }
+
+    // --- Resume ---
+
+    @Transactional
+    public UserProfile uploadResume(Long userId, MultipartFile file) {
+        String text = resumeService.extractText(file);
+        UserProfile profile = getOrCreateProfile(userId);
+        profile.setResumeText(text);
+        profile.setResumeFilename(file.getOriginalFilename());
+        profile.setResumeUploadedAt(OffsetDateTime.now());
+        return profileRepo.save(profile);
+    }
+
+    @Transactional
+    public UserProfile deleteResume(Long userId) {
+        UserProfile profile = getOrCreateProfile(userId);
+        profile.setResumeText("");
+        profile.setResumeFilename(null);
+        profile.setResumeUploadedAt(null);
+        updateAxisScore(profile, "resume", 0);
+        updateAxisScore(profile, "projects", 0);
+        return profileRepo.save(profile);
+    }
+
+    // --- Questionnaires ---
+
+    @Transactional
+    public UserProfile submitQuestionnaire(Long userId, String axis, Map<String, Object> answers) {
+        UserProfile profile = getOrCreateProfile(userId);
+
+        int score = computeQuestionnaireScore(answers);
+
+        if ("systemDesign".equals(axis)) {
+            profile.setSystemDesignAnswers(answers);
+            updateAxisScore(profile, "systemDesign", score);
+        } else if ("coreCs".equals(axis)) {
+            profile.setCoreCsAnswers(answers);
+            updateAxisScore(profile, "coreCs", score);
+        }
+
+        return profileRepo.save(profile);
+    }
+
+    private int computeQuestionnaireScore(Map<String, Object> answers) {
+        if (answers == null || answers.isEmpty()) return 0;
+
+        Object answersObj = answers.get("answers");
+        if (!(answersObj instanceof List<?> answerList) || answerList.isEmpty()) return 0;
+
+        int totalPoints = 0;
+        int maxPoints = answerList.size() * 3;
+
+        for (Object a : answerList) {
+            if (a instanceof Map<?, ?> answer) {
+                Object val = answer.get("value");
+                if (val instanceof Number n) {
+                    totalPoints += n.intValue();
+                }
+            }
+        }
+
+        return maxPoints > 0 ? (int) Math.round((double) totalPoints / maxPoints * 100) : 0;
+    }
+
+    private void updateAxisScore(UserProfile profile, String axis, int score) {
+        Map<String, Object> scores = new HashMap<>(profile.getAxisScores());
+        scores.put(axis, score);
+        profile.setAxisScores(scores);
+    }
+
+    // --- Goals ---
+
     public List<UserGoal> getGoals(Long userId) {
         return goalRepo.findByUserId(userId);
     }
@@ -161,6 +276,8 @@ public class PersonalService {
         goalRepo.delete(goal);
     }
 
+    // --- Heatmap ---
+
     public Map<String, Integer> getActivityHeatmap(Long userId, int months) {
         LocalDateTime since = LocalDateTime.now().minusMonths(months);
         List<Object[]> rows = eventRepo.countByUserIdGroupByDate(userId, since);
@@ -171,6 +288,8 @@ public class PersonalService {
         }
         return heatmap;
     }
+
+    // --- AI Insights ---
 
     public String generateInsights(Long userId) {
         UserProfile profile = getOrCreateProfile(userId);
@@ -186,12 +305,20 @@ public class PersonalService {
             context.append(profile.getProfileMarkdown()).append("\n\n");
         }
 
-        if (!profile.getKnowledgeAreas().isEmpty()) {
-            context.append("=== KNOWLEDGE LEVELS ===\n");
-            for (Map<String, Object> area : profile.getKnowledgeAreas()) {
-                context.append(String.format("- %s: %s/5\n", area.get("area"), area.get("level")));
-            }
-            context.append("\n");
+        if (profile.getLeetcodeStats() != null && !profile.getLeetcodeStats().isEmpty()) {
+            context.append("=== LEETCODE STATS ===\n");
+            Map<String, Object> lc = profile.getLeetcodeStats();
+            context.append(String.format("Total solved: %s (Easy: %s, Medium: %s, Hard: %s)\n",
+                    lc.get("total"), lc.get("easy"), lc.get("medium"), lc.get("hard")));
+            context.append(String.format("DSA Score: %s/100\n\n", lc.get("dsaScore")));
+        }
+
+        Map<String, Object> scores = profile.getAxisScores();
+        if (scores != null && !scores.isEmpty()) {
+            context.append("=== AXIS SCORES ===\n");
+            context.append(String.format("DSA: %s, System Design: %s, Core CS: %s, Projects: %s, Resume: %s\n\n",
+                    scores.get("dsa"), scores.get("systemDesign"), scores.get("coreCs"),
+                    scores.get("projects"), scores.get("resume")));
         }
 
         if (!goals.isEmpty()) {
