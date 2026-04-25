@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.HashMap;
@@ -24,6 +25,7 @@ public class EmailProviderConfig {
      * WebClient for Resend API calls
      */
     @Bean
+    @Primary
     public WebClient resendWebClient() {
         return WebClient.builder()
                 .baseUrl("https://api.resend.com")

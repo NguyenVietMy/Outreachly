@@ -33,7 +33,8 @@ public class OAuth2Config {
                                                 .maxSessionsPreventsLogin(false))
                                 .authorizeHttpRequests(authz -> authz
                                                 .requestMatchers("/", "/login", "/oauth2/**", "/actuator/**",
-                                                                "/api/auth/**")
+                                                                "/api/auth/**",
+                                                                "/api/integrations/*/callback")
                                                 .permitAll()
                                                 .requestMatchers("/api/**")
                                                 .authenticated()
