@@ -81,6 +81,11 @@ public class UserProfile {
     private Map<String, Object> axisScores = Map.of(
             "dsa", 0, "projects", 0, "systemDesign", 0, "coreCs", 0, "resume", 0);
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "resume_score_breakdown", columnDefinition = "jsonb")
+    @Builder.Default
+    private Map<String, Object> resumeScoreBreakdown = Map.of();
+
     @Column(name = "target_role", length = 20)
     @Builder.Default
     private String targetRole = "swe_intern";

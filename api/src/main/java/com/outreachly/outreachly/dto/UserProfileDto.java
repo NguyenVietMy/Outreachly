@@ -14,6 +14,7 @@ public record UserProfileDto(
         Map<String, Object> systemDesignAnswers,
         Map<String, Object> coreCsAnswers,
         Map<String, Object> axisScores,
+        Map<String, Object> resumeScoreBreakdown,
         String targetRole,
         Integer graduationYear
 ) {}

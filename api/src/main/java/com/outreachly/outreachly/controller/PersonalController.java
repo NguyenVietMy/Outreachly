@@ -172,6 +172,15 @@ public class PersonalController {
         return ResponseEntity.ok(toDto(profile));
     }
 
+    @PostMapping("/resume/score")
+    public ResponseEntity<UserProfileDto> scoreResume(Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        UserProfile profile = personalService.scoreResume(user.getId());
+        return ResponseEntity.ok(toDto(profile));
+    }
+
     @DeleteMapping("/resume")
     public ResponseEntity<UserProfileDto> deleteResume(Authentication authentication) {
         User user = getUser(authentication);
@@ -224,6 +233,7 @@ public class PersonalController {
                 profile.getSystemDesignAnswers(),
                 profile.getCoreCsAnswers(),
                 profile.getAxisScores(),
+                profile.getResumeScoreBreakdown(),
                 profile.getTargetRole(),
                 profile.getGraduationYear()
         );
