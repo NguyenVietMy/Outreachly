@@ -4,7 +4,9 @@ import { useState, useRef } from "react";
 import AuthGuard from "@/components/AuthGuard";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
-import { usePersonal, KnowledgeArea, OnboardingData } from "@/hooks/usePersonal";
+import { usePersonal, KnowledgeArea, OnboardingData, AxisAssessmentPayload, SectionAssessment, ResumeScoreBreakdown, ResumeSubScore } from "@/hooks/usePersonal";
+import MilestoneAssessmentModal from "@/components/assessment/MilestoneAssessmentModal";
+import { CS_FUNDAMENTALS_SECTIONS, SYSTEM_DESIGN_SECTIONS, SECTION_COUNTS } from "@/data/assessmentContent";
 import {
   Bot,
   ChevronDown,
@@ -164,110 +166,23 @@ const DEFAULT_AREAS = [
   "Machine Learning", "Security",
 ];
 
-const SYSTEM_DESIGN_QUESTIONS = [
-  { id: "api_design", q: "How comfortable are you designing REST APIs?", options: ["Never done it", "Can build basic CRUD", "Can design with auth, pagination, versioning", "Can design scalable APIs with rate limiting, caching"] },
-  { id: "databases", q: "SQL vs NoSQL — when would you pick each?", options: ["Not sure", "Know the basics", "Can reason about tradeoffs", "Can design schemas for complex systems"] },
-  { id: "caching", q: "How well do you understand caching strategies?", options: ["What's caching?", "Know Redis/Memcached basics", "Can design cache invalidation strategies", "Can design multi-layer caching"] },
-  { id: "scaling", q: "How would you scale a service to 10x traffic?", options: ["No idea", "Know about load balancers", "Can reason about horizontal vs vertical scaling", "Can design auto-scaling with queues, CDNs, sharding"] },
-  { id: "cloud", q: "Cloud infrastructure experience?", options: ["None", "Deployed to Vercel/Heroku", "Used AWS/GCP services (EC2, S3, etc.)", "Can architect with IaC (Terraform, CDK)"] },
-  { id: "tradeoffs", q: "Can you discuss CAP theorem / consistency vs availability?", options: ["Never heard of it", "Know the concept", "Can apply to real scenarios", "Can design systems with specific consistency guarantees"] },
-];
-
-const CORE_CS_QUESTIONS = [
-  { id: "os_processes", q: "Processes vs threads — what's the difference?", options: ["Not sure", "Know the basic difference", "Understand scheduling, context switching", "Can explain IPC, synchronization primitives"] },
-  { id: "os_memory", q: "Virtual memory and paging?", options: ["No idea", "Know what virtual memory is", "Understand page tables, TLB", "Can explain page replacement algorithms"] },
-  { id: "networking", q: "What happens when you type a URL in the browser?", options: ["Not sure", "DNS, HTTP basics", "Can explain TCP handshake, TLS, routing", "Full stack: DNS, TCP, TLS, HTTP/2, CDN"] },
-  { id: "concurrency", q: "Mutex vs semaphore vs condition variable?", options: ["No idea", "Know mutex basics", "Can use all three correctly", "Can design lock-free data structures"] },
-  { id: "db_internals", q: "How does a database index work?", options: ["No idea", "Know it makes queries faster", "Understand B-tree structure", "Can reason about index selection and query plans"] },
-  { id: "os_fs", q: "File systems — inodes, journaling?", options: ["Never studied", "Know basic file system concepts", "Understand inodes, directories, links", "Can compare ext4, ZFS, etc."] },
-];
-
-// --- Questionnaire Component ---
-
-function QuestionnaireModal({
-  title,
-  questions,
-  onSubmit,
-  onClose,
-}: {
-  title: string;
-  questions: typeof SYSTEM_DESIGN_QUESTIONS;
-  onSubmit: (answers: Record<string, unknown>) => Promise<void>;
-  onClose: () => void;
-}) {
-  const [answers, setAnswers] = useState<Record<string, number>>({});
-  const [submitting, setSubmitting] = useState(false);
-
-  const allAnswered = questions.every((q) => answers[q.id] !== undefined);
-
-  const handleSubmit = async () => {
-    setSubmitting(true);
-    try {
-      const payload = {
-        answers: questions.map((q) => ({
-          questionId: q.id,
-          value: answers[q.id] ?? 0,
-        })),
-      };
-      await onSubmit(payload);
-      onClose();
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="mx-4 w-full max-w-[640px] max-h-[90vh] overflow-y-auto rounded-[20px] bg-white p-8 shadow-xl">
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-[22px] font-semibold tracking-[-0.2px] text-[#0d0d0d]">{title}</h2>
-          <button onClick={onClose} className="p-1 text-[#999] hover:text-[#333]">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="space-y-6">
-          {questions.map((q, qi) => (
-            <div key={q.id}>
-              <p className="mb-2 text-[15px] font-medium text-[#0d0d0d]">
-                {qi + 1}. {q.q}
-              </p>
-              <div className="space-y-1.5">
-                {q.options.map((opt, oi) => (
-                  <button
-                    key={oi}
-                    onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: oi }))}
-                    className={`w-full rounded-lg border px-3 py-2 text-left text-[14px] transition-colors ${
-                      answers[q.id] === oi
-                        ? "border-[#0d0d0d] bg-[#0d0d0d] text-white"
-                        : "border-[rgba(0,0,0,0.1)] text-[#333] hover:border-[#999]"
-                    }`}
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-6 flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose} className="h-auto rounded-full px-6 py-2">
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={!allAnswered || submitting}
-            className="h-auto rounded-full bg-[#0d0d0d] px-6 py-2 text-white"
-          >
-            {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Submit
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
+function isNewFormatAssessment(
+  data: AxisAssessmentPayload | Record<string, unknown> | null
+): data is AxisAssessmentPayload {
+  return !!data && "sections" in data && "axisId" in data;
 }
+
+function getAssessmentProgress(
+  answers: AxisAssessmentPayload | Record<string, unknown> | null,
+  axis: "systemDesign" | "coreCs"
+): { completed: number; total: number } | null {
+  if (!isNewFormatAssessment(answers)) return null;
+  return {
+    completed: answers.sections.length,
+    total: SECTION_COUNTS[axis],
+  };
+}
+
 
 // --- Onboarding Modal ---
 
@@ -463,6 +378,103 @@ function AxisCard({
   );
 }
 
+// --- Resume Breakdown ---
+
+function ScoreBar({ label, sub }: { label: string; sub?: ResumeSubScore }) {
+  if (!sub) return null;
+  const pct = sub.max > 0 ? (sub.score / sub.max) * 100 : 0;
+  const color = pct >= 70 ? "#0fa76e" : pct >= 40 ? "#c37d0d" : "#d45656";
+  return (
+    <div className="group relative">
+      <div className="flex items-center justify-between text-[12px]">
+        <span className="text-[#555]">{label}</span>
+        <span className="font-medium" style={{ color }}>{sub.score}/{sub.max}</span>
+      </div>
+      <div className="mt-1 h-1.5 w-full rounded-full bg-[#f0f0f0]">
+        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
+      </div>
+      {sub.rationale && (
+        <div className="pointer-events-none absolute bottom-full left-0 z-10 mb-2 hidden w-64 rounded-lg border border-[rgba(0,0,0,0.08)] bg-white p-2.5 text-[11px] leading-[1.5] text-[#555] shadow-lg group-hover:block">
+          {sub.rationale}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ResumeBreakdownView({ breakdown }: { breakdown: ResumeScoreBreakdown | null }) {
+  if (!breakdown || !breakdown.sections) {
+    return <p className="text-[12px] text-[#999]">Upload a resume to get AI-powered scoring.</p>;
+  }
+
+  const s = breakdown.sections;
+  const decisionColor =
+    breakdown.decision === "ADVANCE" ? "bg-[#d4fae8] text-[#0fa76e]" :
+    breakdown.decision === "HOLD" ? "bg-[#f8ebd8] text-[#c37d0d]" :
+    "bg-[#f7e5e5] text-[#d45656]";
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${decisionColor}`}>
+            {breakdown.decision}
+          </span>
+          <span className="text-[12px] text-[#999]">{breakdown.total_score}/{breakdown.max_score}</span>
+        </div>
+        {breakdown.flags && breakdown.flags.length > 0 && (
+          <div className="flex gap-1">
+            {breakdown.flags.map((f) => (
+              <span key={f} className="rounded bg-[#f5f5f5] px-1.5 py-0.5 text-[10px] text-[#666]">{f}</span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#999]">Technical Skills</p>
+        <ScoreBar label="Languages" sub={s.technical_skills?.primary_language} />
+        <ScoreBar label="Frameworks" sub={s.technical_skills?.backend_frameworks} />
+        <ScoreBar label="Data Layer" sub={s.technical_skills?.data_layer} />
+        <ScoreBar label="Infra/DevOps" sub={s.technical_skills?.infra_devops} />
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#999]">Experience</p>
+        <ScoreBar label="Years" sub={s.experience?.years} />
+        <ScoreBar label="Progression" sub={s.experience?.progression} />
+        <ScoreBar label="Recency" sub={s.experience?.recency} />
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#999]">Impact</p>
+        <ScoreBar label="Quantified Outcomes" sub={s.impact?.quantified_outcomes} />
+        <ScoreBar label="Scope" sub={s.impact?.scope} />
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#999]">Education</p>
+        <ScoreBar label="Degree" sub={s.education?.degree} />
+        <ScoreBar label="Certifications" sub={s.education?.certifications} />
+      </div>
+
+      <ScoreBar label="Project Complexity" sub={s.project_complexity} />
+
+      <div className="space-y-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#999]">Resume Quality</p>
+        <ScoreBar label="Parsability" sub={s.resume_quality?.parsability} />
+        <ScoreBar label="Conciseness" sub={s.resume_quality?.conciseness} />
+      </div>
+
+      {breakdown.summary && (
+        <p className="border-t border-[rgba(0,0,0,0.05)] pt-2 text-[12px] leading-[1.5] text-[#555]">
+          {breakdown.summary}
+        </p>
+      )}
+    </div>
+  );
+}
+
 // --- Main Page ---
 
 export default function PersonalPage() {
@@ -474,6 +486,7 @@ export default function PersonalPage() {
     loadingInsights,
     loadingLeetCode,
     loadingResume,
+    scoringResume,
     updateProfile,
     completeOnboarding,
     updateCareer,
@@ -481,6 +494,7 @@ export default function PersonalPage() {
     refreshLeetCode,
     uploadResume,
     deleteResume,
+    scoreResume,
     submitQuestionnaire,
     requestInsights,
   } = usePersonal();
@@ -492,8 +506,8 @@ export default function PersonalPage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [lcUsername, setLcUsername] = useState("");
   const [lcError, setLcError] = useState("");
-  const [showSDQuiz, setShowSDQuiz] = useState(false);
-  const [showCSQuiz, setShowCSQuiz] = useState(false);
+  const [showSDAssessment, setShowSDAssessment] = useState(false);
+  const [showCSAssessment, setShowCSAssessment] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Career editing
@@ -585,20 +599,26 @@ export default function PersonalPage() {
         {profile && !profile.onboardingCompleted && (
           <OnboardingModal onComplete={completeOnboarding} />
         )}
-        {showSDQuiz && (
-          <QuestionnaireModal
+        {showSDAssessment && (
+          <MilestoneAssessmentModal
+            axisId="systemDesign"
             title="System Design Assessment"
-            questions={SYSTEM_DESIGN_QUESTIONS}
-            onSubmit={(answers) => submitQuestionnaire("systemDesign", answers)}
-            onClose={() => setShowSDQuiz(false)}
+            sections={SYSTEM_DESIGN_SECTIONS}
+            existingAssessment={profile?.systemDesignAnswers ?? null}
+            onSectionComplete={(section: SectionAssessment) => submitQuestionnaire("systemDesign", section as unknown as Record<string, unknown>)}
+            onComplete={() => {}}
+            onClose={() => setShowSDAssessment(false)}
           />
         )}
-        {showCSQuiz && (
-          <QuestionnaireModal
-            title="Core CS Assessment"
-            questions={CORE_CS_QUESTIONS}
-            onSubmit={(answers) => submitQuestionnaire("coreCs", answers)}
-            onClose={() => setShowCSQuiz(false)}
+        {showCSAssessment && (
+          <MilestoneAssessmentModal
+            axisId="coreCs"
+            title="CS Fundamentals Assessment"
+            sections={CS_FUNDAMENTALS_SECTIONS}
+            existingAssessment={profile?.coreCsAnswers ?? null}
+            onSectionComplete={(section: SectionAssessment) => submitQuestionnaire("coreCs", section as unknown as Record<string, unknown>)}
+            onComplete={() => {}}
+            onClose={() => setShowCSAssessment(false)}
           />
         )}
 
@@ -901,13 +921,27 @@ export default function PersonalPage() {
                   description="APIs, scaling, caching, cloud, tradeoffs"
                   connected={(axes?.systemDesign ?? 0) > 0}
                 >
-                  <Button
-                    onClick={() => setShowSDQuiz(true)}
-                    variant="outline"
-                    className="h-auto w-full rounded-lg px-4 py-2 text-[13px]"
-                  >
-                    {(axes?.systemDesign ?? 0) > 0 ? "Retake assessment" : "Take assessment"}
-                  </Button>
+                  {(() => {
+                    const progress = getAssessmentProgress(profile?.systemDesignAnswers ?? null, "systemDesign");
+                    return (
+                      <>
+                        {progress && (
+                          <p className="mb-2 text-[12px] text-[#999]">
+                            {progress.completed} of {progress.total} sections complete
+                          </p>
+                        )}
+                        <Button
+                          onClick={() => setShowSDAssessment(true)}
+                          variant="outline"
+                          className="h-auto w-full rounded-lg px-4 py-2 text-[13px]"
+                        >
+                          {progress && progress.completed > 0
+                            ? progress.completed >= progress.total ? "Retake assessment" : "Continue assessment"
+                            : (axes?.systemDesign ?? 0) > 0 ? "Retake assessment" : "Take assessment"}
+                        </Button>
+                      </>
+                    );
+                  })()}
                 </AxisCard>
 
                 {/* Core CS */}
@@ -917,13 +951,27 @@ export default function PersonalPage() {
                   description="OS, networking, concurrency, DB internals"
                   connected={(axes?.coreCs ?? 0) > 0}
                 >
-                  <Button
-                    onClick={() => setShowCSQuiz(true)}
-                    variant="outline"
-                    className="h-auto w-full rounded-lg px-4 py-2 text-[13px]"
-                  >
-                    {(axes?.coreCs ?? 0) > 0 ? "Retake assessment" : "Take assessment"}
-                  </Button>
+                  {(() => {
+                    const progress = getAssessmentProgress(profile?.coreCsAnswers ?? null, "coreCs");
+                    return (
+                      <>
+                        {progress && (
+                          <p className="mb-2 text-[12px] text-[#999]">
+                            {progress.completed} of {progress.total} sections complete
+                          </p>
+                        )}
+                        <Button
+                          onClick={() => setShowCSAssessment(true)}
+                          variant="outline"
+                          className="h-auto w-full rounded-lg px-4 py-2 text-[13px]"
+                        >
+                          {progress && progress.completed > 0
+                            ? progress.completed >= progress.total ? "Retake assessment" : "Continue assessment"
+                            : (axes?.coreCs ?? 0) > 0 ? "Retake assessment" : "Take assessment"}
+                        </Button>
+                      </>
+                    );
+                  })()}
                 </AxisCard>
 
                 {/* Resume */}
@@ -934,27 +982,38 @@ export default function PersonalPage() {
                   connected={!!profile?.hasResume}
                 >
                   {profile?.hasResume ? (
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-[#666]" />
-                        <p className="text-[13px] text-[#333]">{profile.resumeFilename}</p>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-[#666]" />
+                          <p className="text-[13px] text-[#333]">{profile.resumeFilename}</p>
+                        </div>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={scoreResume}
+                            disabled={scoringResume}
+                            className="rounded-lg p-1.5 text-[#666] hover:bg-[#f5f5f5] hover:text-[#0d0d0d]"
+                            title="Re-score"
+                          >
+                            {scoringResume ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                          </button>
+                          <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="rounded-lg p-1.5 text-[#666] hover:bg-[#f5f5f5] hover:text-[#0d0d0d]"
+                            title="Replace"
+                          >
+                            <Upload className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={deleteResume}
+                            className="rounded-lg p-1.5 text-[#666] hover:bg-[#f5f5f5] hover:text-[#d45656]"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => fileInputRef.current?.click()}
-                          className="rounded-lg p-1.5 text-[#666] hover:bg-[#f5f5f5] hover:text-[#0d0d0d]"
-                          title="Replace"
-                        >
-                          <Upload className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={deleteResume}
-                          className="rounded-lg p-1.5 text-[#666] hover:bg-[#f5f5f5] hover:text-[#d45656]"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                      <ResumeBreakdownView breakdown={profile.resumeScoreBreakdown} />
                     </div>
                   ) : (
                     <Button
@@ -971,7 +1030,6 @@ export default function PersonalPage() {
                       Upload resume (PDF)
                     </Button>
                   )}
-                  <p className="mt-2 text-[12px] text-[#999]">LLM scoring coming soon.</p>
                 </AxisCard>
               </div>
               <input

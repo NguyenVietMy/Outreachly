@@ -15,6 +15,24 @@ export interface AxisScores {
   resume: number;
 }
 
+export interface SubskillAssessment {
+  subskillId: string;
+  tier: 0 | 1 | 2 | 3 | 4;
+}
+
+export interface SectionAssessment {
+  sectionId: string;
+  confidence: "low" | "medium" | "high";
+  completedAt: string;
+  subskills: SubskillAssessment[];
+}
+
+export interface AxisAssessmentPayload {
+  axisId: string;
+  completedAt: string | null;
+  sections: SectionAssessment[];
+}
+
 export interface LeetCodeStats {
   username: string;
   easy: number;
@@ -25,6 +43,48 @@ export interface LeetCodeStats {
   dsaScore: number;
 }
 
+export interface ResumeSubScore {
+  score: number;
+  max: number;
+  rationale: string;
+}
+
+export interface ResumeScoreBreakdown {
+  candidate_id?: string;
+  scoring_date?: string;
+  sections?: {
+    technical_skills?: {
+      primary_language?: ResumeSubScore;
+      backend_frameworks?: ResumeSubScore;
+      data_layer?: ResumeSubScore;
+      infra_devops?: ResumeSubScore;
+    };
+    experience?: {
+      years?: ResumeSubScore;
+      progression?: ResumeSubScore;
+      recency?: ResumeSubScore;
+    };
+    impact?: {
+      quantified_outcomes?: ResumeSubScore;
+      scope?: ResumeSubScore;
+    };
+    education?: {
+      degree?: ResumeSubScore;
+      certifications?: ResumeSubScore;
+    };
+    project_complexity?: ResumeSubScore;
+    resume_quality?: {
+      parsability?: ResumeSubScore;
+      conciseness?: ResumeSubScore;
+    };
+  };
+  total_score?: number;
+  max_score?: number;
+  decision?: "ADVANCE" | "HOLD" | "REJECT";
+  flags?: string[];
+  summary?: string;
+}
+
 export interface UserProfile {
   profileMarkdown: string;
   knowledgeAreas: KnowledgeArea[];
@@ -33,9 +93,10 @@ export interface UserProfile {
   leetcodeStats: LeetCodeStats | null;
   resumeFilename: string | null;
   hasResume: boolean;
-  systemDesignAnswers: Record<string, unknown>;
-  coreCsAnswers: Record<string, unknown>;
+  systemDesignAnswers: AxisAssessmentPayload | Record<string, unknown>;
+  coreCsAnswers: AxisAssessmentPayload | Record<string, unknown>;
   axisScores: AxisScores;
+  resumeScoreBreakdown: ResumeScoreBreakdown | null;
   targetRole: "swe_intern" | "swe_job" | null;
   graduationYear: number | null;
 }
@@ -69,6 +130,7 @@ export function usePersonal() {
   const [loadingLeetCode, setLoadingLeetCode] = useState(false);
   const [loadingResume, setLoadingResume] = useState(false);
   const [loadingQuestionnaire, setLoadingQuestionnaire] = useState(false);
+  const [scoringResume, setScoringResume] = useState(false);
   const { user } = useAuth();
 
   const fetchProfile = useCallback(async () => {
@@ -206,6 +268,24 @@ export function usePersonal() {
     }
   };
 
+  const scoreResume = async () => {
+    setScoringResume(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/personal/resume/score`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setProfile(data);
+        return data;
+      }
+      throw new Error("Failed to score resume");
+    } finally {
+      setScoringResume(false);
+    }
+  };
+
   const submitQuestionnaire = async (axis: "systemDesign" | "coreCs", answers: Record<string, unknown>) => {
     setLoadingQuestionnaire(true);
     try {
@@ -310,6 +390,7 @@ export function usePersonal() {
     loadingInsights,
     loadingLeetCode,
     loadingResume,
+    scoringResume,
     loadingQuestionnaire,
     updateProfile,
     completeOnboarding,
@@ -318,6 +399,7 @@ export function usePersonal() {
     refreshLeetCode,
     uploadResume,
     deleteResume,
+    scoreResume,
     submitQuestionnaire,
     createGoal,
     updateGoal,
