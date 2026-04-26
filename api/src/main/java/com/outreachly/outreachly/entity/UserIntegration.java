@@ -49,6 +49,20 @@ public class UserIntegration {
     @Column(name = "last_synced_at")
     private LocalDateTime lastSyncedAt;
 
+    @Column(name = "auto_sync_enabled", nullable = false)
+    @Builder.Default
+    private Boolean autoSyncEnabled = true;
+
+    @Column(name = "consecutive_failures", nullable = false)
+    @Builder.Default
+    private Integer consecutiveFailures = 0;
+
+    @Column(name = "next_sync_after")
+    private LocalDateTime nextSyncAfter;
+
+    @Column(name = "last_sync_duration_ms")
+    private Long lastSyncDurationMs;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

@@ -18,7 +18,12 @@
       "Bash(sed -i 's/bg-blue-50\"/bg-blue-50 dark:bg-blue-950\\\\/20\"/g' app/campaigns/page.tsx app/send-gmail/page.tsx app/send-email-ses/page.tsx app/settings/page.tsx)",
       "Bash(sed -i 's/border-green-200\"/border-green-200 dark:border-green-800\"/g' app/send-gmail/page.tsx app/settings/page.tsx components/dashboard/OnboardingChecklist.tsx components/import/ColumnMappingModal.tsx)",
       "Bash(sed -i 's/border-red-200\"/border-red-200 dark:border-red-800\"/g' app/settings/page.tsx app/send-gmail/page.tsx)",
-      "Bash(curl *)"
+      "Bash(curl *)",
+      "Bash(npx tsc *)",
+      "Bash(grep -v \"\\\\.class$\")",
+      "Bash(xargs grep *)",
+      "Bash(./mvnw compile *)",
+      "Bash(git add *)"
     ]
   }
 }

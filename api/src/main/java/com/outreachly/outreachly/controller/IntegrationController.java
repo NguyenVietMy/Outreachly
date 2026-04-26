@@ -5,6 +5,7 @@ import com.outreachly.outreachly.dto.IntegrationDto;
 import com.outreachly.outreachly.entity.UserIntegration;
 import com.outreachly.outreachly.entity.User;
 import com.outreachly.outreachly.service.IntegrationService;
+import com.outreachly.outreachly.service.IntegrationSyncScheduler;
 import com.outreachly.outreachly.service.UserService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ import java.util.*;
 public class IntegrationController {
 
     private final IntegrationService integrationService;
+    private final IntegrationSyncScheduler syncScheduler;
     private final UserService userService;
 
     @Value("${integrations.frontend-url:http://localhost:3000}")
@@ -151,6 +153,31 @@ public class IntegrationController {
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", e.getMessage()));
         }
+    }
+
+    @GetMapping("/sync/stats")
+    public ResponseEntity<IntegrationSyncScheduler.SyncSchedulerStats> getSyncStats(Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(syncScheduler.getStats());
+    }
+
+    @PostMapping("/sync/trigger")
+    public ResponseEntity<Map<String, String>> triggerAutoSync(Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+        syncScheduler.triggerManualSync();
+        return ResponseEntity.ok(Map.of("status", "triggered"));
+    }
+
+    @PostMapping("/{provider}/reset-backoff")
+    public ResponseEntity<Map<String, String>> resetBackoff(
+            @PathVariable String provider,
+            Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+        syncScheduler.resetBackoff(user.getId(), provider);
+        return ResponseEntity.ok(Map.of("status", "reset"));
     }
 
     private IntegrationDto buildConnectedDto(UserIntegration integration, Long userId) {

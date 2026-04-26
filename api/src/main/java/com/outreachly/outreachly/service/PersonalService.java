@@ -1,5 +1,7 @@
 package com.outreachly.outreachly.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.outreachly.outreachly.dto.OnboardingRequest;
 import com.outreachly.outreachly.entity.IntegrationEvent;
 import com.outreachly.outreachly.entity.UserGoal;
@@ -175,7 +177,61 @@ public class PersonalService {
         profile.setResumeText(text);
         profile.setResumeFilename(file.getOriginalFilename());
         profile.setResumeUploadedAt(OffsetDateTime.now());
-        return profileRepo.save(profile);
+        profileRepo.save(profile);
+
+        try {
+            return applyResumeScore(profile);
+        } catch (Exception e) {
+            log.warn("Resume scoring failed on upload, score will be 0 until re-scored", e);
+            return profile;
+        }
+    }
+
+    @Transactional
+    public UserProfile scoreResume(Long userId) {
+        UserProfile profile = getOrCreateProfile(userId);
+        if (profile.getResumeText() == null || profile.getResumeText().isBlank()) {
+            throw new RuntimeException("No resume uploaded");
+        }
+        return applyResumeScore(profile);
+    }
+
+    private UserProfile applyResumeScore(UserProfile profile) {
+        String raw = openAiService.scoreResume(profile.getResumeText()).block();
+        ObjectMapper mapper = new ObjectMapper();
+        try {
+            Map<String, Object> breakdown = mapper.readValue(raw, new TypeReference<>() {});
+            profile.setResumeScoreBreakdown(breakdown);
+
+            Number totalScore = (Number) breakdown.get("total_score");
+            int score = totalScore != null ? totalScore.intValue() : 0;
+            updateAxisScore(profile, "resume", score);
+
+            int projectScore = extractProjectScore(breakdown);
+            updateAxisScore(profile, "projects", projectScore);
+
+            return profileRepo.save(profile);
+        } catch (Exception e) {
+            log.error("Failed to parse resume scoring response: {}", raw, e);
+            throw new RuntimeException("Failed to parse resume score", e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private int extractProjectScore(Map<String, Object> breakdown) {
+        try {
+            Map<String, Object> sections = (Map<String, Object>) breakdown.get("sections");
+            if (sections == null) return 0;
+            Map<String, Object> complexity = (Map<String, Object>) sections.get("project_complexity");
+            if (complexity == null) return 0;
+            Number score = (Number) complexity.get("score");
+            Number max = (Number) complexity.get("max");
+            if (score == null || max == null || max.intValue() == 0) return 0;
+            return (int) Math.round((double) score.intValue() / max.intValue() * 100);
+        } catch (Exception e) {
+            log.warn("Could not extract project score from breakdown", e);
+            return 0;
+        }
     }
 
     @Transactional
@@ -184,6 +240,7 @@ public class PersonalService {
         profile.setResumeText("");
         profile.setResumeFilename(null);
         profile.setResumeUploadedAt(null);
+        profile.setResumeScoreBreakdown(Map.of());
         updateAxisScore(profile, "resume", 0);
         updateAxisScore(profile, "projects", 0);
         return profileRepo.save(profile);
@@ -192,23 +249,99 @@ public class PersonalService {
     // --- Questionnaires ---
 
     @Transactional
-    public UserProfile submitQuestionnaire(Long userId, String axis, Map<String, Object> answers) {
+    public UserProfile submitQuestionnaire(Long userId, String axis, Map<String, Object> payload) {
         UserProfile profile = getOrCreateProfile(userId);
 
-        int score = computeQuestionnaireScore(answers);
+        if (isNewFormatSection(payload)) {
+            Map<String, Object> merged = mergeSection(axis, profile, payload);
+            int score = computeNewFormatScore(merged);
 
-        if ("systemDesign".equals(axis)) {
-            profile.setSystemDesignAnswers(answers);
-            updateAxisScore(profile, "systemDesign", score);
-        } else if ("coreCs".equals(axis)) {
-            profile.setCoreCsAnswers(answers);
-            updateAxisScore(profile, "coreCs", score);
+            if ("systemDesign".equals(axis)) {
+                profile.setSystemDesignAnswers(merged);
+                updateAxisScore(profile, "systemDesign", score);
+            } else if ("coreCs".equals(axis)) {
+                profile.setCoreCsAnswers(merged);
+                updateAxisScore(profile, "coreCs", score);
+            }
+        } else {
+            int score = computeLegacyScore(payload);
+
+            if ("systemDesign".equals(axis)) {
+                profile.setSystemDesignAnswers(payload);
+                updateAxisScore(profile, "systemDesign", score);
+            } else if ("coreCs".equals(axis)) {
+                profile.setCoreCsAnswers(payload);
+                updateAxisScore(profile, "coreCs", score);
+            }
         }
 
         return profileRepo.save(profile);
     }
 
-    private int computeQuestionnaireScore(Map<String, Object> answers) {
+    private boolean isNewFormatSection(Map<String, Object> payload) {
+        return payload != null && payload.containsKey("sectionId") && payload.containsKey("subskills");
+    }
+
+    private boolean isNewFormatAssessment(Map<String, Object> payload) {
+        return payload != null && payload.containsKey("sections") && payload.containsKey("axisId");
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> mergeSection(String axis, UserProfile profile, Map<String, Object> incomingSection) {
+        Map<String, Object> existing = "systemDesign".equals(axis)
+                ? profile.getSystemDesignAnswers()
+                : profile.getCoreCsAnswers();
+
+        Map<String, Object> assessment;
+        if (isNewFormatAssessment(existing)) {
+            assessment = new HashMap<>(existing);
+            assessment.put("sections", new ArrayList<>((List<?>) existing.get("sections")));
+        } else {
+            assessment = new HashMap<>();
+            assessment.put("axisId", "systemDesign".equals(axis) ? "system_design" : "cs_fundamentals");
+            assessment.put("completedAt", null);
+            assessment.put("sections", new ArrayList<>());
+        }
+
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) assessment.get("sections");
+        String incomingSectionId = (String) incomingSection.get("sectionId");
+        sections.removeIf(s -> incomingSectionId.equals(s.get("sectionId")));
+        sections.add(new HashMap<>(incomingSection));
+
+        int expectedSections = "systemDesign".equals(axis) ? 11 : 8;
+        if (sections.size() >= expectedSections) {
+            assessment.put("completedAt", OffsetDateTime.now().toString());
+        }
+
+        return assessment;
+    }
+
+    @SuppressWarnings("unchecked")
+    private int computeNewFormatScore(Map<String, Object> assessment) {
+        List<?> sections = (List<?>) assessment.get("sections");
+        if (sections == null || sections.isEmpty()) return 0;
+
+        int totalTiers = 0;
+        int totalSubskills = 0;
+        for (Object sec : sections) {
+            Map<String, Object> section = (Map<String, Object>) sec;
+            List<?> subskills = (List<?>) section.get("subskills");
+            if (subskills == null) continue;
+            for (Object ss : subskills) {
+                Map<String, Object> subskill = (Map<String, Object>) ss;
+                Number tier = (Number) subskill.get("tier");
+                if (tier != null) {
+                    totalTiers += tier.intValue();
+                    totalSubskills++;
+                }
+            }
+        }
+        return totalSubskills > 0
+                ? (int) Math.round((double) totalTiers / (totalSubskills * 4) * 100)
+                : 0;
+    }
+
+    private int computeLegacyScore(Map<String, Object> answers) {
         if (answers == null || answers.isEmpty()) return 0;
 
         Object answersObj = answers.get("answers");
