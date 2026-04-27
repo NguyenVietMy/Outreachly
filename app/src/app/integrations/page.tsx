@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -11,6 +11,7 @@ import {
   Clock3,
   Link2,
   Loader2,
+  Mail,
   PanelsTopLeft,
   RefreshCw,
 } from "lucide-react";
@@ -30,8 +31,20 @@ const PROVIDER_CONFIG: Record<
     connectLabel: string;
     connectType: "oauth" | "apikey" | "obsidian";
     syncedAtDisconnected: string;
+    connectedSubtext?: string;
   }
 > = {
+  gmail: {
+    name: "Gmail",
+    description: "Connect your sending account",
+    icon: Mail,
+    iconTone: "bg-[#fde7d7] text-[#d14836]",
+    pitch: "Connect Gmail so future sending features can use your Google account.",
+    connectLabel: "Connect Gmail",
+    connectType: "oauth",
+    syncedAtDisconnected: "Google OAuth - gmail.send",
+    connectedSubtext: "Connected for future sending features",
+  },
   github: {
     name: "GitHub",
     description: "Commits, PRs, issues",
@@ -74,7 +87,7 @@ const PROVIDER_CONFIG: Record<
   },
 };
 
-const PROVIDER_ORDER = ["github", "obsidian", "slack", "linear"];
+const PROVIDER_ORDER = ["gmail", "github", "obsidian", "slack", "linear"];
 
 const comingSoon = [
   { name: "Notion", description: "Pages, databases, updates", icon: PanelsTopLeft },
@@ -82,6 +95,14 @@ const comingSoon = [
 ];
 
 export default function IntegrationsPage() {
+  return (
+    <Suspense fallback={null}>
+      <IntegrationsContent />
+    </Suspense>
+  );
+}
+
+function IntegrationsContent() {
   const { integrations, loading, connectOAuth, connectApiKey, disconnect, sync, refetch } =
     useIntegrations();
   const { toast } = useToast();
@@ -252,48 +273,58 @@ export default function IntegrationsPage() {
 
                       {isConnected && integration ? (
                         <div className="mt-5 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <p className="text-[14px] leading-[1.5] text-[#666666]">
-                              {integration.accountLabel}
-                            </p>
-                            <p className="font-mono text-[12px] font-medium text-[#333333]">
-                              {integration.accountValue}
-                            </p>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <p className="text-[14px] leading-[1.5] text-[#666666]">
-                              {integration.eventsLabel}
-                            </p>
-                            <p className="font-mono text-[12px] font-medium text-[#333333]">
-                              {integration.eventsValue}
-                            </p>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <p className="text-[14px] leading-[1.5] text-[#666666]">Activity</p>
-                            <div className="flex h-6 items-end gap-1">
-                              {integration.activitySparkline.map((value, idx) => {
-                                const max = Math.max(...integration.activitySparkline, 1);
-                                return (
-                                  <div
-                                    key={`${providerKey}-bar-${idx}`}
-                                    className="w-1.5 rounded-[2px]"
-                                    style={{
-                                      height: `${(value / max) * 100}%`,
-                                      minHeight: value > 0 ? "2px" : "0px",
-                                      backgroundColor:
-                                        config.iconTone.includes("0fa76e")
-                                          ? "#18E299"
-                                          : config.iconTone.includes("3772cf")
-                                            ? "#3772cf"
-                                            : config.iconTone.includes("c37d0d")
-                                              ? "#c37d0d"
-                                              : "#d45656",
-                                    }}
-                                  />
-                                );
-                              })}
+                          {integration.accountLabel && integration.accountValue && (
+                            <div className="flex items-center justify-between">
+                              <p className="text-[14px] leading-[1.5] text-[#666666]">
+                                {integration.accountLabel}
+                              </p>
+                              <p className="font-mono text-[12px] font-medium text-[#333333]">
+                                {integration.accountValue}
+                              </p>
                             </div>
-                          </div>
+                          )}
+                          {integration.supportsSync && integration.eventsLabel && integration.eventsValue && (
+                            <div className="flex items-center justify-between">
+                              <p className="text-[14px] leading-[1.5] text-[#666666]">
+                                {integration.eventsLabel}
+                              </p>
+                              <p className="font-mono text-[12px] font-medium text-[#333333]">
+                                {integration.eventsValue}
+                              </p>
+                            </div>
+                          )}
+                          {integration.supportsSync && integration.activitySparkline.length > 0 ? (
+                            <div className="flex items-center justify-between">
+                              <p className="text-[14px] leading-[1.5] text-[#666666]">Activity</p>
+                              <div className="flex h-6 items-end gap-1">
+                                {integration.activitySparkline.map((value, idx) => {
+                                  const max = Math.max(...integration.activitySparkline, 1);
+                                  return (
+                                    <div
+                                      key={`${providerKey}-bar-${idx}`}
+                                      className="w-1.5 rounded-[2px]"
+                                      style={{
+                                        height: `${(value / max) * 100}%`,
+                                        minHeight: value > 0 ? "2px" : "0px",
+                                        backgroundColor:
+                                          config.iconTone.includes("0fa76e")
+                                            ? "#18E299"
+                                            : config.iconTone.includes("3772cf")
+                                              ? "#3772cf"
+                                              : config.iconTone.includes("c37d0d")
+                                                ? "#c37d0d"
+                                                : "#d45656",
+                                      }}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-[14px] leading-[1.5] text-[#666666]">
+                              {config.connectedSubtext || "Connected"}
+                            </p>
+                          )}
                         </div>
                       ) : (
                         <>
@@ -357,19 +388,21 @@ export default function IntegrationsPage() {
                         </p>
                         {isConnected ? (
                           <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              onClick={() => handleSync(providerKey)}
-                              disabled={syncingProvider === providerKey}
-                              className="h-auto rounded-full border-[rgba(0,0,0,0.08)] bg-white px-4 py-2 text-[15px] font-medium text-[#0d0d0d]"
-                            >
-                              {syncingProvider === providerKey ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              ) : (
-                                <RefreshCw className="mr-2 h-4 w-4" />
-                              )}
-                              Sync
-                            </Button>
+                            {integration?.supportsSync && (
+                              <Button
+                                variant="outline"
+                                onClick={() => handleSync(providerKey)}
+                                disabled={syncingProvider === providerKey}
+                                className="h-auto rounded-full border-[rgba(0,0,0,0.08)] bg-white px-4 py-2 text-[15px] font-medium text-[#0d0d0d]"
+                              >
+                                {syncingProvider === providerKey ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="mr-2 h-4 w-4" />
+                                )}
+                                Sync
+                              </Button>
+                            )}
                             <Button
                               variant="outline"
                               onClick={() => handleDisconnect(providerKey)}

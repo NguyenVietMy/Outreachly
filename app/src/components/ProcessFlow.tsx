@@ -81,8 +81,8 @@ const ProcessFlow = () => {
     },
     {
       icon: <BarChart3 className="w-6 h-6" />,
-      title: "Send & Measure",
-      description: "Launch campaigns and track performance metrics",
+      title: "Review & Iterate",
+      description: "Track results, refine your list, and improve your workflow",
       step: 5,
     },
   ];
@@ -94,7 +94,7 @@ const ProcessFlow = () => {
           <h2 className="text-[40px] font-semibold tracking-[-0.02em] leading-[1.10] mb-4">How Outreachly Works</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
             Our streamlined process helps you go from raw lead lists to
-            personalized outreach campaigns in minutes
+            enriched, personalized outreach data in minutes
           </p>
         </div>
 

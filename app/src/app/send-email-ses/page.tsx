@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 export default function DomainSendingRedirect() {
   const router = useRouter();
   useEffect(() => {
-    router.replace("/workspace?tab=domain-sending");
+    router.replace("/integrations");
   }, [router]);
   return null;
 }

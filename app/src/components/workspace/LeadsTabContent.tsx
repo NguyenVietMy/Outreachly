@@ -31,7 +31,6 @@ import {
 import {
   Search,
   Filter,
-  Plus,
   Mail,
   Eye,
   History,
@@ -40,7 +39,6 @@ import {
   Loader2,
 } from "lucide-react";
 import { useLeads, Lead } from "@/hooks/useLeads";
-import { useCampaigns, Campaign } from "@/hooks/useCampaigns";
 import Link from "next/link";
 import { listTemplates, parseContent, TemplateModel } from "@/lib/templates";
 import TemplateBrowserModal from "@/components/templates/TemplateBrowserModal";
@@ -56,14 +54,6 @@ interface FilterState {
 }
 
 export default function LeadsTabContent() {
-  const [selectedCampaignId, setSelectedCampaignId] = useState<
-    string | undefined
-  >(undefined);
-  const {
-    campaigns,
-    loading: campaignsLoading,
-    createCampaign,
-  } = useCampaigns();
   const {
     leads,
     loading,
@@ -71,9 +61,7 @@ export default function LeadsTabContent() {
     refetch,
     enrichLeads,
     exportLeads,
-    assignLeadsToCampaign,
-    removeLeadsFromCampaign,
-  } = useLeads(selectedCampaignId);
+  } = useLeads();
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [showLeadModal, setShowLeadModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -87,21 +75,10 @@ export default function LeadsTabContent() {
   const [showAllTemplates, setShowAllTemplates] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(false);
-  const [showCreateCampaign, setShowCreateCampaign] = useState(false);
-  const [showCampaignImport, setShowCampaignImport] = useState(false);
-  const [campaignForm, setCampaignForm] = useState({
-    name: "",
-    description: "",
-  });
   const [buttonLoading, setButtonLoading] = useState({
     enrich: false,
     export: false,
-    campaignImport: false,
-    removeFromCampaign: false,
   });
-  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
-  const [selectedCampaignForImport, setSelectedCampaignForImport] =
-    useState<string>("");
   const [filters, setFilters] = useState<FilterState>({
     verifiedStatus: "all",
     position: "",
@@ -282,29 +259,6 @@ export default function LeadsTabContent() {
     return count;
   };
 
-  const handleCreateCampaign = async () => {
-    if (!campaignForm.name.trim()) return;
-
-    try {
-      await createCampaign(campaignForm.name, campaignForm.description);
-      setCampaignForm({ name: "", description: "" });
-      setShowCreateCampaign(false);
-    } catch (error) {
-      console.error("Error creating campaign:", error);
-    }
-  };
-
-  const handleCampaignChange = (campaignId: string) => {
-    setSelectedCampaignId(campaignId === "all" ? undefined : campaignId);
-    setSelectedLeads([]); // Clear selected leads when switching campaigns
-  };
-
-  const getCurrentCampaignName = () => {
-    if (!selectedCampaignId) return "All Leads";
-    const campaign = campaigns.find((c) => c.id === selectedCampaignId);
-    return campaign ? campaign.name : "Unknown Campaign";
-  };
-
   // Button handlers
   const handleEnrich = async () => {
     if (selectedLeads.length === 0) return;
@@ -338,50 +292,15 @@ export default function LeadsTabContent() {
     }
   };
 
-  const handleCampaignImport = async () => {
-    if (selectedLeads.length === 0 || !selectedCampaignForImport) return;
-
-    setButtonLoading((prev) => ({ ...prev, campaignImport: true }));
-    try {
-      await assignLeadsToCampaign(selectedLeads, selectedCampaignForImport);
-      setSelectedLeads([]);
-      setShowCampaignImport(false);
-      setSelectedCampaignForImport("");
-      // Show success message or toast
-    } catch (error) {
-      console.error("Error assigning leads to campaign:", error);
-      // Show error message or toast
-    } finally {
-      setButtonLoading((prev) => ({ ...prev, campaignImport: false }));
-    }
-  };
-
-  const handleRemoveFromCampaign = async () => {
-    if (selectedLeads.length === 0 || !selectedCampaignId) return;
-
-    setButtonLoading((prev) => ({ ...prev, removeFromCampaign: true }));
-    try {
-      await removeLeadsFromCampaign(selectedLeads, selectedCampaignId);
-      setSelectedLeads([]);
-      // Show success message or toast
-    } catch (error) {
-      console.error("Error removing leads from campaign:", error);
-      // Show error message or toast
-    } finally {
-      setButtonLoading((prev) => ({ ...prev, removeFromCampaign: false }));
-    }
-  };
-
   return (
     <>
       <div className="p-6 max-w-7xl mx-auto">
-        {/* Header with Campaign Switcher and Create Campaign Button */}
         <div className="mb-6 mt-8">
           <div className="flex justify-between items-center mb-4">
             <div>
               <h1 className="text-3xl font-bold">Leads</h1>
               <p className="text-sm text-muted-foreground mt-1">
-                Manage your leads, track activities, and create campaigns
+                Manage your leads and track activity across your workspace
                 {!loading && leads.length > 0 && (
                   <span className="ml-2">• {leads.length} total leads</span>
                 )}
@@ -399,41 +318,6 @@ export default function LeadsTabContent() {
                   Modify Leads
                 </Button>
               </Link>
-              <Button
-                className="bg-brand-accent text-[#0d0d0d] hover:bg-brand-deep hover:text-white"
-                onClick={() => setShowCreateCampaign(true)}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Create Campaign
-              </Button>
-            </div>
-          </div>
-
-          {/* Campaign Switcher */}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium">Campaign:</label>
-              <Select
-                value={selectedCampaignId || "all"}
-                onValueChange={handleCampaignChange}
-                disabled={campaignsLoading}
-              >
-                <SelectTrigger className="w-64">
-                  <SelectValue placeholder="Select campaign..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Leads</SelectItem>
-                  {campaigns.map((campaign) => (
-                    <SelectItem key={campaign.id} value={campaign.id}>
-                      {campaign.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="text-sm text-muted-foreground">
-              Currently viewing:{" "}
-              <span className="font-medium">{getCurrentCampaignName()}</span>
             </div>
           </div>
         </div>
@@ -745,32 +629,6 @@ export default function LeadsTabContent() {
                 ) : null}
                 {selectedLeads.length > 1 ? "Bulk " : ""}Export
               </Button>
-              <Button
-                variant={selectedLeads.length > 1 ? "default" : "outline"}
-                disabled={selectedLeads.length === 0}
-                onClick={() => setShowCampaignImport(true)}
-              >
-                {selectedLeads.length > 1 ? "Bulk " : ""}Campaign Lead Import
-              </Button>
-              {/* Only show Remove from Campaign button when viewing a specific campaign */}
-              {selectedCampaignId && (
-                <Button
-                  variant={
-                    selectedLeads.length > 1 ? "destructive" : "outline"
-                  }
-                  disabled={
-                    selectedLeads.length === 0 ||
-                    buttonLoading.removeFromCampaign
-                  }
-                  onClick={() => setShowRemoveConfirm(true)}
-                >
-                  {buttonLoading.removeFromCampaign ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : null}
-                  {selectedLeads.length > 1 ? "Bulk " : ""}Remove from
-                  Campaign
-                </Button>
-              )}
             </div>
 
             {loading ? (
@@ -1227,147 +1085,6 @@ export default function LeadsTabContent() {
         </DialogContent>
       </Dialog>
 
-      {/* Campaign Lead Import Modal */}
-      <Dialog open={showCampaignImport} onOpenChange={setShowCampaignImport}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Import Leads to Campaign</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">
-                Select Campaign
-              </label>
-              <Select
-                value={selectedCampaignForImport}
-                onValueChange={setSelectedCampaignForImport}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a campaign..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {campaigns.map((campaign) => (
-                    <SelectItem key={campaign.id} value={campaign.id}>
-                      {campaign.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="text-sm text-muted-foreground">
-              {selectedLeads.length} lead(s) will be assigned to the selected
-              campaign.
-            </div>
-            <div className="flex gap-2 justify-end">
-              <Button
-                variant="outline"
-                onClick={() => setShowCampaignImport(false)}
-                disabled={buttonLoading.campaignImport}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleCampaignImport}
-                disabled={
-                  !selectedCampaignForImport || buttonLoading.campaignImport
-                }
-              >
-                {buttonLoading.campaignImport ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : null}
-                Import to Campaign
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Create Campaign Modal */}
-      <Dialog open={showCreateCampaign} onOpenChange={setShowCreateCampaign}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Create New Campaign</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">
-                Campaign Name *
-              </label>
-              <Input
-                placeholder="Enter campaign name..."
-                value={campaignForm.name}
-                onChange={(e) =>
-                  setCampaignForm((prev) => ({
-                    ...prev,
-                    name: e.target.value,
-                  }))
-                }
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block">
-                Description
-              </label>
-              <Input
-                placeholder="Enter campaign description..."
-                value={campaignForm.description}
-                onChange={(e) =>
-                  setCampaignForm((prev) => ({
-                    ...prev,
-                    description: e.target.value,
-                  }))
-                }
-              />
-            </div>
-            <div className="flex gap-2 justify-end">
-              <Button
-                variant="outline"
-                onClick={() => setShowCreateCampaign(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleCreateCampaign}
-                disabled={!campaignForm.name.trim()}
-              >
-                Create Campaign
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Remove from Campaign confirmation dialog */}
-      <Dialog open={showRemoveConfirm} onOpenChange={setShowRemoveConfirm}>
-        <DialogContent className="sm:max-w-[520px]">
-          <DialogHeader>
-            <DialogTitle>Remove from campaign</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            You will not be able to send email to this person through this
-            campaign, proceed?
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowRemoveConfirm(false)}
-              disabled={buttonLoading.removeFromCampaign}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={async () => {
-                setShowRemoveConfirm(false);
-                await handleRemoveFromCampaign();
-              }}
-              disabled={buttonLoading.removeFromCampaign}
-            >
-              {buttonLoading.removeFromCampaign ? "Removing..." : "Remove"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

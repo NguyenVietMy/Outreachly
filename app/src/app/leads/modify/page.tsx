@@ -27,7 +27,7 @@ import Link from "next/link";
 
 export default function ModifyLeadsPage() {
   const { leads, loading, error, refetch, createLead, updateLead, deleteLead } =
-    useLeads(undefined);
+    useLeads();
 
   // Create form state
   const [createForm, setCreateForm] = useState({

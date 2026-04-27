@@ -11,8 +11,6 @@ import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -88,22 +86,6 @@ public class Lead {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
-
-    // Many-to-many relationship with Campaign through CampaignLead join table
-    @OneToMany(mappedBy = "lead", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @Builder.Default
-    @com.fasterxml.jackson.annotation.JsonIgnore
-    private List<CampaignLead> campaignLeads = new ArrayList<>();
-
-    // Helper method to get campaigns
-    @Transient
-    @com.fasterxml.jackson.annotation.JsonIgnore
-    public List<Campaign> getCampaigns() {
-        return campaignLeads.stream()
-                .filter(cl -> cl.getStatus() != CampaignLead.CampaignLeadStatus.removed)
-                .map(CampaignLead::getCampaign)
-                .toList();
-    }
 
     public enum VerifiedStatus {
         unknown, valid, risky, invalid

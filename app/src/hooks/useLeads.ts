@@ -1,14 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
-export interface CampaignInfo {
-  id: string;
-  name: string;
-  description?: string;
-  status: string;
-  addedAt?: string;
-}
-
 export interface Lead {
   id: string;
   firstName: string;
@@ -33,10 +25,9 @@ export interface Lead {
   updatedAt: string;
   orgId: string;
   listId?: string;
-  campaigns?: CampaignInfo[];
 }
 
-export function useLeads(campaignId?: string) {
+export function useLeads() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,11 +46,7 @@ export function useLeads(campaignId?: string) {
       setLoading(true);
       setError(null);
 
-      const url = campaignId
-        ? `${API_URL}/api/leads?campaignId=${campaignId}`
-        : `${API_URL}/api/leads`;
-
-      const response = await fetch(url, {
+      const response = await fetch(`${API_URL}/api/leads`, {
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
@@ -92,7 +79,7 @@ export function useLeads(campaignId?: string) {
 
   useEffect(() => {
     fetchLeads();
-  }, [user, campaignId]);
+  }, [user]);
 
   // Enrich leads
   const enrichLeads = async (leadIds: string[]) => {
@@ -154,36 +141,6 @@ export function useLeads(campaignId?: string) {
       return true;
     } catch (err) {
       console.error("Error exporting leads:", err);
-      throw err;
-    }
-  };
-
-  // Assign leads to campaign
-  const assignLeadsToCampaign = async (
-    leadIds: string[],
-    campaignId: string
-  ) => {
-    try {
-      const response = await fetch(`${API_URL}/api/leads/bulk-campaign`, {
-        method: "PUT",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ leadIds, campaignId }),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to assign leads to campaign: ${response.statusText}`
-        );
-      }
-
-      const result = await response.json();
-      await fetchLeads(); // Refresh leads after assignment
-      return result;
-    } catch (err) {
-      console.error("Error assigning leads to campaign:", err);
       throw err;
     }
   };
@@ -269,39 +226,6 @@ export function useLeads(campaignId?: string) {
     return true;
   };
 
-  // Remove leads from campaign
-  const removeLeadsFromCampaign = async (
-    leadIds: string[],
-    campaignId: string
-  ) => {
-    try {
-      const response = await fetch(
-        `${API_URL}/api/leads/bulk-campaign-remove`,
-        {
-          method: "DELETE",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ leadIds, campaignId }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to remove leads from campaign: ${response.statusText}`
-        );
-      }
-
-      const result = await response.json();
-      await fetchLeads(); // Refresh leads after removal
-      return result;
-    } catch (err) {
-      console.error("Error removing leads from campaign:", err);
-      throw err;
-    }
-  };
-
   return {
     leads,
     loading,
@@ -309,8 +233,6 @@ export function useLeads(campaignId?: string) {
     refetch: fetchLeads,
     enrichLeads,
     exportLeads,
-    assignLeadsToCampaign,
-    removeLeadsFromCampaign,
     createLead,
     updateLead,
     deleteLead,

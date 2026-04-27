@@ -5,6 +5,7 @@ import { API_BASE_URL } from "@/lib/config";
 export interface Integration {
   provider: string;
   status: "connected" | "disconnected";
+  supportsSync: boolean;
   accountLabel: string | null;
   accountValue: string | null;
   eventsLabel: string | null;

@@ -62,11 +62,11 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
                         // Ensure the authentication is properly set in the security context
                         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                        // For incremental Gmail consent flow, redirect back to send-gmail
+                        // For incremental Gmail consent flow, redirect back to integrations
                         if (authentication instanceof OAuth2AuthenticationToken oauth2Token) {
                                 String registrationId = oauth2Token.getAuthorizedClientRegistrationId();
                                 if ("google-gmail".equals(registrationId)) {
-                                        String targetUrl = frontendUrl + "/send-gmail?connected=true";
+                                        String targetUrl = frontendUrl + "/integrations?connected=gmail";
                                         log.info("Redirecting to Gmail connect target: {}", targetUrl);
                                         getRedirectStrategy().sendRedirect(request, response, targetUrl);
                                         return;

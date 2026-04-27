@@ -87,14 +87,6 @@ resource "aws_secretsmanager_secret" "google_client_secret" {
   recovery_window_in_days = 0
 }
 
-# module "ses" {
-#   source = "../../modules/ses"
-
-#   domain_name = "outreach-ly.com"
-#   route53_zone_id = "Z02495573ISDF5X4NF9YA"
-#   region = "us-east-1"
-# }
-
 resource "aws_route53_record" "api_alias" {
   zone_id = "Z02495573ISDF5X4NF9YA"
   name    = "api.outreach-ly.com"

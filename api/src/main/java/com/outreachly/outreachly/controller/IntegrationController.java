@@ -2,8 +2,9 @@ package com.outreachly.outreachly.controller;
 
 import com.outreachly.outreachly.dto.ConnectApiKeyRequest;
 import com.outreachly.outreachly.dto.IntegrationDto;
-import com.outreachly.outreachly.entity.UserIntegration;
 import com.outreachly.outreachly.entity.User;
+import com.outreachly.outreachly.entity.UserIntegration;
+import com.outreachly.outreachly.service.GmailService;
 import com.outreachly.outreachly.service.IntegrationService;
 import com.outreachly.outreachly.service.IntegrationSyncScheduler;
 import com.outreachly.outreachly.service.UserService;
@@ -14,6 +15,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -28,6 +30,7 @@ public class IntegrationController {
 
     private final IntegrationService integrationService;
     private final IntegrationSyncScheduler syncScheduler;
+    private final GmailService gmailService;
     private final UserService userService;
 
     @Value("${integrations.frontend-url:http://localhost:3000}")
@@ -46,6 +49,8 @@ public class IntegrationController {
 
         List<UserIntegration> integrations = integrationService.getIntegrations(user.getId());
         List<IntegrationDto> dtos = new ArrayList<>();
+
+        dtos.add(buildGmailDto(user));
 
         Set<String> allProviders = Set.of("github", "obsidian", "slack", "linear");
         Map<String, UserIntegration> byProvider = new HashMap<>();
@@ -71,6 +76,13 @@ public class IntegrationController {
             Authentication authentication) {
         User user = getUser(authentication);
         if (user == null) return ResponseEntity.status(401).build();
+
+        if ("gmail".equals(provider)) {
+            String url = ServletUriComponentsBuilder.fromCurrentContextPath()
+                    .path("/oauth2/authorization/google-gmail")
+                    .toUriString();
+            return ResponseEntity.ok(Map.of("url", url));
+        }
 
         String redirectUri = getRedirectUri(provider);
         String url = integrationService.getOAuthUrl(user.getId(), provider, redirectUri);
@@ -130,6 +142,11 @@ public class IntegrationController {
             Authentication authentication) {
         User user = getUser(authentication);
         if (user == null) return ResponseEntity.status(401).build();
+
+        if ("gmail".equals(provider)) {
+            gmailService.disconnectCurrentUser();
+            return ResponseEntity.noContent().build();
+        }
 
         integrationService.disconnect(user.getId(), provider);
         return ResponseEntity.noContent().build();
@@ -231,6 +248,7 @@ public class IntegrationController {
         return new IntegrationDto(
                 provider,
                 "connected",
+                true,
                 accountLabel,
                 accountValue,
                 eventsLabel,
@@ -244,9 +262,24 @@ public class IntegrationController {
         return new IntegrationDto(
                 provider,
                 "disconnected",
+                true,
                 null, null, null, null, null,
                 Collections.emptyList()
         );
+    }
+
+    private IntegrationDto buildGmailDto(User user) {
+        boolean connected = gmailService.hasGmailAccess();
+        return new IntegrationDto(
+                "gmail",
+                connected ? "connected" : "disconnected",
+                false,
+                connected ? "Account" : null,
+                connected ? user.getEmail() : null,
+                null,
+                null,
+                connected ? "Connected" : null,
+                Collections.emptyList());
     }
 
     private String getRedirectUri(String provider) {

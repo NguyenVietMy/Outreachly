@@ -63,9 +63,9 @@ const FeatureGrid = () => {
     },
     {
       icon: <Send className="h-6 w-6 text-brand-deep" />,
-      title: "Campaign Management",
+      title: "Workspace Automation",
       description:
-        "Design, schedule, and manage multi-step outreach campaigns with intuitive workflows and automation.",
+        "Run lead workflows, enrich records, and keep your workspace organized with lightweight automation.",
     },
     {
       icon: <BarChart3 className="h-6 w-6 text-brand-deep" />,
@@ -89,8 +89,8 @@ const FeatureGrid = () => {
             Powerful Features
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Everything you need to create successful outreach campaigns that get
-            real results.
+            Everything you need to build a cleaner outbound workflow from lead
+            import through enrichment and personalization.
           </p>
         </div>
 

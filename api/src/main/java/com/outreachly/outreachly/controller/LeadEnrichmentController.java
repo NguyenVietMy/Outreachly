@@ -1,19 +1,15 @@
 package com.outreachly.outreachly.controller;
 
-import com.outreachly.outreachly.dto.LeadWithCampaignsDto;
-import com.outreachly.outreachly.entity.CampaignLead;
+import com.outreachly.outreachly.dto.LeadDto;
 import com.outreachly.outreachly.entity.EnrichmentJob;
+import com.outreachly.outreachly.entity.Lead;
 import com.outreachly.outreachly.entity.User;
 import com.outreachly.outreachly.repository.EnrichmentJobRepository;
 import com.outreachly.outreachly.repository.LeadRepository;
-import com.outreachly.outreachly.repository.CampaignRepository;
-import com.outreachly.outreachly.entity.Lead;
-import com.outreachly.outreachly.entity.Campaign;
-import com.outreachly.outreachly.service.CampaignLeadService;
 import com.outreachly.outreachly.repository.OrgLeadRepository;
-import com.outreachly.outreachly.service.OrgLeadService;
 import com.outreachly.outreachly.service.EnrichmentService;
 import com.outreachly.outreachly.service.EnrichmentPreviewService;
+import com.outreachly.outreachly.service.OrgLeadService;
 import com.outreachly.outreachly.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,8 +30,6 @@ public class LeadEnrichmentController {
     private final EnrichmentJobRepository jobRepository;
     private final UserService userService;
     private final LeadRepository leadRepository;
-    private final CampaignLeadService campaignLeadService;
-    private final CampaignRepository campaignRepository;
     private final OrgLeadService orgLeadService;
     private final OrgLeadRepository orgLeadRepository;
 
@@ -112,7 +106,7 @@ public class LeadEnrichmentController {
             }
 
             return ResponseEntity
-                    .ok(LeadWithCampaignsDto.fromLead(leadRepository.findByIdWithCampaigns(lead.getId()).orElse(lead)));
+                    .ok(LeadDto.fromLead(leadRepository.findByIdForResponse(lead.getId()).orElse(lead)));
         } catch (Exception e) {
             log.error("Error creating lead: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body(Map.of("error", "Failed to create lead: " + e.getMessage()));
@@ -166,7 +160,7 @@ public class LeadEnrichmentController {
 
             lead = leadRepository.save(lead);
             return ResponseEntity
-                    .ok(LeadWithCampaignsDto.fromLead(leadRepository.findByIdWithCampaigns(lead.getId()).orElse(lead)));
+                    .ok(LeadDto.fromLead(leadRepository.findByIdForResponse(lead.getId()).orElse(lead)));
         } catch (Exception e) {
             log.error("Error updating lead {}: {}", id, e.getMessage(), e);
             return ResponseEntity.status(500).body(Map.of("error", "Failed to update lead: " + e.getMessage()));
@@ -671,166 +665,23 @@ public class LeadEnrichmentController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getAllLeads(
-            @RequestParam(required = false) UUID campaignId,
-            Authentication authentication) {
+    public ResponseEntity<?> getAllLeads(Authentication authentication) {
         try {
             User user = getUser(authentication);
             if (user == null)
                 return ResponseEntity.status(401).build();
 
             UUID orgId = getOrgIdOrForbidden(user);
-            List<Lead> leads;
-
-            if (campaignId != null) {
-                log.info("Fetching leads for campaign: {} for organization: {}", campaignId, orgId);
-                // Get leads through campaign-lead relationship
-                List<Lead> campaignLeads = campaignLeadService.getActiveLeadsForCampaign(campaignId);
-
-                // Restrict to leads that are mapped to the user's organization via org_leads
-                java.util.Set<java.util.UUID> orgLeadIds = new java.util.HashSet<>(
-                        orgLeadService.getLeadsForOrg(orgId).stream().map(Lead::getId).toList());
-
-                leads = campaignLeads.stream()
-                        .filter(lead -> orgLeadIds.contains(lead.getId()))
-                        .toList();
-
-                log.info("Filtered to {} leads belonging to organization {} for campaign {}",
-                        leads.size(), orgId, campaignId);
-            } else {
-                log.info("Fetching all leads for organization: {}", orgId);
-                // Get all leads for the organization via org_leads mapping
-                leads = orgLeadService.getLeadsForOrg(orgId);
-            }
-
-            // Convert to DTO with campaign information
-            List<LeadWithCampaignsDto> leadDtos = leads.stream()
-                    .map(LeadWithCampaignsDto::fromLead)
+            log.info("Fetching all leads for organization: {}", orgId);
+            List<Lead> leads = orgLeadService.getLeadsForOrg(orgId);
+            List<LeadDto> leadDtos = leads.stream()
+                    .map(LeadDto::fromLead)
                     .toList();
 
             return ResponseEntity.ok(leadDtos);
         } catch (Exception e) {
             log.error("Error fetching leads: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body(Map.of("error", "Failed to fetch leads: " + e.getMessage()));
-        }
-    }
-
-    @PutMapping("/bulk-campaign")
-    public ResponseEntity<?> assignLeadsToCampaign(
-            @RequestBody BulkCampaignAssignmentRequest request,
-            Authentication authentication) {
-        User user = getUser(authentication);
-        if (user == null) {
-            log.warn("Unauthorized attempt to assign leads to campaign - no user found");
-            return ResponseEntity.status(401).build();
-        }
-
-        UUID orgId = getOrgIdOrForbidden(user);
-        log.info("Starting bulk campaign assignment - User: {}, Org: {}, Campaign: {}, Lead IDs: {}",
-                user.getId(), orgId, request.getCampaignId(), request.getLeadIds());
-
-        try {
-            List<Lead> leads = leadRepository.findAllById(request.getLeadIds());
-
-            // Filter leads that are mapped to the user's organization via org_leads
-            List<Lead> userLeads = leads.stream()
-                    .filter(lead -> orgLeadService.hasMapping(orgId, lead.getId()))
-                    .toList();
-
-            log.info("Filtered to {} leads belonging to organization {} out of {} total leads",
-                    userLeads.size(), orgId, leads.size());
-
-            // Create campaign-lead relationships using service
-            List<UUID> leadIds = userLeads.stream().map(Lead::getId).toList();
-            int assignedCount = campaignLeadService.addLeadsToCampaign(request.getCampaignId(), leadIds, user.getId());
-
-            log.info("Successfully assigned {} leads to campaign {} for user {}",
-                    assignedCount, request.getCampaignId(), user.getId());
-
-            // Verify the assignments by checking the database
-            long actualCount = campaignLeadService.getActiveLeadCountForCampaign(request.getCampaignId());
-            log.info("Verification: Campaign {} now has {} active leads in database",
-                    request.getCampaignId(), actualCount);
-
-            return ResponseEntity.ok(Map.of(
-                    "message", "Leads assigned to campaign successfully",
-                    "assignedCount", assignedCount));
-        } catch (Exception e) {
-            log.error("Error assigning leads to campaign - User: {}, Campaign: {}, Lead IDs: {}, Error: {}",
-                    user.getId(), request.getCampaignId(), request.getLeadIds(), e.getMessage(), e);
-            return ResponseEntity.status(500).body(Map.of("error", "Failed to assign leads to campaign"));
-        }
-    }
-
-    @PutMapping("/{id}/campaign")
-    public ResponseEntity<?> assignLeadToCampaign(
-            @PathVariable UUID id,
-            @RequestBody CampaignAssignmentRequest request,
-            Authentication authentication) {
-        User user = getUser(authentication);
-        if (user == null) {
-            log.warn("Unauthorized attempt to assign lead to campaign - no user found for lead ID: {}", id);
-            return ResponseEntity.status(401).build();
-        }
-
-        UUID orgId = getOrgIdOrForbidden(user);
-        log.info("Starting single lead campaign assignment - User: {}, Org: {}, Lead ID: {}, Campaign: {}",
-                user.getId(), orgId, id, request.getCampaignId());
-
-        try {
-            Lead lead = leadRepository.findById(id)
-                    .orElseThrow(() -> {
-                        log.warn("Lead not found - Lead ID: {}", id);
-                        return new IllegalArgumentException("Lead not found");
-                    });
-
-            if (!orgLeadService.hasMapping(orgId, lead.getId())) {
-                log.warn("Lead not accessible for org - Lead ID: {}, Org: {}", id, orgId);
-                return ResponseEntity.status(403).body(Map.of("error", "Lead not accessible for this organization"));
-            }
-
-            // Create campaign-lead relationship using service
-            campaignLeadService.addLeadToCampaign(request.getCampaignId(), lead.getId(), user.getId());
-
-            log.info("Successfully assigned lead {} to campaign {} for user {}",
-                    lead.getId(), request.getCampaignId(), user.getId());
-
-            return ResponseEntity.ok(Map.of("message", "Lead assigned to campaign successfully"));
-        } catch (Exception e) {
-            log.error("Error assigning lead to campaign - User: {}, Lead ID: {}, Campaign: {}, Error: {}",
-                    user.getId(), id, request.getCampaignId(), e.getMessage(), e);
-            return ResponseEntity.status(500).body(Map.of("error", "Failed to assign lead to campaign"));
-        }
-    }
-
-    @DeleteMapping("/bulk-campaign-remove")
-    public ResponseEntity<?> removeLeadsFromCampaign(
-            @RequestBody BulkCampaignRemovalRequest request,
-            Authentication authentication) {
-        User user = getUser(authentication);
-        if (user == null)
-            return ResponseEntity.status(401).build();
-
-        UUID orgId = getOrgIdOrForbidden(user);
-
-        try {
-            List<Lead> leads = leadRepository.findAllById(request.getLeadIds());
-
-            // Filter leads that are mapped to the user's organization via org_leads
-            List<Lead> userLeads = leads.stream()
-                    .filter(lead -> orgLeadService.hasMapping(orgId, lead.getId()))
-                    .toList();
-
-            // Remove campaign-lead relationships using service
-            List<UUID> leadIds = userLeads.stream().map(Lead::getId).toList();
-            int removedCount = campaignLeadService.removeLeadsFromCampaign(request.getCampaignId(), leadIds);
-
-            return ResponseEntity.ok(Map.of(
-                    "message", "Leads removed from campaign successfully",
-                    "removedCount", removedCount));
-        } catch (Exception e) {
-            log.error("Error removing leads from campaign: {}", e.getMessage());
-            return ResponseEntity.status(500).body(Map.of("error", "Failed to remove leads from campaign"));
         }
     }
 
@@ -850,7 +701,6 @@ public class LeadEnrichmentController {
 
         try {
             List<String> createdLeadIds = new ArrayList<>();
-            log.info("Campaign ID: {}", request.getCampaignId());
 
             // For each selected email: ensure global lead exists (hunter_api) and ensure
             // org_leads mapping
@@ -889,31 +739,6 @@ public class LeadEnrichmentController {
             log.info("Successfully ensured org mappings for {} leads for org {}",
                     createdLeadIds.size(), orgId);
 
-            // If campaign ID is provided, add leads to campaign
-            if (request.getCampaignId() != null) {
-                List<UUID> leadIds = createdLeadIds.stream().map(UUID::fromString).toList();
-                log.info("Adding {} leads to campaign {} for user {}",
-                        leadIds.size(), request.getCampaignId(), user.getId());
-
-                try {
-                    // Validate campaign exists and belongs to user's organization
-                    Campaign campaign = campaignRepository.findByIdAndOrgId(request.getCampaignId(), orgId)
-                            .orElseThrow(() -> new IllegalArgumentException("Campaign not found or access denied"));
-
-                    log.info("Campaign validation successful: {} (ID: {})", campaign.getName(), campaign.getId());
-
-                    int assignedCount = campaignLeadService.addLeadsToCampaign(request.getCampaignId(), leadIds,
-                            user.getId());
-                    log.info("Successfully assigned {} leads to campaign {} for user {}",
-                            assignedCount, request.getCampaignId(), user.getId());
-                } catch (Exception e) {
-                    log.error("Error adding leads to campaign {}: {}", request.getCampaignId(), e.getMessage(), e);
-                    // Don't fail the entire operation if campaign assignment fails
-                }
-            } else {
-                log.info("No campaign ID provided, leads created without campaign assignment");
-            }
-
             return ResponseEntity.ok(Map.of(
                     "message", "Org mappings ensured successfully",
                     "leadIds", createdLeadIds,
@@ -935,61 +760,6 @@ public class LeadEnrichmentController {
         return java.util.Optional.ofNullable(user.getOrgId())
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
                         org.springframework.http.HttpStatus.FORBIDDEN, "Organization required"));
-    }
-
-    // Request DTOs
-    public static class BulkCampaignAssignmentRequest {
-        private List<UUID> leadIds;
-        private UUID campaignId;
-
-        public List<UUID> getLeadIds() {
-            return leadIds;
-        }
-
-        public void setLeadIds(List<UUID> leadIds) {
-            this.leadIds = leadIds;
-        }
-
-        public UUID getCampaignId() {
-            return campaignId;
-        }
-
-        public void setCampaignId(UUID campaignId) {
-            this.campaignId = campaignId;
-        }
-    }
-
-    public static class CampaignAssignmentRequest {
-        private UUID campaignId;
-
-        public UUID getCampaignId() {
-            return campaignId;
-        }
-
-        public void setCampaignId(UUID campaignId) {
-            this.campaignId = campaignId;
-        }
-    }
-
-    public static class BulkCampaignRemovalRequest {
-        private List<UUID> leadIds;
-        private UUID campaignId;
-
-        public List<UUID> getLeadIds() {
-            return leadIds;
-        }
-
-        public void setLeadIds(List<UUID> leadIds) {
-            this.leadIds = leadIds;
-        }
-
-        public UUID getCampaignId() {
-            return campaignId;
-        }
-
-        public void setCampaignId(UUID campaignId) {
-            this.campaignId = campaignId;
-        }
     }
 
     public static class ExportRequest {
@@ -1021,39 +791,6 @@ public class LeadEnrichmentController {
         } catch (Exception e) {
             log.error("Error verifying lead: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body(Map.of("error", "Failed to verify lead: " + e.getMessage()));
-        }
-    }
-
-    @GetMapping("/debug/campaign/{campaignId}")
-    public ResponseEntity<?> debugCampaignLeads(
-            @PathVariable UUID campaignId,
-            Authentication authentication) {
-        try {
-            User user = getUser(authentication);
-            if (user == null)
-                return ResponseEntity.status(401).build();
-
-            UUID orgId = getOrgIdOrForbidden(user);
-
-            // Get campaign-lead relationships directly
-            List<CampaignLead> campaignLeads = campaignLeadService.getActiveCampaignsForLead(campaignId);
-            long count = campaignLeadService.getActiveLeadCountForCampaign(campaignId);
-
-            // Get leads through the service
-            List<Lead> leads = campaignLeadService.getActiveLeadsForCampaign(campaignId);
-
-            Map<String, Object> debug = Map.of(
-                    "campaignId", campaignId,
-                    "orgId", orgId,
-                    "campaignLeadRelationships", campaignLeads.size(),
-                    "activeLeadCount", count,
-                    "leadsRetrieved", leads.size(),
-                    "leadIds", leads.stream().map(Lead::getId).toList());
-
-            return ResponseEntity.ok(debug);
-        } catch (Exception e) {
-            log.error("Error debugging campaign leads: {}", e.getMessage(), e);
-            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }
     }
 
@@ -1124,7 +861,6 @@ public class LeadEnrichmentController {
     // Request DTOs
     public static class BulkCreateLeadsRequest {
         private List<LeadData> leads;
-        private UUID campaignId;
 
         public List<LeadData> getLeads() {
             return leads;
@@ -1132,14 +868,6 @@ public class LeadEnrichmentController {
 
         public void setLeads(List<LeadData> leads) {
             this.leads = leads;
-        }
-
-        public UUID getCampaignId() {
-            return campaignId;
-        }
-
-        public void setCampaignId(UUID campaignId) {
-            this.campaignId = campaignId;
         }
     }
 

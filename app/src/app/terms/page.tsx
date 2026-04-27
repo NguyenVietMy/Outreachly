@@ -49,8 +49,8 @@ export default function TermsOfServicePage() {
               Outreachly may offer optional integrations, including the Gmail
               API. When you choose to connect your Google account, Google will
               present a consent screen requesting permissions (e.g.,{" "}
-              <code>gmail.send</code>) so that Outreachly can send email you
-              author. You can revoke access at any time in your Google Account
+              <code>gmail.send</code>) to enable the Gmail integration flow. You
+              can revoke access at any time in your Google Account
               settings. Your use of third-party services is subject to their own
               terms and privacy policies.
             </p>

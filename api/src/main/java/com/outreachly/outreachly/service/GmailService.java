@@ -275,4 +275,13 @@ public class GmailService {
             return false;
         }
     }
+
+    public void disconnectCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (!(authentication instanceof OAuth2AuthenticationToken oauth2Token)) {
+            return;
+        }
+
+        authorizedClientService.removeAuthorizedClient("google-gmail", oauth2Token.getName());
+    }
 }

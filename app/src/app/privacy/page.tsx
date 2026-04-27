@@ -47,8 +47,8 @@ export default function PrivacyPolicyPage() {
                 <strong>Integrations</strong>: If you connect third‑party
                 services (e.g., Gmail), we receive tokens and limited profile
                 details necessary to provide the integration. For Gmail, this
-                may include the <code>gmail.send</code> scope for sending email
-                you author.
+                may include the <code>gmail.send</code> scope during integration
+                setup.
               </li>
             </ul>
 
@@ -59,8 +59,7 @@ export default function PrivacyPolicyPage() {
               </li>
               <li>Authenticate users, secure accounts, and prevent abuse.</li>
               <li>
-                Offer integrations you opt into (e.g., sending emails via
-                Gmail).
+                Offer integrations you opt into (e.g., Gmail).
               </li>
               <li>
                 Provide support, communicate updates, and improve user

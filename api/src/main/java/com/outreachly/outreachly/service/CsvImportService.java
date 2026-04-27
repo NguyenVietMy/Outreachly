@@ -9,10 +9,8 @@ import com.outreachly.outreachly.entity.Organization;
 import com.outreachly.outreachly.repository.ImportJobRepository;
 import com.outreachly.outreachly.repository.LeadRepository;
 import com.outreachly.outreachly.repository.OrganizationRepository;
-// import com.outreachly.outreachly.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-// import org.apache.commons.validator.routines.EmailValidator;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -33,10 +31,6 @@ public class CsvImportService {
     private final OrgLeadService orgLeadService;
     private final ImportJobRepository importJobRepository;
     private final OrganizationRepository organizationRepository;
-    private final CampaignLeadService campaignLeadService;
-    // private final UserRepository userRepository; // Will be used when
-    // implementing proper user lookup
-    // private final EmailValidator emailValidator = EmailValidator.getInstance();
 
     public static class CsvValidationResult {
         private final boolean valid;
@@ -269,11 +263,6 @@ public class CsvImportService {
 
     @Async
     public CompletableFuture<Void> processImportJob(UUID jobId, List<Map<String, String>> data) {
-        return processImportJob(jobId, data, null);
-    }
-
-    @Async
-    public CompletableFuture<Void> processImportJob(UUID jobId, List<Map<String, String>> data, UUID campaignId) {
         ImportJob job = importJobRepository.findById(jobId)
                 .orElseThrow(() -> new RuntimeException("Import job not found"));
 
@@ -326,19 +315,6 @@ public class CsvImportService {
 
                     // Ensure org_leads mapping exists for org
                     orgLeadService.ensureOrgLeadForEmail(job.getOrgId(), email, "csv_import");
-
-                    // If campaignId is provided, create campaign-lead relationship
-                    if (campaignId != null) {
-                        try {
-                            campaignLeadService.addLeadToCampaign(campaignId, lead.getId(), job.getUserId());
-                            log.info("Successfully added lead {} to campaign {} during CSV import", lead.getId(),
-                                    campaignId);
-                        } catch (Exception e) {
-                            log.error("Failed to add lead {} to campaign {} during CSV import: {}", lead.getId(),
-                                    campaignId, e.getMessage());
-                            // Don't fail the entire import for campaign assignment errors
-                        }
-                    }
 
                     processedRows++;
 

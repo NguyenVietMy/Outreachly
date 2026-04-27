@@ -16,6 +16,6 @@ public interface OrgLeadRepository extends JpaRepository<OrgLead, UUID> {
     @Query("SELECT ol FROM OrgLead ol WHERE ol.orgId = :orgId AND ol.lead.id = :leadId")
     Optional<OrgLead> findByOrgIdAndLeadId(@Param("orgId") UUID orgId, @Param("leadId") UUID leadId);
 
-    @Query("SELECT DISTINCT ol FROM OrgLead ol JOIN FETCH ol.lead l LEFT JOIN FETCH l.campaignLeads cl LEFT JOIN FETCH cl.campaign WHERE ol.orgId = :orgId")
-    java.util.List<OrgLead> findByOrgIdWithLeadAndCampaigns(@Param("orgId") UUID orgId);
+    @Query("SELECT ol FROM OrgLead ol JOIN FETCH ol.lead l WHERE ol.orgId = :orgId")
+    java.util.List<OrgLead> findByOrgIdWithLead(@Param("orgId") UUID orgId);
 }

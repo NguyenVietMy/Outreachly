@@ -5,6 +5,7 @@ import java.util.List;
 public record IntegrationDto(
         String provider,
         String status,
+        boolean supportsSync,
         String accountLabel,
         String accountValue,
         String eventsLabel,

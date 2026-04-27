@@ -22,7 +22,7 @@ public class OrgLeadService {
     }
 
     public java.util.List<Lead> getLeadsForOrg(UUID orgId) {
-        java.util.List<OrgLead> mappings = orgLeadRepository.findByOrgIdWithLeadAndCampaigns(orgId);
+        java.util.List<OrgLead> mappings = orgLeadRepository.findByOrgIdWithLead(orgId);
         return mappings.stream().map(OrgLead::getLead).toList();
     }
 
