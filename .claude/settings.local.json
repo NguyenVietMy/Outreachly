@@ -23,7 +23,10 @@
       "Bash(grep -v \"\\\\.class$\")",
       "Bash(xargs grep *)",
       "Bash(./mvnw compile *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "WebFetch(domain:platform.openai.com)",
+      "WebSearch",
+      "WebFetch(domain:developers.openai.com)"
     ]
   }
 }

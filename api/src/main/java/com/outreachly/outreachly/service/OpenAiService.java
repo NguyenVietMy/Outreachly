@@ -196,13 +196,13 @@ public class OpenAiService {
         String systemPrompt = RESUME_SCORING_SYSTEM_PROMPT + "\n\n" + RESUME_SCORING_RUBRIC;
 
         Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", "gpt-5.3");
+        requestBody.put("model", "gpt-5.2");
         requestBody.put("messages", new Object[] {
                 Map.of("role", "system", "content", systemPrompt),
                 Map.of("role", "user", "content", resumeText)
         });
-        requestBody.put("max_tokens", 4000);
-        requestBody.put("temperature", 0.1);
+        requestBody.put("max_completion_tokens", 4000);
+        requestBody.put("reasoning_effort", "low");
 
         return webClient.post()
                 .uri("/chat/completions")
