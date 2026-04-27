@@ -81,8 +81,8 @@ export default function Dashboard() {
   return (
     <AuthGuard>
       <DashboardLayout>
-        <div className="min-h-[calc(100vh-64px)] bg-[#ffffff] px-6 py-12 text-[#0d0d0d] md:px-8 md:py-16">
-          <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-12">
+        <div className="min-h-full bg-transparent px-6 py-10 text-[#0d0d0d] md:px-8 md:py-12">
+          <div className="flex w-full flex-col gap-12">
             <section className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <p className="font-mono text-[12px] font-medium uppercase tracking-[0.6px] text-[#666666]">

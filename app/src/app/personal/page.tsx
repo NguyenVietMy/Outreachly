@@ -585,7 +585,7 @@ export default function PersonalPage() {
     return (
       <AuthGuard>
         <DashboardLayout>
-          <div className="flex min-h-[calc(100vh-64px)] items-center justify-center">
+          <div className="flex min-h-full items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-[#666666]" />
           </div>
         </DashboardLayout>
@@ -622,8 +622,8 @@ export default function PersonalPage() {
           />
         )}
 
-        <div className="min-h-[calc(100vh-64px)] bg-[#ffffff] px-6 py-12 text-[#0d0d0d] md:px-8 md:py-16">
-          <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-10">
+        <div className="min-h-full bg-transparent px-6 py-10 text-[#0d0d0d] md:px-8 md:py-12">
+          <div className="flex w-full flex-col gap-10">
             {/* Header + Career Target */}
             <section>
               <div className="flex flex-wrap items-start justify-between gap-4">
