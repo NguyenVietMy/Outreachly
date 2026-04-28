@@ -32,6 +32,7 @@ public class DashboardController {
         if (user == null) return ResponseEntity.status(401).build();
 
         Map<String, Long> counts = dashboardService.getMetrics(user.getId());
+        Map<String, Map<String, Long>> breakdown = dashboardService.getEventTypeBreakdown(user.getId());
 
         DashboardMetricsDto dto = new DashboardMetricsDto(
                 counts.getOrDefault("github", 0L),
@@ -39,7 +40,8 @@ public class DashboardController {
                 counts.getOrDefault("slack", 0L),
                 counts.getOrDefault("linear", 0L),
                 dashboardService.getGreeting(),
-                dashboardService.getDateLabel()
+                dashboardService.getDateLabel(),
+                breakdown
         );
 
         return ResponseEntity.ok(dto);
@@ -66,6 +68,17 @@ public class DashboardController {
         if (user == null) return ResponseEntity.status(401).build();
 
         return ResponseEntity.ok(dashboardService.getActivityBySource(user.getId()));
+    }
+
+    @GetMapping("/trend")
+    public ResponseEntity<Map<String, Map<String, Long>>> getTrend(
+            @RequestParam(defaultValue = "14") int days,
+            Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        int clampedDays = Math.min(Math.max(days, 1), 90);
+        return ResponseEntity.ok(dashboardService.getTrend(user.getId(), clampedDays));
     }
 
     @PostMapping("/digest")

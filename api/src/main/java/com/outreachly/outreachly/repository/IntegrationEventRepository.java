@@ -36,6 +36,12 @@ public interface IntegrationEventRepository extends JpaRepository<IntegrationEve
                                           @Param("provider") String provider,
                                           @Param("since") LocalDateTime since);
 
+    @Query("SELECT ie.provider, ie.eventType, COUNT(ie) FROM IntegrationEvent ie " +
+           "WHERE ie.userId = :userId AND ie.eventTimestamp >= :since " +
+           "GROUP BY ie.provider, ie.eventType")
+    List<Object[]> countByProviderAndEventTypeSince(@Param("userId") Long userId,
+                                                     @Param("since") LocalDateTime since);
+
     @Query("SELECT CAST(ie.eventTimestamp AS date), COUNT(ie) FROM IntegrationEvent ie " +
            "WHERE ie.userId = :userId AND ie.eventTimestamp >= :since " +
            "GROUP BY CAST(ie.eventTimestamp AS date) " +

@@ -27,7 +27,9 @@
       "WebFetch(domain:platform.openai.com)",
       "WebSearch",
       "WebFetch(domain:developers.openai.com)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(sort -t'V' -k2 -n)",
+      "Bash(./mvnw clean *)"
     ]
   }
 }

@@ -9,6 +9,7 @@ export interface DashboardMetrics {
   linearTickets: number;
   greeting: string;
   dateLabel: string;
+  eventTypeBreakdown: Record<string, Record<string, number>>;
 }
 
 export interface ActivityItem {
@@ -24,10 +25,60 @@ export interface ActivityBySource {
   [provider: string]: number;
 }
 
+export interface TrendData {
+  [date: string]: Record<string, number>;
+}
+
+export interface Integration {
+  provider: string;
+  status: "connected" | "disconnected";
+  supportsSync: boolean;
+  lastSyncedAt: string | null;
+  consecutiveFailures: number;
+  autoSyncEnabled: boolean;
+}
+
+export interface AxisScores {
+  dsa: number;
+  projects: number;
+  systemDesign: number;
+  coreCs: number;
+  resume: number;
+}
+
+export interface ResumeScoreBreakdown {
+  total_score?: number;
+  max_score?: number;
+  decision?: "ADVANCE" | "HOLD" | "REJECT";
+  flags?: string[];
+  summary?: string;
+}
+
+export interface UserProfile {
+  axisScores: AxisScores;
+  resumeScoreBreakdown: ResumeScoreBreakdown | null;
+  onboardingCompleted: boolean;
+}
+
+export interface UserGoal {
+  id: string;
+  title: string;
+  category: string;
+  targetValue: number | null;
+  currentValue: number;
+  unit: string;
+  deadline: string | null;
+  status: string;
+}
+
 export function useDashboard() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [activityBySource, setActivityBySource] = useState<ActivityBySource>({});
+  const [trendData, setTrendData] = useState<TrendData>({});
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [goals, setGoals] = useState<UserGoal[]>([]);
+  const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [digest, setDigest] = useState<string | null>(null);
   const [loadingMetrics, setLoadingMetrics] = useState(true);
   const [loadingActivity, setLoadingActivity] = useState(true);
@@ -35,51 +86,38 @@ export function useDashboard() {
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
-  const fetchMetrics = useCallback(async () => {
+  const fetchAll = useCallback(async () => {
     if (!user) {
       setLoadingMetrics(false);
-      return;
-    }
-    try {
-      setLoadingMetrics(true);
-      const res = await fetch(`${API_BASE_URL}/api/dashboard/metrics`, {
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to fetch metrics");
-      const data = await res.json();
-      setMetrics(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch metrics");
-    } finally {
-      setLoadingMetrics(false);
-    }
-  }, [user]);
-
-  const fetchActivity = useCallback(async () => {
-    if (!user) {
       setLoadingActivity(false);
       return;
     }
     try {
+      setLoadingMetrics(true);
       setLoadingActivity(true);
-      const [activityRes, sourceRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/dashboard/activity?limit=10`, {
-          credentials: "include",
-        }),
-        fetch(`${API_BASE_URL}/api/dashboard/activity-by-source`, {
-          credentials: "include",
-        }),
-      ]);
 
-      if (activityRes.ok) {
-        setActivity(await activityRes.json());
-      }
-      if (sourceRes.ok) {
-        setActivityBySource(await sourceRes.json());
-      }
+      const [metricsRes, activityRes, sourceRes, trendRes, profileRes, goalsRes, integrationsRes] =
+        await Promise.all([
+          fetch(`${API_BASE_URL}/api/dashboard/metrics`, { credentials: "include" }),
+          fetch(`${API_BASE_URL}/api/dashboard/activity?limit=8`, { credentials: "include" }),
+          fetch(`${API_BASE_URL}/api/dashboard/activity-by-source`, { credentials: "include" }),
+          fetch(`${API_BASE_URL}/api/dashboard/trend?days=14`, { credentials: "include" }),
+          fetch(`${API_BASE_URL}/api/personal/profile`, { credentials: "include" }),
+          fetch(`${API_BASE_URL}/api/personal/goals`, { credentials: "include" }),
+          fetch(`${API_BASE_URL}/api/integrations`, { credentials: "include" }),
+        ]);
+
+      if (metricsRes.ok) setMetrics(await metricsRes.json());
+      if (activityRes.ok) setActivity(await activityRes.json());
+      if (sourceRes.ok) setActivityBySource(await sourceRes.json());
+      if (trendRes.ok) setTrendData(await trendRes.json());
+      if (profileRes.ok) setProfile(await profileRes.json());
+      if (goalsRes.ok) setGoals(await goalsRes.json());
+      if (integrationsRes.ok) setIntegrations(await integrationsRes.json());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch activity");
+      setError(err instanceof Error ? err.message : "Failed to fetch dashboard data");
     } finally {
+      setLoadingMetrics(false);
       setLoadingActivity(false);
     }
   }, [user]);
@@ -101,25 +139,24 @@ export function useDashboard() {
     }
   };
 
-  const refetch = useCallback(async () => {
-    await Promise.all([fetchMetrics(), fetchActivity()]);
-  }, [fetchMetrics, fetchActivity]);
-
   useEffect(() => {
-    fetchMetrics();
-    fetchActivity();
-  }, [fetchMetrics, fetchActivity]);
+    fetchAll();
+  }, [fetchAll]);
 
   return {
     metrics,
     activity,
     activityBySource,
+    trendData,
+    profile,
+    goals,
+    integrations,
     digest,
     loadingMetrics,
     loadingActivity,
     loadingDigest,
     error,
     requestDigest,
-    refetch,
+    refetch: fetchAll,
   };
 }

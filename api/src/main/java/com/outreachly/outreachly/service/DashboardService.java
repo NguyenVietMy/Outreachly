@@ -7,14 +7,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +34,45 @@ public class DashboardService {
 
         for (Object[] row : rows) {
             result.put((String) row[0], (Long) row[1]);
+        }
+
+        return result;
+    }
+
+    public Map<String, Map<String, Long>> getEventTypeBreakdown(Long userId) {
+        LocalDateTime startOfDay = LocalDateTime.now().truncatedTo(ChronoUnit.DAYS);
+        List<Object[]> rows = eventRepo.countByProviderAndEventTypeSince(userId, startOfDay);
+
+        Map<String, Map<String, Long>> result = new HashMap<>();
+        for (Object[] row : rows) {
+            String provider = (String) row[0];
+            String eventType = (String) row[1];
+            Long count = (Long) row[2];
+            result.computeIfAbsent(provider, k -> new HashMap<>()).put(eventType, count);
+        }
+        return result;
+    }
+
+    public Map<String, Map<String, Long>> getTrend(Long userId, int days) {
+        LocalDateTime since = LocalDateTime.now().minusDays(days).truncatedTo(ChronoUnit.DAYS);
+        String[] providers = {"github", "obsidian", "slack", "linear"};
+
+        Map<String, Map<String, Long>> result = new LinkedHashMap<>();
+        LocalDate start = LocalDate.now().minusDays(days - 1);
+        for (int i = 0; i < days; i++) {
+            result.put(start.plusDays(i).toString(), new HashMap<>());
+        }
+
+        for (String provider : providers) {
+            List<Object[]> rows = eventRepo.countByProviderPerDay(userId, provider, since);
+            for (Object[] row : rows) {
+                String date = row[0].toString();
+                Long count = (Long) row[1];
+                Map<String, Long> dayMap = result.get(date);
+                if (dayMap != null) {
+                    dayMap.put(provider, count);
+                }
+            }
         }
 
         return result;

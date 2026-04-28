@@ -254,7 +254,9 @@ public class IntegrationController {
                 eventsLabel,
                 eventsValue,
                 lastSynced,
-                sparkline
+                sparkline,
+                integration.getConsecutiveFailures() != null ? integration.getConsecutiveFailures() : 0,
+                integration.getAutoSyncEnabled() != null && integration.getAutoSyncEnabled()
         );
     }
 
@@ -264,7 +266,9 @@ public class IntegrationController {
                 "disconnected",
                 true,
                 null, null, null, null, null,
-                Collections.emptyList()
+                Collections.emptyList(),
+                0,
+                false
         );
     }
 
@@ -279,7 +283,9 @@ public class IntegrationController {
                 null,
                 null,
                 connected ? "Connected" : null,
-                Collections.emptyList());
+                Collections.emptyList(),
+                0,
+                false);
     }
 
     private String getRedirectUri(String provider) {

@@ -339,6 +339,125 @@ public class OpenAiService {
             "\"total_score\":0,\"max_score\":100," +
             "\"decision\":\"ADVANCE|HOLD|REJECT\",\"flags\":[],\"summary\":\"\"}";
 
+    public Mono<String> generateSectionTasks(String sectionContext) {
+        String systemPrompt = "You are a CS study coach. Given a student's assessment results for a specific section, " +
+                "generate a checklist of concrete topics and skills to learn or master. " +
+                "Focus on weak areas (tier 0-2). For strong areas (tier 3-4), suggest advanced practice only.\n\n" +
+                "Return ONLY a JSON array of objects, each with:\n" +
+                "- \"title\": short actionable task (e.g., \"Learn consistent hashing and practice a design using it\")\n" +
+                "- \"description\": 1 sentence explaining why this matters or how to approach it\n" +
+                "- \"priority\": 0 (highest) to 2 (lowest), based on how weak the student is in this area\n\n" +
+                "Generate 3-8 tasks per section. More tasks for weaker sections, fewer for strong ones. " +
+                "If the student scored tier 3-4 on everything, return 1-2 stretch tasks.\n" +
+                "Return ONLY the JSON array, no markdown fences.";
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", "gpt-4o-mini");
+        requestBody.put("messages", new Object[] {
+                Map.of("role", "system", "content", systemPrompt),
+                Map.of("role", "user", "content", sectionContext)
+        });
+        requestBody.put("max_tokens", 800);
+        requestBody.put("temperature", 0.4);
+
+        return webClient.post()
+                .uri("/chat/completions")
+                .bodyValue(requestBody)
+                .retrieve()
+                .bodyToMono(JsonNode.class)
+                .map(response -> {
+                    JsonNode choices = response.get("choices");
+                    if (choices != null && choices.isArray() && choices.size() > 0) {
+                        JsonNode message = choices.get(0).get("message");
+                        if (message != null) {
+                            return message.get("content").asText();
+                        }
+                    }
+                    throw new RuntimeException("No response from OpenAI");
+                })
+                .doOnError(error -> log.error("OpenAI section tasks error: ", error));
+    }
+
+    public Mono<String> updateMemory(String currentMemory, String eventContext) {
+        String systemPrompt = "You are a memory manager for a CS student career platform. " +
+                "You maintain a markdown profile about the student that evolves as they progress.\n\n" +
+                "Rules:\n" +
+                "- Merge the new information into the existing profile naturally\n" +
+                "- Update facts that changed (e.g., new LeetCode count, new resume score)\n" +
+                "- Add new achievements or milestones\n" +
+                "- Keep the same markdown structure (# headers, ## sections, bullet points)\n" +
+                "- Preserve information that hasn't changed\n" +
+                "- Keep it concise — under 500 words total\n" +
+                "- Write in third person about the student\n\n" +
+                "Return ONLY the updated markdown profile, no preamble.";
+
+        String userPrompt = "=== CURRENT MEMORY ===\n" + currentMemory +
+                "\n\n=== NEW EVENT ===\n" + eventContext;
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", "gpt-4o-mini");
+        requestBody.put("messages", new Object[] {
+                Map.of("role", "system", "content", systemPrompt),
+                Map.of("role", "user", "content", userPrompt)
+        });
+        requestBody.put("max_tokens", 1000);
+        requestBody.put("temperature", 0.3);
+
+        return webClient.post()
+                .uri("/chat/completions")
+                .bodyValue(requestBody)
+                .retrieve()
+                .bodyToMono(JsonNode.class)
+                .map(response -> {
+                    JsonNode choices = response.get("choices");
+                    if (choices != null && choices.isArray() && choices.size() > 0) {
+                        JsonNode message = choices.get(0).get("message");
+                        if (message != null) {
+                            return message.get("content").asText();
+                        }
+                    }
+                    throw new RuntimeException("No response from OpenAI");
+                })
+                .doOnError(error -> log.error("OpenAI memory update error: ", error));
+    }
+
+    public Mono<String> generateEventTasks(String eventContext) {
+        String systemPrompt = "You are a CS career coach. Based on a student event (resume upload, LeetCode progress), " +
+                "generate actionable study/improvement tasks.\n\n" +
+                "Return ONLY a JSON array of objects, each with:\n" +
+                "- \"title\": short actionable task\n" +
+                "- \"description\": 1 sentence explaining why or how\n" +
+                "- \"priority\": 0 (highest) to 2 (lowest)\n\n" +
+                "Generate 2-5 tasks. Be specific to the student's data. " +
+                "Return ONLY the JSON array, no markdown fences.";
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", "gpt-4o-mini");
+        requestBody.put("messages", new Object[] {
+                Map.of("role", "system", "content", systemPrompt),
+                Map.of("role", "user", "content", eventContext)
+        });
+        requestBody.put("max_tokens", 600);
+        requestBody.put("temperature", 0.4);
+
+        return webClient.post()
+                .uri("/chat/completions")
+                .bodyValue(requestBody)
+                .retrieve()
+                .bodyToMono(JsonNode.class)
+                .map(response -> {
+                    JsonNode choices = response.get("choices");
+                    if (choices != null && choices.isArray() && choices.size() > 0) {
+                        JsonNode message = choices.get(0).get("message");
+                        if (message != null) {
+                            return message.get("content").asText();
+                        }
+                    }
+                    throw new RuntimeException("No response from OpenAI");
+                })
+                .doOnError(error -> log.error("OpenAI event tasks error: ", error));
+    }
+
     private String buildImprovementPrompt(String platform, String improvementType) {
         StringBuilder prompt = new StringBuilder();
         prompt.append("You are an expert email and LinkedIn message optimizer. ");

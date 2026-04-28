@@ -1,6 +1,7 @@
 package com.outreachly.outreachly.controller;
 
 import com.outreachly.outreachly.dto.*;
+import com.outreachly.outreachly.entity.AiTask;
 import com.outreachly.outreachly.entity.UserGoal;
 import com.outreachly.outreachly.entity.UserProfile;
 import com.outreachly.outreachly.entity.User;
@@ -206,6 +207,28 @@ public class PersonalController {
         return ResponseEntity.ok(toDto(profile));
     }
 
+    @GetMapping("/tasks")
+    public ResponseEntity<List<AiTaskDto>> getTasks(Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        List<AiTaskDto> tasks = personalService.getTasks(user.getId()).stream()
+                .map(this::toTaskDto)
+                .toList();
+        return ResponseEntity.ok(tasks);
+    }
+
+    @PutMapping("/tasks/{id}/toggle")
+    public ResponseEntity<AiTaskDto> toggleTask(
+            @PathVariable UUID id,
+            Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        AiTask task = personalService.toggleTask(user.getId(), id);
+        return ResponseEntity.ok(toTaskDto(task));
+    }
+
     @PutMapping("/career")
     public ResponseEntity<UserProfileDto> updateCareer(
             @RequestBody Map<String, Object> request,
@@ -249,6 +272,20 @@ public class PersonalController {
                 goal.getUnit(),
                 goal.getDeadline(),
                 goal.getStatus()
+        );
+    }
+
+    private AiTaskDto toTaskDto(AiTask task) {
+        return new AiTaskDto(
+                task.getId(),
+                task.getAxis(),
+                task.getSectionId(),
+                task.getTitle(),
+                task.getDescription(),
+                task.isCompleted(),
+                task.getSource(),
+                task.getPriority(),
+                task.getOrderIndex()
         );
     }
 

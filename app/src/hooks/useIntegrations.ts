@@ -12,6 +12,8 @@ export interface Integration {
   eventsValue: string | null;
   lastSyncedAt: string | null;
   activitySparkline: number[];
+  consecutiveFailures: number;
+  autoSyncEnabled: boolean;
 }
 
 export function useIntegrations() {

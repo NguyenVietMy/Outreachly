@@ -11,5 +11,7 @@ public record IntegrationDto(
         String eventsLabel,
         String eventsValue,
         String lastSyncedAt,
-        List<Integer> activitySparkline
+        List<Integer> activitySparkline,
+        int consecutiveFailures,
+        boolean autoSyncEnabled
 ) {}

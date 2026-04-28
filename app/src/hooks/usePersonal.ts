@@ -112,6 +112,18 @@ export interface UserGoal {
   status: string;
 }
 
+export interface AiTask {
+  id: string;
+  axis: string;
+  sectionId: string | null;
+  title: string;
+  description: string | null;
+  completed: boolean;
+  source: string;
+  priority: number;
+  orderIndex: number;
+}
+
 export interface OnboardingData {
   knowledgeAreas: KnowledgeArea[];
   goals: { title: string; category: string; targetValue: number | null; unit: string }[];
@@ -122,10 +134,12 @@ export function usePersonal() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [goals, setGoals] = useState<UserGoal[]>([]);
   const [heatmap, setHeatmap] = useState<Record<string, number>>({});
+  const [tasks, setTasks] = useState<AiTask[]>([]);
   const [insights, setInsights] = useState<string | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [loadingGoals, setLoadingGoals] = useState(true);
   const [loadingHeatmap, setLoadingHeatmap] = useState(true);
+  const [loadingTasks, setLoadingTasks] = useState(true);
   const [loadingInsights, setLoadingInsights] = useState(false);
   const [loadingLeetCode, setLoadingLeetCode] = useState(false);
   const [loadingResume, setLoadingResume] = useState(false);
@@ -163,6 +177,17 @@ export function usePersonal() {
       if (res.ok) setHeatmap(await res.json());
     } finally {
       setLoadingHeatmap(false);
+    }
+  }, [user]);
+
+  const fetchTasks = useCallback(async () => {
+    if (!user) { setLoadingTasks(false); return; }
+    try {
+      setLoadingTasks(true);
+      const res = await fetch(`${API_BASE_URL}/api/personal/tasks`, { credentials: "include" });
+      if (res.ok) setTasks(await res.json());
+    } finally {
+      setLoadingTasks(false);
     }
   }, [user]);
 
@@ -286,6 +311,19 @@ export function usePersonal() {
     }
   };
 
+  const toggleTask = async (taskId: string) => {
+    const res = await fetch(`${API_BASE_URL}/api/personal/tasks/${taskId}/toggle`, {
+      method: "PUT",
+      credentials: "include",
+    });
+    if (res.ok) {
+      const updated: AiTask = await res.json();
+      setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      return updated;
+    }
+    throw new Error("Failed to toggle task");
+  };
+
   const submitQuestionnaire = async (axis: "systemDesign" | "coreCs", answers: Record<string, unknown>) => {
     setLoadingQuestionnaire(true);
     try {
@@ -298,6 +336,8 @@ export function usePersonal() {
       if (res.ok) {
         const data = await res.json();
         setProfile(data);
+        fetchTasks();
+        fetchProfile();
         return data;
       }
       throw new Error("Failed to submit questionnaire");
@@ -377,16 +417,19 @@ export function usePersonal() {
     fetchProfile();
     fetchGoals();
     fetchHeatmap();
-  }, [fetchProfile, fetchGoals, fetchHeatmap]);
+    fetchTasks();
+  }, [fetchProfile, fetchGoals, fetchHeatmap, fetchTasks]);
 
   return {
     profile,
     goals,
     heatmap,
+    tasks,
     insights,
     loadingProfile,
     loadingGoals,
     loadingHeatmap,
+    loadingTasks,
     loadingInsights,
     loadingLeetCode,
     loadingResume,
@@ -401,10 +444,11 @@ export function usePersonal() {
     deleteResume,
     scoreResume,
     submitQuestionnaire,
+    toggleTask,
     createGoal,
     updateGoal,
     deleteGoal,
     requestInsights,
-    refetch: () => { fetchProfile(); fetchGoals(); fetchHeatmap(); },
+    refetch: () => { fetchProfile(); fetchGoals(); fetchHeatmap(); fetchTasks(); },
   };
 }

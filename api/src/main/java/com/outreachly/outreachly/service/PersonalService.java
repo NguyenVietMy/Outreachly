@@ -3,9 +3,11 @@ package com.outreachly.outreachly.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.outreachly.outreachly.dto.OnboardingRequest;
+import com.outreachly.outreachly.entity.AiTask;
 import com.outreachly.outreachly.entity.IntegrationEvent;
 import com.outreachly.outreachly.entity.UserGoal;
 import com.outreachly.outreachly.entity.UserProfile;
+import com.outreachly.outreachly.repository.AiTaskRepository;
 import com.outreachly.outreachly.repository.IntegrationEventRepository;
 import com.outreachly.outreachly.repository.UserGoalRepository;
 import com.outreachly.outreachly.repository.UserProfileRepository;
@@ -26,10 +28,12 @@ public class PersonalService {
 
     private final UserProfileRepository profileRepo;
     private final UserGoalRepository goalRepo;
+    private final AiTaskRepository aiTaskRepo;
     private final IntegrationEventRepository eventRepo;
     private final OpenAiService openAiService;
     private final LeetCodeService leetCodeService;
     private final ResumeService resumeService;
+    private final ObjectMapper objectMapper;
 
     public UserProfile getOrCreateProfile(Long userId) {
         return profileRepo.findByUserId(userId)
@@ -152,7 +156,15 @@ public class PersonalService {
         profile.setLeetcodeStats(stats);
         profile.setLeetcodeFetchedAt(OffsetDateTime.now());
         updateAxisScore(profile, "dsa", ((Number) stats.get("dsaScore")).intValue());
-        return profileRepo.save(profile);
+        UserProfile saved = profileRepo.save(profile);
+
+        String eventContext = String.format(
+                "Connected LeetCode account: %s. Total %s (Easy: %s, Medium: %s, Hard: %s). DSA score: %s/100.",
+                username, stats.get("total"), stats.get("easy"),
+                stats.get("medium"), stats.get("hard"), stats.get("dsaScore"));
+        generateEventTasks(userId, "dsa", "leetcode_refresh", eventContext);
+        updateMemory(saved, eventContext);
+        return saved;
     }
 
     @Transactional
@@ -165,7 +177,15 @@ public class PersonalService {
         profile.setLeetcodeStats(stats);
         profile.setLeetcodeFetchedAt(OffsetDateTime.now());
         updateAxisScore(profile, "dsa", ((Number) stats.get("dsaScore")).intValue());
-        return profileRepo.save(profile);
+        UserProfile saved = profileRepo.save(profile);
+
+        String eventContext = String.format(
+                "LeetCode stats updated for %s: Total %s (Easy: %s, Medium: %s, Hard: %s). DSA score: %s/100.",
+                profile.getLeetcodeUsername(), stats.get("total"), stats.get("easy"),
+                stats.get("medium"), stats.get("hard"), stats.get("dsaScore"));
+        generateEventTasks(userId, "dsa", "leetcode_refresh", eventContext);
+        updateMemory(saved, eventContext);
+        return saved;
     }
 
     // --- Resume ---
@@ -198,9 +218,8 @@ public class PersonalService {
 
     private UserProfile applyResumeScore(UserProfile profile) {
         String raw = openAiService.scoreResume(profile.getResumeText()).block();
-        ObjectMapper mapper = new ObjectMapper();
         try {
-            Map<String, Object> breakdown = mapper.readValue(raw, new TypeReference<>() {});
+            Map<String, Object> breakdown = objectMapper.readValue(raw, new TypeReference<>() {});
             profile.setResumeScoreBreakdown(breakdown);
 
             Number totalScore = (Number) breakdown.get("total_score");
@@ -210,7 +229,15 @@ public class PersonalService {
             int projectScore = extractProjectScore(breakdown);
             updateAxisScore(profile, "projects", projectScore);
 
-            return profileRepo.save(profile);
+            UserProfile saved = profileRepo.save(profile);
+
+            String decision = (String) breakdown.getOrDefault("decision", "UNKNOWN");
+            String summary = (String) breakdown.getOrDefault("summary", "");
+            String eventContext = String.format(
+                    "Resume scored: %d/100 (%s). %s", score, decision, summary);
+            generateEventTasks(profile.getUserId(), "resume", "resume_upload", eventContext);
+            updateMemory(saved, eventContext);
+            return saved;
         } catch (Exception e) {
             log.error("Failed to parse resume scoring response: {}", raw, e);
             throw new RuntimeException("Failed to parse resume score", e);
@@ -263,6 +290,12 @@ public class PersonalService {
                 profile.setCoreCsAnswers(merged);
                 updateAxisScore(profile, "coreCs", score);
             }
+
+            UserProfile saved = profileRepo.save(profile);
+            generateSectionTasks(userId, axis, payload);
+            updateMemory(saved, String.format("Completed %s assessment section: %s. New %s score: %d/100.",
+                    axis, payload.get("sectionId"), axis, score));
+            return saved;
         } else {
             int score = computeLegacyScore(payload);
 
@@ -420,6 +453,102 @@ public class PersonalService {
             heatmap.put(row[0].toString(), ((Long) row[1]).intValue());
         }
         return heatmap;
+    }
+
+    // --- AI Tasks ---
+
+    public List<AiTask> getTasks(Long userId) {
+        return aiTaskRepo.findByUserIdOrderByAxisAscOrderIndexAsc(userId);
+    }
+
+    @Transactional
+    public AiTask toggleTask(Long userId, UUID taskId) {
+        AiTask task = aiTaskRepo.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Task not found"));
+        if (!task.getUserId().equals(userId)) {
+            throw new RuntimeException("Not authorized");
+        }
+        task.setCompleted(!task.isCompleted());
+        task.setCompletedAt(task.isCompleted() ? java.time.OffsetDateTime.now() : null);
+        return aiTaskRepo.save(task);
+    }
+
+    @SuppressWarnings("unchecked")
+    void generateSectionTasks(Long userId, String axis, Map<String, Object> sectionPayload) {
+        try {
+            String sectionId = (String) sectionPayload.get("sectionId");
+            List<?> subskills = (List<?>) sectionPayload.get("subskills");
+            if (subskills == null) return;
+
+            StringBuilder context = new StringBuilder();
+            context.append("Axis: ").append(axis).append("\n");
+            context.append("Section: ").append(sectionId).append("\n");
+            context.append("Subskill results:\n");
+            for (Object ss : subskills) {
+                Map<String, Object> subskill = (Map<String, Object>) ss;
+                context.append(String.format("- %s: tier %s/4\n",
+                        subskill.get("subskillId"), subskill.get("tier")));
+            }
+
+            String raw = openAiService.generateSectionTasks(context.toString()).block();
+            List<Map<String, Object>> tasks = objectMapper.readValue(raw, new TypeReference<>() {});
+
+            aiTaskRepo.deleteByUserIdAndAxisAndSectionId(userId, axis, sectionId);
+
+            int idx = 0;
+            for (Map<String, Object> t : tasks) {
+                aiTaskRepo.save(AiTask.builder()
+                        .userId(userId)
+                        .axis(axis)
+                        .sectionId(sectionId)
+                        .title((String) t.get("title"))
+                        .description((String) t.get("description"))
+                        .source("assessment")
+                        .priority(((Number) t.getOrDefault("priority", 1)).intValue())
+                        .orderIndex(idx++)
+                        .build());
+            }
+        } catch (Exception e) {
+            log.error("Failed to generate section tasks for {}/{}", axis,
+                    sectionPayload.get("sectionId"), e);
+        }
+    }
+
+    void generateEventTasks(Long userId, String axis, String source, String eventContext) {
+        try {
+            String raw = openAiService.generateEventTasks(eventContext).block();
+            List<Map<String, Object>> tasks = objectMapper.readValue(raw, new TypeReference<>() {});
+
+            aiTaskRepo.deleteByUserIdAndSource(userId, source);
+
+            int idx = 0;
+            for (Map<String, Object> t : tasks) {
+                aiTaskRepo.save(AiTask.builder()
+                        .userId(userId)
+                        .axis(axis)
+                        .title((String) t.get("title"))
+                        .description((String) t.get("description"))
+                        .source(source)
+                        .priority(((Number) t.getOrDefault("priority", 1)).intValue())
+                        .orderIndex(idx++)
+                        .build());
+            }
+        } catch (Exception e) {
+            log.error("Failed to generate event tasks for {}", source, e);
+        }
+    }
+
+    void updateMemory(UserProfile profile, String eventDescription) {
+        try {
+            String updated = openAiService.updateMemory(
+                    profile.getProfileMarkdown(), eventDescription).block();
+            if (updated != null && !updated.isBlank()) {
+                profile.setProfileMarkdown(updated);
+                profileRepo.save(profile);
+            }
+        } catch (Exception e) {
+            log.error("Failed to update memory", e);
+        }
     }
 
     // --- AI Insights ---
