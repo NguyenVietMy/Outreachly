@@ -29,17 +29,17 @@ import {
   Loader2,
   Save,
   Clock,
-  FileText,
+  Brain,
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import DashboardLayout from "@/components/DashboardLayout";
 import AuthGuard from "@/components/AuthGuard";
-import TemplatesTab from "@/components/templates/TemplatesTab";
+import { usePersonal } from "@/hooks/usePersonal";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "https://api.outreach-ly.com";
 
-const VALID_TABS = ["timezone", "account", "templates"] as const;
+const VALID_TABS = ["timezone", "account", "memory"] as const;
 type SettingsTab = (typeof VALID_TABS)[number];
 
 function SettingsContent() {
@@ -47,6 +47,7 @@ function SettingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const { profile } = usePersonal();
 
   const tabParam = searchParams.get("tab") as SettingsTab | null;
   const activeTab: SettingsTab =
@@ -177,9 +178,9 @@ function SettingsContent() {
                   <Shield className="h-4 w-4" />
                   Account
                 </TabsTrigger>
-                <TabsTrigger value="templates" className="flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Templates
+                <TabsTrigger value="memory" className="flex items-center gap-2">
+                  <Brain className="h-4 w-4" />
+                  Memory
                 </TabsTrigger>
               </TabsList>
 
@@ -286,8 +287,29 @@ function SettingsContent() {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="templates">
-                <TemplatesTab />
+              <TabsContent value="memory" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Brain className="h-5 w-5" />
+                      Memory
+                    </CardTitle>
+                    <CardDescription>
+                      This is what the system knows about you, built from your onboarding and activity.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {profile?.profileMarkdown ? (
+                      <pre className="whitespace-pre-wrap font-mono text-sm leading-[1.7] text-foreground">
+                        {profile.profileMarkdown}
+                      </pre>
+                    ) : (
+                      <p className="text-muted-foreground">
+                        No profile data yet. Complete onboarding on the Personal page to get started.
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
           </div>
