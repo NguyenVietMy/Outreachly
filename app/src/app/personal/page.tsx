@@ -4,21 +4,17 @@ import { useState, useRef } from "react";
 import AuthGuard from "@/components/AuthGuard";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
-import { usePersonal, KnowledgeArea, OnboardingData, AxisAssessmentPayload, SectionAssessment, ResumeScoreBreakdown, ResumeSubScore } from "@/hooks/usePersonal";
+import { usePersonal, KnowledgeArea, OnboardingData, AxisAssessmentPayload, SectionAssessment, ResumeScoreBreakdown, ResumeSubScore, AiTask } from "@/hooks/usePersonal";
 import MilestoneAssessmentModal from "@/components/assessment/MilestoneAssessmentModal";
 import { CS_FUNDAMENTALS_SECTIONS, SYSTEM_DESIGN_SECTIONS, SECTION_COUNTS } from "@/data/assessmentContent";
 import {
   Bot,
-  ChevronDown,
-  ChevronUp,
   FileText,
   Loader2,
   RefreshCw,
-  Save,
   Sparkles,
   Trash2,
   Upload,
-  X,
   GraduationCap,
   Briefcase,
   Target,
@@ -291,52 +287,6 @@ function OnboardingModal({
   );
 }
 
-// --- Activity Heatmap ---
-
-function ActivityHeatmap({ data }: { data: Record<string, number> }) {
-  const today = new Date();
-  const days: { date: string; count: number }[] = [];
-  for (let i = 89; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const key = d.toISOString().split("T")[0];
-    days.push({ date: key, count: data[key] || 0 });
-  }
-
-  const maxCount = Math.max(...days.map((d) => d.count), 1);
-
-  const getColor = (count: number) => {
-    if (count === 0) return "#f5f5f5";
-    const intensity = Math.min(count / maxCount, 1);
-    if (intensity < 0.25) return "#d4fae8";
-    if (intensity < 0.5) return "#7fe0b8";
-    if (intensity < 0.75) return "#34c88a";
-    return "#18a068";
-  };
-
-  const weeks: { date: string; count: number }[][] = [];
-  for (let i = 0; i < days.length; i += 7) {
-    weeks.push(days.slice(i, i + 7));
-  }
-
-  return (
-    <div className="flex gap-1">
-      {weeks.map((week, wi) => (
-        <div key={wi} className="flex flex-col gap-1">
-          {week.map((day) => (
-            <div
-              key={day.date}
-              className="h-3 w-3 rounded-[2px]"
-              style={{ backgroundColor: getColor(day.count) }}
-              title={`${day.date}: ${day.count} events`}
-            />
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // --- Axis Card ---
 
 function AxisCard({
@@ -480,14 +430,13 @@ function ResumeBreakdownView({ breakdown }: { breakdown: ResumeScoreBreakdown | 
 export default function PersonalPage() {
   const {
     profile,
-    heatmap,
+    tasks,
     insights,
     loadingProfile,
     loadingInsights,
     loadingLeetCode,
     loadingResume,
     scoringResume,
-    updateProfile,
     completeOnboarding,
     updateCareer,
     connectLeetCode,
@@ -496,14 +445,10 @@ export default function PersonalPage() {
     deleteResume,
     scoreResume,
     submitQuestionnaire,
+    toggleTask,
     requestInsights,
   } = usePersonal();
 
-  const [editingProfile, setEditingProfile] = useState(false);
-  const [profileDraft, setProfileDraft] = useState("");
-  const [knowledgeDraft, setKnowledgeDraft] = useState<KnowledgeArea[]>([]);
-  const [profileExpanded, setProfileExpanded] = useState(false);
-  const [savingProfile, setSavingProfile] = useState(false);
   const [lcUsername, setLcUsername] = useState("");
   const [lcError, setLcError] = useState("");
   const [showSDAssessment, setShowSDAssessment] = useState(false);
@@ -514,24 +459,6 @@ export default function PersonalPage() {
   const [editingCareer, setEditingCareer] = useState(false);
   const [careerDraft, setCareerDraft] = useState({ targetRole: "swe_intern", graduationYear: new Date().getFullYear() + 2 });
   const [savingCareer, setSavingCareer] = useState(false);
-
-  const startEditProfile = () => {
-    if (profile) {
-      setProfileDraft(profile.profileMarkdown);
-      setKnowledgeDraft([...profile.knowledgeAreas]);
-    }
-    setEditingProfile(true);
-  };
-
-  const saveProfile = async () => {
-    setSavingProfile(true);
-    try {
-      await updateProfile(profileDraft, knowledgeDraft);
-      setEditingProfile(false);
-    } finally {
-      setSavingProfile(false);
-    }
-  };
 
   const handleSaveCareer = async () => {
     setSavingCareer(true);
@@ -1041,79 +968,64 @@ export default function PersonalPage() {
               />
             </section>
 
-            {/* Heatmap */}
-            <section className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-6 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
-              <h2 className="mb-4 text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
-                Activity (last 90 days)
-              </h2>
-              <div className="overflow-x-auto">
-                <ActivityHeatmap data={heatmap} />
-              </div>
-              <div className="mt-3 flex items-center gap-2 text-[12px] text-[#999999]">
-                <span>Less</span>
-                {["#f5f5f5", "#d4fae8", "#7fe0b8", "#34c88a", "#18a068"].map((c) => (
-                  <div
-                    key={c}
-                    className="h-3 w-3 rounded-[2px]"
-                    style={{ backgroundColor: c }}
-                  />
-                ))}
-                <span>More</span>
-              </div>
-            </section>
-
-            {/* Profile markdown */}
-            <section className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
-              <button
-                onClick={() => setProfileExpanded(!profileExpanded)}
-                className="flex w-full items-center justify-between px-6 py-5"
-              >
-                <h2 className="text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
-                  Profile
+            {/* AI Tasks */}
+            {tasks.length > 0 && (
+              <section>
+                <h2 className="mb-4 text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
+                  Study Plan
                 </h2>
-                {profileExpanded ? (
-                  <ChevronUp className="h-5 w-5 text-[#666666]" />
-                ) : (
-                  <ChevronDown className="h-5 w-5 text-[#666666]" />
-                )}
-              </button>
-              {profileExpanded && (
-                <div className="border-t border-[rgba(0,0,0,0.05)] px-6 pb-6 pt-4">
-                  {editingProfile ? (
-                    <>
-                      <textarea
-                        value={profileDraft}
-                        onChange={(e) => setProfileDraft(e.target.value)}
-                        rows={16}
-                        className="w-full rounded-lg border border-[rgba(0,0,0,0.1)] px-4 py-3 font-mono text-[14px] leading-[1.7] outline-none focus:border-[#0d0d0d]"
-                      />
-                      <div className="mt-3 flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => setEditingProfile(false)} className="h-auto rounded-lg px-4 py-1.5 text-[13px]">
-                          Cancel
-                        </Button>
-                        <Button onClick={saveProfile} disabled={savingProfile} className="h-auto rounded-lg bg-[#0d0d0d] px-4 py-1.5 text-[13px] text-white">
-                          {savingProfile && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
-                          <Save className="mr-1.5 h-3.5 w-3.5" />
-                          Save
-                        </Button>
+                <div className="space-y-3">
+                  {Object.entries(
+                    tasks.reduce<Record<string, AiTask[]>>((acc, task) => {
+                      const key = task.axis;
+                      if (!acc[key]) acc[key] = [];
+                      acc[key].push(task);
+                      return acc;
+                    }, {})
+                  ).map(([axis, axisTasks]) => (
+                    <article
+                      key={axis}
+                      className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-5 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]"
+                    >
+                      <h3 className="mb-3 text-[15px] font-semibold capitalize text-[#0d0d0d]">
+                        {axis === "coreCs" ? "Core CS" : axis === "systemDesign" ? "System Design" : axis.toUpperCase()}
+                      </h3>
+                      <div className="space-y-2">
+                        {axisTasks.map((task) => (
+                          <label
+                            key={task.id}
+                            className="flex cursor-pointer items-start gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-[#fafafa]"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={task.completed}
+                              onChange={() => toggleTask(task.id)}
+                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-[#ccc] accent-[#0fa76e]"
+                            />
+                            <div className="min-w-0">
+                              <p className={`text-[14px] leading-[1.5] ${task.completed ? "text-[#999] line-through" : "text-[#333]"}`}>
+                                {task.title}
+                              </p>
+                              {task.description && (
+                                <p className="mt-0.5 text-[12px] leading-[1.5] text-[#999]">
+                                  {task.description}
+                                </p>
+                              )}
+                            </div>
+                            {task.priority === 0 && !task.completed && (
+                              <span className="mt-0.5 shrink-0 rounded-full bg-[#f7e5e5] px-2 py-0.5 text-[10px] font-semibold text-[#d45656]">
+                                High
+                              </span>
+                            )}
+                          </label>
+                        ))}
                       </div>
-                    </>
-                  ) : (
-                    <>
-                      <pre className="whitespace-pre-wrap font-mono text-[14px] leading-[1.7] text-[#333333]">
-                        {profile?.profileMarkdown || "No profile yet. Complete onboarding to get started."}
-                      </pre>
-                      <button
-                        onClick={startEditProfile}
-                        className="mt-4 text-[14px] font-medium text-[#666666] hover:text-[#0d0d0d]"
-                      >
-                        Edit profile
-                      </button>
-                    </>
-                  )}
+                    </article>
+                  ))}
                 </div>
-              )}
-            </section>
+              </section>
+            )}
+
           </div>
         </div>
       </DashboardLayout>
