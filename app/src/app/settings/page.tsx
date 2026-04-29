@@ -30,6 +30,7 @@ import {
   Save,
   Clock,
   Brain,
+  Trash2,
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -47,7 +48,7 @@ function SettingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const { profile } = usePersonal();
+  const { profile, updateProfile } = usePersonal();
 
   const tabParam = searchParams.get("tab") as SettingsTab | null;
   const activeTab: SettingsTab =
@@ -59,6 +60,8 @@ function SettingsContent() {
   const [isUpdatingTimezone, setIsUpdatingTimezone] = useState(false);
   const [timezoneError, setTimezoneError] = useState<string>("");
   const [timezoneSuccess, setTimezoneSuccess] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [isClearingMemory, setIsClearingMemory] = useState(false);
 
   const handleTabChange = (value: string) => {
     router.replace(`/settings?tab=${value}`, { scroll: false });
@@ -146,6 +149,30 @@ function SettingsContent() {
       );
     } finally {
       setIsUpdatingTimezone(false);
+    }
+  };
+
+  const handleClearMemory = async () => {
+    if (!confirmClear) {
+      setConfirmClear(true);
+      return;
+    }
+    setIsClearingMemory(true);
+    try {
+      await updateProfile("", profile?.knowledgeAreas ?? []);
+      toast({
+        title: "Memory Cleared",
+        description: "Your profile memory has been cleared.",
+      });
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to clear memory.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsClearingMemory(false);
+      setConfirmClear(false);
     }
   };
 
@@ -300,9 +327,31 @@ function SettingsContent() {
                   </CardHeader>
                   <CardContent>
                     {profile?.profileMarkdown ? (
-                      <pre className="whitespace-pre-wrap font-mono text-sm leading-[1.7] text-foreground">
-                        {profile.profileMarkdown}
-                      </pre>
+                      <>
+                        <pre className="whitespace-pre-wrap font-mono text-sm leading-[1.7] text-foreground">
+                          {profile.profileMarkdown}
+                        </pre>
+                        <div className="mt-6 flex justify-end">
+                          <button
+                            onClick={handleClearMemory}
+                            onBlur={() => setConfirmClear(false)}
+                            disabled={isClearingMemory}
+                            className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[15px] font-medium transition-colors"
+                            style={{
+                              color: confirmClear ? "#ffffff" : "#d45656",
+                              borderColor: confirmClear ? "#d45656" : "rgba(212,86,86,0.3)",
+                              backgroundColor: confirmClear ? "#d45656" : "transparent",
+                            }}
+                          >
+                            {isClearingMemory ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                            {confirmClear ? "Confirm Clear" : "Clear Memory"}
+                          </button>
+                        </div>
+                      </>
                     ) : (
                       <p className="text-muted-foreground">
                         No profile data yet. Complete onboarding on the Personal page to get started.

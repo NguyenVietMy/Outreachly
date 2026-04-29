@@ -32,7 +32,9 @@
       "Bash(./mvnw clean *)",
       "Bash(cp -r api/src/main/java/com/outreachly/outreachly/* api/src/main/java/com/pulse/pulse/)",
       "Bash(cp -r api/src/test/java/com/outreachly/outreachly/* api/src/test/java/com/pulse/pulse/)",
-      "Bash(xargs sed *)"
+      "Bash(xargs sed *)",
+      "Bash(git commit *)",
+      "Bash(timeout 10)"
     ]
   }
 }

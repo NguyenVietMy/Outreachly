@@ -7,10 +7,12 @@ import com.pulse.pulse.entity.AiTask;
 import com.pulse.pulse.entity.IntegrationEvent;
 import com.pulse.pulse.entity.UserGoal;
 import com.pulse.pulse.entity.UserProfile;
+import com.pulse.pulse.entity.User;
 import com.pulse.pulse.repository.AiTaskRepository;
 import com.pulse.pulse.repository.IntegrationEventRepository;
 import com.pulse.pulse.repository.UserGoalRepository;
 import com.pulse.pulse.repository.UserProfileRepository;
+import com.pulse.pulse.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +34,7 @@ public class PersonalService {
     private final UserGoalRepository goalRepo;
     private final AiTaskRepository aiTaskRepo;
     private final IntegrationEventRepository eventRepo;
+    private final UserRepository userRepo;
     private final OpenAiService openAiService;
     private final LeetCodeService leetCodeService;
     private final ResumeService resumeService;
@@ -540,8 +545,9 @@ public class PersonalService {
 
     void updateMemory(UserProfile profile, String eventDescription) {
         try {
+            String fullContext = buildFullContext(profile, eventDescription);
             String updated = openAiService.updateMemory(
-                    profile.getProfileMarkdown(), eventDescription).block();
+                    profile.getProfileMarkdown(), fullContext).block();
             if (updated != null && !updated.isBlank()) {
                 profile.setProfileMarkdown(updated);
                 profileRepo.save(profile);
@@ -549,6 +555,114 @@ public class PersonalService {
         } catch (Exception e) {
             log.error("Failed to update memory", e);
         }
+    }
+
+    private String buildFullContext(UserProfile profile, String eventDescription) {
+        StringBuilder ctx = new StringBuilder();
+        ctx.append("=== TRIGGER EVENT ===\n").append(eventDescription).append("\n\n");
+
+        User user = userRepo.findById(profile.getUserId()).orElse(null);
+        if (user != null) {
+            String name = Stream.of(user.getFirstName(), user.getLastName())
+                    .filter(s -> s != null && !s.isBlank())
+                    .collect(Collectors.joining(" "));
+            if (!name.isEmpty()) ctx.append("Name: ").append(name).append("\n");
+            ctx.append("Email: ").append(user.getEmail()).append("\n");
+        }
+
+        if (profile.getTargetRole() != null)
+            ctx.append("Target Role: ").append(profile.getTargetRole()).append("\n");
+        if (profile.getGraduationYear() != null)
+            ctx.append("Graduation Year: ").append(profile.getGraduationYear()).append("\n");
+        ctx.append("\n");
+
+        Map<String, Object> scores = profile.getAxisScores();
+        if (scores != null && !scores.isEmpty()) {
+            ctx.append("=== AXIS SCORES ===\n");
+            ctx.append(String.format("DSA: %s | System Design: %s | Core CS: %s | Projects: %s | Resume: %s\n\n",
+                    scores.get("dsa"), scores.get("systemDesign"), scores.get("coreCs"),
+                    scores.get("projects"), scores.get("resume")));
+        }
+
+        if (profile.getLeetcodeStats() != null && !profile.getLeetcodeStats().isEmpty()) {
+            Map<String, Object> lc = profile.getLeetcodeStats();
+            ctx.append("=== LEETCODE ===\n");
+            ctx.append(String.format("Username: %s | Total: %s (Easy: %s, Medium: %s, Hard: %s) | DSA Score: %s/100\n\n",
+                    profile.getLeetcodeUsername(), lc.get("total"),
+                    lc.get("easy"), lc.get("medium"), lc.get("hard"), lc.get("dsaScore")));
+        }
+
+        if (profile.getResumeScoreBreakdown() != null && !profile.getResumeScoreBreakdown().isEmpty()) {
+            Map<String, Object> rb = profile.getResumeScoreBreakdown();
+            ctx.append("=== RESUME SCORE ===\n");
+            ctx.append(String.format("Score: %s/100 | Decision: %s\n",
+                    rb.get("total_score"), rb.get("decision")));
+            if (rb.get("summary") != null)
+                ctx.append("Summary: ").append(rb.get("summary")).append("\n");
+            if (rb.get("flags") != null)
+                ctx.append("Flags: ").append(rb.get("flags")).append("\n");
+            ctx.append("\n");
+        }
+
+        if (profile.getResumeText() != null && !profile.getResumeText().isBlank()) {
+            ctx.append("=== RESUME TEXT ===\n");
+            String resumeText = profile.getResumeText();
+            if (resumeText.length() > 3000) resumeText = resumeText.substring(0, 3000) + "\n[truncated]";
+            ctx.append(resumeText).append("\n\n");
+        }
+
+        if (profile.getKnowledgeAreas() != null && !profile.getKnowledgeAreas().isEmpty()) {
+            ctx.append("=== KNOWLEDGE AREAS ===\n");
+            List<String> strong = new ArrayList<>(), developing = new ArrayList<>(), weak = new ArrayList<>();
+            for (Map<String, Object> area : profile.getKnowledgeAreas()) {
+                int level = ((Number) area.getOrDefault("level", 1)).intValue();
+                String name = (String) area.get("area");
+                if (level >= 4) strong.add(name + " (" + level + "/5)");
+                else if (level >= 3) developing.add(name + " (" + level + "/5)");
+                else weak.add(name + " (" + level + "/5)");
+            }
+            if (!strong.isEmpty()) ctx.append("Strong: ").append(String.join(", ", strong)).append("\n");
+            if (!developing.isEmpty()) ctx.append("Developing: ").append(String.join(", ", developing)).append("\n");
+            if (!weak.isEmpty()) ctx.append("Weak: ").append(String.join(", ", weak)).append("\n");
+            ctx.append("\n");
+        }
+
+        List<UserGoal> goals = goalRepo.findByUserId(profile.getUserId());
+        if (!goals.isEmpty()) {
+            ctx.append("=== GOALS ===\n");
+            for (UserGoal g : goals) {
+                ctx.append(String.format("- [%s] %s: %d/%s %s",
+                        g.getStatus(), g.getTitle(), g.getCurrentValue(),
+                        g.getTargetValue() != null ? g.getTargetValue().toString() : "?",
+                        g.getUnit()));
+                if (g.getDeadline() != null)
+                    ctx.append(" (deadline: ").append(g.getDeadline()).append(")");
+                ctx.append("\n");
+            }
+            ctx.append("\n");
+        }
+
+        List<IntegrationEvent> recentEvents = eventRepo
+                .findByUserIdAndEventTimestampAfterOrderByEventTimestampDesc(
+                        profile.getUserId(), LocalDateTime.now().minusDays(14));
+        if (!recentEvents.isEmpty()) {
+            ctx.append("=== RECENT ACTIVITY (last 14 days) ===\n");
+            recentEvents.stream().limit(20).forEach(e ->
+                    ctx.append(String.format("- [%s] %s\n", e.getProvider(), e.getTitle())));
+            ctx.append("\n");
+        }
+
+        Map<String, Object> sdAnswers = profile.getSystemDesignAnswers();
+        Map<String, Object> csAnswers = profile.getCoreCsAnswers();
+        if ((sdAnswers != null && !sdAnswers.isEmpty()) || (csAnswers != null && !csAnswers.isEmpty())) {
+            ctx.append("=== ASSESSMENTS ===\n");
+            if (sdAnswers != null && !sdAnswers.isEmpty())
+                ctx.append("System Design: completed\n");
+            if (csAnswers != null && !csAnswers.isEmpty())
+                ctx.append("Core CS: completed\n");
+        }
+
+        return ctx.toString();
     }
 
     // --- AI Insights ---

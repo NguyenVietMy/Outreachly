@@ -279,21 +279,24 @@ public class OpenAiService {
                 .doOnError(error -> log.error("OpenAI section tasks error: ", error));
     }
 
-    public Mono<String> updateMemory(String currentMemory, String eventContext) {
-        String systemPrompt = "You are a memory manager for a CS student career platform. " +
+    public Mono<String> updateMemory(String currentMemory, String fullContext) {
+        String systemPrompt = "You are a memory manager for a CS student career platform called Pulse. " +
                 "You maintain a markdown profile about the student that evolves as they progress.\n\n" +
+                "You receive the current memory and the student's full data context (stats, resume, goals, activity, etc.) " +
+                "along with the specific event that triggered this update.\n\n" +
                 "Rules:\n" +
-                "- Merge the new information into the existing profile naturally\n" +
-                "- Update facts that changed (e.g., new LeetCode count, new resume score)\n" +
-                "- Add new achievements or milestones\n" +
-                "- Keep the same markdown structure (# headers, ## sections, bullet points)\n" +
-                "- Preserve information that hasn't changed\n" +
-                "- Keep it concise — under 500 words total\n" +
-                "- Write in third person about the student\n\n" +
-                "Return ONLY the updated markdown profile, no preamble.";
+                "- Rewrite the profile using ALL provided data — scores, resume details, projects, goals, activity\n" +
+                "- Use the student's real name if provided\n" +
+                "- Extract concrete details from the resume: project names, technologies, job titles, companies\n" +
+                "- Include specific numbers: LeetCode counts, axis scores, resume score\n" +
+                "- NEVER use bracket placeholders like [Student Name] or [Project Name] — if data is unknown, omit it entirely\n" +
+                "- Use markdown: # for title, ## for sections, bullet points for lists\n" +
+                "- Write in third person about the student\n" +
+                "- Keep it concise — under 500 words total\n\n" +
+                "Return ONLY the updated markdown profile, no preamble or code fences.";
 
         String userPrompt = "=== CURRENT MEMORY ===\n" + currentMemory +
-                "\n\n=== NEW EVENT ===\n" + eventContext;
+                "\n\n=== FULL CONTEXT ===\n" + fullContext;
 
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("model", "gpt-4o-mini");
