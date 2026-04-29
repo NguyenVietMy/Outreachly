@@ -4,6 +4,14 @@ import { useState, useRef } from "react";
 import AuthGuard from "@/components/AuthGuard";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { usePersonal, KnowledgeArea, OnboardingData, AxisAssessmentPayload, SectionAssessment, ResumeScoreBreakdown, ResumeSubScore, AiTask } from "@/hooks/usePersonal";
 import MilestoneAssessmentModal from "@/components/assessment/MilestoneAssessmentModal";
 import { CS_FUNDAMENTALS_SECTIONS, SYSTEM_DESIGN_SECTIONS, SECTION_COUNTS } from "@/data/assessmentContent";
@@ -28,7 +36,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-// --- Level + Guidance Logic ---
+// --- Level Logic ---
 
 function computeLevel(graduationYear: number): string {
   const now = new Date();
@@ -42,116 +50,6 @@ function computeLevel(graduationYear: number): string {
   if (yearsUntilGrad === 1) return "Junior";
   if (yearsUntilGrad === 0) return "Senior";
   return "New Grad";
-}
-
-function getGuidance(level: string, targetRole: string, month: number): string[] {
-  const isIntern = targetRole === "swe_intern";
-
-  if (level === "Freshman") {
-    if (month >= 0 && month <= 4) return [
-      "Build your first project — a personal site or CLI tool counts.",
-      "Start LeetCode Easy problems to build problem-solving habits.",
-      "Look into freshman/sophomore programs: Google STEP, Meta University, Explore Microsoft.",
-    ];
-    return [
-      "Summer = build time. Pick a project with real users or a tech you want to learn.",
-      "Start applying to freshman-specific internship programs (apps open Aug-Oct).",
-      "Aim for 50+ LC easy problems before fall semester.",
-    ];
-  }
-
-  if (level === "Sophomore") {
-    if (isIntern) {
-      if (month >= 7 && month <= 10) return [
-        "Internship apps are OPEN. Apply daily — big tech closes by October.",
-        "Aim to solve 100+ LC problems (mix of easy + medium) before interviews.",
-        "Your resume needs 1-2 projects with measurable impact. Polish it now.",
-      ];
-      if (month >= 0 && month <= 4) return [
-        "Late recruiting season — focus on mid-size companies and startups.",
-        "Keep grinding LC mediums. Target 150+ total by summer.",
-        "Build or ship a project you can demo in interviews.",
-      ];
-      return [
-        "Summer = grind time. Build your strongest project yet.",
-        "Start LC mediums and study common patterns (sliding window, two pointers, BFS/DFS).",
-        "Big tech apps open in August — have your resume ready.",
-      ];
-    }
-    return [
-      "Focus on building strong fundamentals and projects.",
-      "It's early for full-time, but internships now will set you up.",
-      "Start thinking about what kind of SWE role excites you (frontend, backend, infra, ML).",
-    ];
-  }
-
-  if (level === "Junior") {
-    if (isIntern) {
-      if (month >= 7 && month <= 10) return [
-        "CRITICAL: This is your key internship recruiting window. Apply to 50+ companies.",
-        "You should be solving LC mediums consistently. Target 200+ total.",
-        "Practice behavioral interviews — Amazon LPs, Google's Googleyness.",
-        "Junior summer internships often convert to full-time offers.",
-      ];
-      if (month >= 0 && month <= 4) return [
-        "Late season — keep applying, but also prepare for full-time recruiting in fall.",
-        "If you land an internship, prepare to convert. If not, double down on projects.",
-        "Study system design basics — you'll need it for full-time interviews.",
-      ];
-      return [
-        "Summer prep is critical. If interning, aim to convert.",
-        "If not interning, build a standout project and prep for fall full-time cycle.",
-        "Start studying system design — it's tested at senior-level internships and new grad roles.",
-      ];
-    }
-    // SWE job as junior
-    if (month >= 7 && month <= 11) return [
-      "New grad apps are opening. Start applying NOW — early is better.",
-      "LC mediums + hards. Target 200+ problems with strong medium consistency.",
-      "System design is tested in new grad rounds at many companies. Study it.",
-      "Practice mock interviews — Pramp, interviewing.io, or with friends.",
-    ];
-    if (month >= 0 && month <= 4) return [
-      "Spring recruiting = second wave. Keep applying.",
-      "Refine your behavioral answers. Have 3-4 strong project stories.",
-      "If you haven't started system design, start now.",
-    ];
-    return [
-      "Summer = final prep window before peak new grad season in August.",
-      "Solve 200+ LC problems. Focus on mediums and common patterns.",
-      "Have 2-3 strong projects on your resume. At least one deployed.",
-    ];
-  }
-
-  if (level === "Senior") {
-    if (isIntern) return [
-      "As a senior, consider pivoting to full-time roles instead.",
-      "If you need an internship for visa/experience, apply to companies with flexible timelines.",
-    ];
-    if (month >= 7 && month <= 11) return [
-      "Peak new grad season. Apply aggressively — aim for 10+ applications per week.",
-      "System design is critical. Study: load balancing, caching, databases, message queues.",
-      "You should be comfortable with LC mediums and solving some hards.",
-      "Negotiate offers — don't accept the first one immediately.",
-    ];
-    if (month >= 0 && month <= 4) return [
-      "Spring = last major recruiting push before graduation.",
-      "Apply broadly — startups, mid-size, and late-posting big tech roles.",
-      "Practice your pitch: why you, why this company, what you bring.",
-    ];
-    return [
-      "Post-graduation: keep applying, network actively, attend career fairs.",
-      "Consider contract roles or startup positions to get your foot in the door.",
-    ];
-  }
-
-  // New Grad
-  return [
-    "Focus on applying to new grad roles. Cast a wide net.",
-    "Network on LinkedIn — cold messages to recruiters do work.",
-    "Keep your skills sharp with LC practice and side projects.",
-    "Consider your first job as a stepping stone — growth matters more than prestige.",
-  ];
 }
 
 // --- Constants ---
@@ -504,10 +402,6 @@ export default function PersonalPage() {
     : [];
 
   const level = profile?.graduationYear ? computeLevel(profile.graduationYear) : null;
-  const guidance = level && profile?.targetRole
-    ? getGuidance(level, profile.targetRole, new Date().getMonth())
-    : null;
-
   if (loadingProfile) {
     return (
       <AuthGuard>
@@ -551,7 +445,7 @@ export default function PersonalPage() {
 
         <div className="min-h-full bg-transparent px-6 py-10 text-[#0d0d0d] md:px-8 md:py-12">
           <div className="flex w-full flex-col gap-10">
-            {/* Header + Career Target */}
+            {/* Header */}
             <section>
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -575,145 +469,152 @@ export default function PersonalPage() {
                   Get AI Insights
                 </Button>
               </div>
-
-              {/* Career target bar */}
-              <div className="mt-5 flex flex-wrap items-center gap-3 rounded-[14px] border border-[rgba(0,0,0,0.05)] bg-[#fafafa] px-5 py-4">
-                {editingCareer ? (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <Target className="h-4 w-4 text-[#666]" />
-                      <select
-                        value={careerDraft.targetRole}
-                        onChange={(e) => setCareerDraft((d) => ({ ...d, targetRole: e.target.value }))}
-                        className="rounded-lg border border-[rgba(0,0,0,0.1)] bg-white px-3 py-1.5 text-[14px] outline-none"
-                      >
-                        <option value="swe_intern">SWE Intern</option>
-                        <option value="swe_job">SWE Full-Time</option>
-                      </select>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <GraduationCap className="h-4 w-4 text-[#666]" />
-                      <input
-                        type="number"
-                        value={careerDraft.graduationYear}
-                        onChange={(e) => setCareerDraft((d) => ({ ...d, graduationYear: parseInt(e.target.value) || 2028 }))}
-                        className="w-20 rounded-lg border border-[rgba(0,0,0,0.1)] bg-white px-3 py-1.5 text-[14px] outline-none"
-                        min={2024}
-                        max={2032}
-                      />
-                    </div>
-                    <div className="ml-auto flex gap-2">
-                      <Button variant="outline" onClick={() => setEditingCareer(false)} className="h-auto rounded-lg px-3 py-1.5 text-[13px]">
-                        Cancel
-                      </Button>
-                      <Button onClick={handleSaveCareer} disabled={savingCareer} className="h-auto rounded-lg bg-[#0d0d0d] px-3 py-1.5 text-[13px] text-white">
-                        {savingCareer && <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />}
-                        Save
-                      </Button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        {profile?.targetRole === "swe_job" ? (
-                          <Briefcase className="h-4 w-4 text-[#3772cf]" />
-                        ) : (
-                          <Target className="h-4 w-4 text-[#0fa76e]" />
-                        )}
-                        <span className="text-[15px] font-medium text-[#0d0d0d]">
-                          {profile?.targetRole === "swe_job" ? "SWE Full-Time" : "SWE Intern"}
-                        </span>
-                      </div>
-                      {profile?.graduationYear && (
-                        <>
-                          <span className="text-[#ccc]">|</span>
-                          <div className="flex items-center gap-2">
-                            <GraduationCap className="h-4 w-4 text-[#666]" />
-                            <span className="text-[15px] text-[#333]">Class of {profile.graduationYear}</span>
-                          </div>
-                          <span className="text-[#ccc]">|</span>
-                          <span className={`rounded-full px-2.5 py-0.5 text-[12px] font-semibold ${
-                            level === "Freshman" ? "bg-[#e8d8f8] text-[#7c3aed]" :
-                            level === "Sophomore" ? "bg-[#d4fae8] text-[#0fa76e]" :
-                            level === "Junior" ? "bg-[#f8ebd8] text-[#c37d0d]" :
-                            level === "Senior" ? "bg-[#e7eefb] text-[#3772cf]" :
-                            "bg-[#f5f5f5] text-[#666]"
-                          }`}>
-                            {level}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => {
-                        setCareerDraft({
-                          targetRole: profile?.targetRole || "swe_intern",
-                          graduationYear: profile?.graduationYear || new Date().getFullYear() + 2,
-                        });
-                        setEditingCareer(true);
-                      }}
-                      className="ml-auto text-[13px] font-medium text-[#666] hover:text-[#0d0d0d]"
-                    >
-                      Edit
-                    </button>
-                  </>
-                )}
-              </div>
             </section>
-
-            {/* Guidance Banner */}
-            {guidance && (
-              <section className="rounded-[16px] border border-[#e7eefb] bg-gradient-to-r from-[#f8faff] to-[#f0f4ff] p-6">
-                <div className="mb-3 flex items-center gap-2">
-                  <Target className="h-4 w-4 text-[#3772cf]" />
-                  <h3 className="text-[15px] font-semibold text-[#0d0d0d]">
-                    What you should be doing right now
-                  </h3>
-                  <span className="text-[12px] text-[#666]">
-                    ({level} &middot; {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })})
-                  </span>
-                </div>
-                <ul className="space-y-2">
-                  {guidance.map((tip, i) => (
-                    <li key={i} className="flex items-start gap-2.5 text-[14px] leading-[1.6] text-[#333]">
-                      <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#3772cf]" />
-                      {tip}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
 
             {/* 5-Axis Radar + AI Insights */}
             <section className="grid gap-6 xl:grid-cols-2">
               <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-6 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
-                <h2 className="mb-4 text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
-                  SWE Readiness Radar
-                </h2>
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
+                    SWE Readiness Radar
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    {editingCareer ? (
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <div className="flex items-center gap-2 rounded-full border border-[rgba(0,0,0,0.08)] bg-[#fafafa] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                          <Select
+                            value={careerDraft.targetRole}
+                            onValueChange={(value) => setCareerDraft((d) => ({ ...d, targetRole: value }))}
+                          >
+                            <SelectTrigger className="h-9 w-[148px] rounded-full border-0 bg-white px-3 text-[13px] font-medium text-[#333] shadow-none ring-0 focus:ring-0">
+                              <div className="flex items-center gap-2">
+                                {careerDraft.targetRole === "swe_job" ? (
+                                  <Briefcase className="h-3.5 w-3.5 text-[#3772cf]" />
+                                ) : (
+                                  <Target className="h-3.5 w-3.5 text-[#0fa76e]" />
+                                )}
+                                <SelectValue />
+                              </div>
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl border-[rgba(0,0,0,0.08)] bg-white p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.08)]">
+                              <SelectItem value="swe_intern" className="rounded-xl px-3 py-2 text-[13px] font-medium text-[#333]">
+                                SWE Intern
+                              </SelectItem>
+                              <SelectItem value="swe_job" className="rounded-xl px-3 py-2 text-[13px] font-medium text-[#333]">
+                                SWE Job
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <div className="flex items-center gap-2 rounded-full bg-white px-3 py-2">
+                            <GraduationCap className="h-3.5 w-3.5 text-[#666]" />
+                            <Input
+                              type="number"
+                              value={careerDraft.graduationYear}
+                              onChange={(e) => setCareerDraft((d) => ({ ...d, graduationYear: parseInt(e.target.value) || 2028 }))}
+                              className="h-auto w-[58px] rounded-none border-0 bg-transparent px-0 py-0 text-[13px] font-medium text-[#333] shadow-none focus-visible:ring-0"
+                              min={2024}
+                              max={2032}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button onClick={handleSaveCareer} disabled={savingCareer} className="h-9 rounded-full bg-[#0d0d0d] px-4 text-[12px] font-medium text-white">
+                            {savingCareer && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                            Save
+                          </Button>
+                          <button onClick={() => setEditingCareer(false)} className="text-[12px] font-medium text-[#888] hover:text-[#0d0d0d]">
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : profile?.targetRole ? (
+                      <button
+                        onClick={() => {
+                          setCareerDraft({
+                            targetRole: profile.targetRole || "swe_intern",
+                            graduationYear: profile.graduationYear || new Date().getFullYear() + 2,
+                          });
+                          setEditingCareer(true);
+                        }}
+                        className="flex items-center gap-2 rounded-full border border-[rgba(0,0,0,0.08)] bg-[#fafafa] px-3 py-1.5 text-[13px] font-medium text-[#333] transition-colors hover:border-[rgba(0,0,0,0.15)] hover:bg-[#f0f0f0]"
+                      >
+                        {profile.targetRole === "swe_job" ? (
+                          <Briefcase className="h-3.5 w-3.5 text-[#3772cf]" />
+                        ) : (
+                          <Target className="h-3.5 w-3.5 text-[#0fa76e]" />
+                        )}
+                        {profile.targetRole === "swe_job" ? "SWE Job" : "SWE Intern"}
+                        {profile.graduationYear && (
+                          <>
+                            <span className="text-[#ccc]">&middot;</span>
+                            <span className="text-[#666]">{profile.graduationYear}</span>
+                          </>
+                        )}
+                        {level && (
+                          <>
+                            <span className="text-[#ccc]">&middot;</span>
+                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                              level === "Freshman" ? "bg-[#e8d8f8] text-[#7c3aed]" :
+                              level === "Sophomore" ? "bg-[#d4fae8] text-[#0fa76e]" :
+                              level === "Junior" ? "bg-[#f8ebd8] text-[#c37d0d]" :
+                              level === "Senior" ? "bg-[#e7eefb] text-[#3772cf]" :
+                              "bg-[#f5f5f5] text-[#666]"
+                            }`}>
+                              {level}
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <Select
+                        onValueChange={(role) => {
+                          setCareerDraft({ targetRole: role, graduationYear: new Date().getFullYear() + 2 });
+                          setEditingCareer(true);
+                        }}
+                      >
+                        <SelectTrigger className="h-10 w-[168px] rounded-full border-[rgba(0,0,0,0.08)] bg-[#fafafa] px-4 text-[13px] font-medium text-[#666] shadow-none transition-colors hover:border-[rgba(0,0,0,0.15)] hover:bg-[#f5f5f5] focus:ring-0">
+                          <div className="flex items-center gap-2">
+                            <Target className="h-3.5 w-3.5 text-[#999]" />
+                            <SelectValue placeholder="Select Goal" />
+                          </div>
+                        </SelectTrigger>
+                        <SelectContent className="rounded-2xl border-[rgba(0,0,0,0.08)] bg-white p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.08)]">
+                          <SelectItem value="swe_intern" className="rounded-xl px-3 py-2 text-[13px] font-medium text-[#333]">
+                            SWE Intern
+                          </SelectItem>
+                          <SelectItem value="swe_job" className="rounded-xl px-3 py-2 text-[13px] font-medium text-[#333]">
+                            SWE Job
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                </div>
                 {radarData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={320}>
-                    <RadarChart data={radarData} outerRadius="75%">
-                      <PolarGrid stroke="#e5e5e5" />
-                      <PolarAngleAxis
-                        dataKey="axis"
-                        tick={{ fontSize: 12, fill: "#333" }}
-                      />
-                      <PolarRadiusAxis
-                        angle={90}
-                        domain={[0, 100]}
-                        tick={{ fontSize: 10, fill: "#999" }}
-                        tickCount={5}
-                      />
-                      <Radar
-                        dataKey="score"
-                        stroke="#18E299"
-                        fill="#18E299"
-                        fillOpacity={0.2}
-                        strokeWidth={2}
-                      />
-                    </RadarChart>
-                  </ResponsiveContainer>
+                  <div className="[&_.recharts-surface:focus]:outline-none [&_svg:focus]:outline-none">
+                    <ResponsiveContainer width="100%" height={320}>
+                      <RadarChart data={radarData} outerRadius="75%">
+                        <PolarGrid stroke="#e5e5e5" />
+                        <PolarAngleAxis
+                          dataKey="axis"
+                          tick={{ fontSize: 12, fill: "#333" }}
+                        />
+                        <PolarRadiusAxis
+                          angle={90}
+                          domain={[0, 100]}
+                          tick={{ fontSize: 10, fill: "#999" }}
+                          tickCount={5}
+                        />
+                        <Radar
+                          dataKey="score"
+                          stroke="#18E299"
+                          fill="#18E299"
+                          fillOpacity={0.2}
+                          strokeWidth={2}
+                        />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
                 ) : (
                   <p className="py-12 text-center text-[14px] text-[#666666]">
                     Complete assessments to see your radar chart.

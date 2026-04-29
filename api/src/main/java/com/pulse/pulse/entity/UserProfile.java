@@ -87,8 +87,7 @@ public class UserProfile {
     private Map<String, Object> resumeScoreBreakdown = Map.of();
 
     @Column(name = "target_role", length = 20)
-    @Builder.Default
-    private String targetRole = "swe_intern";
+    private String targetRole;
 
     @Column(name = "graduation_year")
     private Integer graduationYear;
