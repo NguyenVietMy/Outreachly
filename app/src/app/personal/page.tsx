@@ -12,9 +12,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { usePersonal, KnowledgeArea, OnboardingData, AxisAssessmentPayload, SectionAssessment, ResumeScoreBreakdown, ResumeSubScore, AiTask } from "@/hooks/usePersonal";
+import {
+  usePersonal,
+  KnowledgeArea,
+  OnboardingData,
+  AxisAssessmentPayload,
+  SectionAssessment,
+  ResumeScoreBreakdown,
+  ResumeSubScore,
+  AiTask,
+} from "@/hooks/usePersonal";
 import MilestoneAssessmentModal from "@/components/assessment/MilestoneAssessmentModal";
-import { CS_FUNDAMENTALS_SECTIONS, SYSTEM_DESIGN_SECTIONS, SECTION_COUNTS } from "@/data/assessmentContent";
+import {
+  CS_FUNDAMENTALS_SECTIONS,
+  SYSTEM_DESIGN_SECTIONS,
+  SECTION_COUNTS,
+} from "@/data/assessmentContent";
 import {
   Bot,
   FileText,
@@ -55,20 +68,27 @@ function computeLevel(graduationYear: number): string {
 // --- Constants ---
 
 const DEFAULT_AREAS = [
-  "Algorithms", "Data Structures", "Operating Systems", "Computer Networks",
-  "Databases", "Systems Design", "Web Development", "Math & Discrete",
-  "Machine Learning", "Security",
+  "Algorithms",
+  "Data Structures",
+  "Operating Systems",
+  "Computer Networks",
+  "Databases",
+  "Systems Design",
+  "Web Development",
+  "Math & Discrete",
+  "Machine Learning",
+  "Security",
 ];
 
 function isNewFormatAssessment(
-  data: AxisAssessmentPayload | Record<string, unknown> | null
+  data: AxisAssessmentPayload | Record<string, unknown> | null,
 ): data is AxisAssessmentPayload {
   return !!data && "sections" in data && "axisId" in data;
 }
 
 function getAssessmentProgress(
   answers: AxisAssessmentPayload | Record<string, unknown> | null,
-  axis: "systemDesign" | "coreCs"
+  axis: "systemDesign" | "coreCs",
 ): { completed: number; total: number } | null {
   if (!isNewFormatAssessment(answers)) return null;
   return {
@@ -76,7 +96,6 @@ function getAssessmentProgress(
     total: SECTION_COUNTS[axis],
   };
 }
-
 
 // --- Onboarding Modal ---
 
@@ -87,7 +106,7 @@ function OnboardingModal({
 }) {
   const [step, setStep] = useState(0);
   const [areas, setAreas] = useState<KnowledgeArea[]>(
-    DEFAULT_AREAS.map((a) => ({ area: a, level: 1 }))
+    DEFAULT_AREAS.map((a) => ({ area: a, level: 1 })),
   );
   const [bio, setBio] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -121,7 +140,10 @@ function OnboardingModal({
         {step === 0 && (
           <div className="max-h-[400px] space-y-3 overflow-y-auto pr-2">
             {areas.map((area, i) => (
-              <div key={area.area} className="flex items-center justify-between">
+              <div
+                key={area.area}
+                className="flex items-center justify-between"
+              >
                 <p className="text-[15px] text-[#333333]">{area.area}</p>
                 <div className="flex gap-1">
                   {[1, 2, 3, 4, 5].map((level) => (
@@ -215,13 +237,19 @@ function AxisCard({
           <p className="mt-0.5 text-[13px] text-[#666]">{description}</p>
         </div>
         <div className="text-right">
-          <p className={`text-[28px] font-bold leading-none ${getScoreColor(score)}`}>
+          <p
+            className={`text-[28px] font-bold leading-none ${getScoreColor(score)}`}
+          >
             {connected ? score : "—"}
           </p>
           {connected && <p className="mt-0.5 text-[11px] text-[#999]">/ 100</p>}
         </div>
       </div>
-      {children && <div className="mt-4 border-t border-[rgba(0,0,0,0.05)] pt-4">{children}</div>}
+      {children && (
+        <div className="mt-4 border-t border-[rgba(0,0,0,0.05)] pt-4">
+          {children}
+        </div>
+      )}
     </article>
   );
 }
@@ -236,10 +264,15 @@ function ScoreBar({ label, sub }: { label: string; sub?: ResumeSubScore }) {
     <div className="group relative">
       <div className="flex items-center justify-between text-[12px]">
         <span className="text-[#555]">{label}</span>
-        <span className="font-medium" style={{ color }}>{sub.score}/{sub.max}</span>
+        <span className="font-medium" style={{ color }}>
+          {sub.score}/{sub.max}
+        </span>
       </div>
       <div className="mt-1 h-1.5 w-full rounded-full bg-[#f0f0f0]">
-        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
+        <div
+          className="h-full rounded-full transition-all"
+          style={{ width: `${pct}%`, backgroundColor: color }}
+        />
       </div>
       {sub.rationale && (
         <div className="pointer-events-none absolute bottom-full left-0 z-10 mb-2 hidden w-64 rounded-lg border border-[rgba(0,0,0,0.08)] bg-white p-2.5 text-[11px] leading-[1.5] text-[#555] shadow-lg group-hover:block">
@@ -250,58 +283,94 @@ function ScoreBar({ label, sub }: { label: string; sub?: ResumeSubScore }) {
   );
 }
 
-function ResumeBreakdownView({ breakdown }: { breakdown: ResumeScoreBreakdown | null }) {
+function ResumeBreakdownView({
+  breakdown,
+}: {
+  breakdown: ResumeScoreBreakdown | null;
+}) {
   if (!breakdown || !breakdown.sections) {
-    return <p className="text-[12px] text-[#999]">Upload a resume to get AI-powered scoring.</p>;
+    return (
+      <p className="text-[12px] text-[#999]">
+        Upload a resume to get AI-powered scoring.
+      </p>
+    );
   }
 
   const s = breakdown.sections;
   const decisionColor =
-    breakdown.decision === "ADVANCE" ? "bg-[#d4fae8] text-[#0fa76e]" :
-    breakdown.decision === "HOLD" ? "bg-[#f8ebd8] text-[#c37d0d]" :
-    "bg-[#f7e5e5] text-[#d45656]";
+    breakdown.decision === "ADVANCE"
+      ? "bg-[#d4fae8] text-[#0fa76e]"
+      : breakdown.decision === "HOLD"
+        ? "bg-[#f8ebd8] text-[#c37d0d]"
+        : "bg-[#f7e5e5] text-[#d45656]";
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${decisionColor}`}>
+          <span
+            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${decisionColor}`}
+          >
             {breakdown.decision}
           </span>
-          <span className="text-[12px] text-[#999]">{breakdown.total_score}/{breakdown.max_score}</span>
+          <span className="text-[12px] text-[#999]">
+            {breakdown.total_score}/{breakdown.max_score}
+          </span>
         </div>
         {breakdown.flags && breakdown.flags.length > 0 && (
           <div className="flex gap-1">
             {breakdown.flags.map((f) => (
-              <span key={f} className="rounded bg-[#f5f5f5] px-1.5 py-0.5 text-[10px] text-[#666]">{f}</span>
+              <span
+                key={f}
+                className="rounded bg-[#f5f5f5] px-1.5 py-0.5 text-[10px] text-[#666]"
+              >
+                {f}
+              </span>
             ))}
           </div>
         )}
       </div>
 
       <div className="space-y-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#999]">Technical Skills</p>
-        <ScoreBar label="Languages" sub={s.technical_skills?.primary_language} />
-        <ScoreBar label="Frameworks" sub={s.technical_skills?.backend_frameworks} />
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#999]">
+          Technical Skills
+        </p>
+        <ScoreBar
+          label="Languages"
+          sub={s.technical_skills?.primary_language}
+        />
+        <ScoreBar
+          label="Frameworks"
+          sub={s.technical_skills?.backend_frameworks}
+        />
         <ScoreBar label="Data Layer" sub={s.technical_skills?.data_layer} />
         <ScoreBar label="Infra/DevOps" sub={s.technical_skills?.infra_devops} />
       </div>
 
       <div className="space-y-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#999]">Experience</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#999]">
+          Experience
+        </p>
         <ScoreBar label="Years" sub={s.experience?.years} />
         <ScoreBar label="Progression" sub={s.experience?.progression} />
         <ScoreBar label="Recency" sub={s.experience?.recency} />
       </div>
 
       <div className="space-y-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#999]">Impact</p>
-        <ScoreBar label="Quantified Outcomes" sub={s.impact?.quantified_outcomes} />
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#999]">
+          Impact
+        </p>
+        <ScoreBar
+          label="Quantified Outcomes"
+          sub={s.impact?.quantified_outcomes}
+        />
         <ScoreBar label="Scope" sub={s.impact?.scope} />
       </div>
 
       <div className="space-y-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#999]">Education</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#999]">
+          Education
+        </p>
         <ScoreBar label="Degree" sub={s.education?.degree} />
         <ScoreBar label="Certifications" sub={s.education?.certifications} />
       </div>
@@ -309,7 +378,9 @@ function ResumeBreakdownView({ breakdown }: { breakdown: ResumeScoreBreakdown | 
       <ScoreBar label="Project Complexity" sub={s.project_complexity} />
 
       <div className="space-y-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#999]">Resume Quality</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#999]">
+          Resume Quality
+        </p>
         <ScoreBar label="Parsability" sub={s.resume_quality?.parsability} />
         <ScoreBar label="Conciseness" sub={s.resume_quality?.conciseness} />
       </div>
@@ -355,7 +426,10 @@ export default function PersonalPage() {
 
   // Career editing
   const [editingCareer, setEditingCareer] = useState(false);
-  const [careerDraft, setCareerDraft] = useState({ targetRole: "swe_intern", graduationYear: new Date().getFullYear() + 2 });
+  const [careerDraft, setCareerDraft] = useState({
+    targetRole: "swe_intern",
+    graduationYear: new Date().getFullYear() + 2,
+  });
   const [savingCareer, setSavingCareer] = useState(false);
 
   const handleSaveCareer = async () => {
@@ -401,7 +475,9 @@ export default function PersonalPage() {
       ]
     : [];
 
-  const level = profile?.graduationYear ? computeLevel(profile.graduationYear) : null;
+  const level = profile?.graduationYear
+    ? computeLevel(profile.graduationYear)
+    : null;
   if (loadingProfile) {
     return (
       <AuthGuard>
@@ -426,7 +502,12 @@ export default function PersonalPage() {
             title="System Design Assessment"
             sections={SYSTEM_DESIGN_SECTIONS}
             existingAssessment={profile?.systemDesignAnswers ?? null}
-            onSectionComplete={(section: SectionAssessment) => submitQuestionnaire("systemDesign", section as unknown as Record<string, unknown>)}
+            onSectionComplete={(section: SectionAssessment) =>
+              submitQuestionnaire(
+                "systemDesign",
+                section as unknown as Record<string, unknown>,
+              )
+            }
             onComplete={() => {}}
             onClose={() => setShowSDAssessment(false)}
           />
@@ -437,7 +518,12 @@ export default function PersonalPage() {
             title="CS Fundamentals Assessment"
             sections={CS_FUNDAMENTALS_SECTIONS}
             existingAssessment={profile?.coreCsAnswers ?? null}
-            onSectionComplete={(section: SectionAssessment) => submitQuestionnaire("coreCs", section as unknown as Record<string, unknown>)}
+            onSectionComplete={(section: SectionAssessment) =>
+              submitQuestionnaire(
+                "coreCs",
+                section as unknown as Record<string, unknown>,
+              )
+            }
             onComplete={() => {}}
             onClose={() => setShowCSAssessment(false)}
           />
@@ -471,462 +557,581 @@ export default function PersonalPage() {
               </div>
             </section>
 
-            {/* 5-Axis Radar + AI Insights */}
-            <section className="grid gap-6 xl:grid-cols-2">
-              <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-6 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
-                    SWE Readiness Radar
+            <section className="grid gap-6 lg:grid-cols-[minmax(0,1.75fr)_minmax(320px,1fr)] lg:items-start">
+              <div className="space-y-10">
+                {/* 5-Axis Radar + AI Insights */}
+                <section>
+                  <h2 className="mb-4 text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
+                    Your Stats
                   </h2>
-                  <div className="flex items-center gap-2">
-                    {editingCareer ? (
-                      <div className="flex flex-wrap items-center justify-end gap-2">
-                        <div className="flex items-center gap-2 rounded-full border border-[rgba(0,0,0,0.08)] bg-[#fafafa] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-                          <Select
-                            value={careerDraft.targetRole}
-                            onValueChange={(value) => setCareerDraft((d) => ({ ...d, targetRole: value }))}
-                          >
-                            <SelectTrigger className="h-9 w-[148px] rounded-full border-0 bg-white px-3 text-[13px] font-medium text-[#333] shadow-none ring-0 focus:ring-0">
-                              <div className="flex items-center gap-2">
-                                {careerDraft.targetRole === "swe_job" ? (
-                                  <Briefcase className="h-3.5 w-3.5 text-[#3772cf]" />
-                                ) : (
-                                  <Target className="h-3.5 w-3.5 text-[#0fa76e]" />
+                  <div className="grid gap-6 lg:grid-cols-2">
+                  <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-6 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        {editingCareer ? (
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            <div className="flex items-center gap-2 rounded-full border border-[rgba(0,0,0,0.08)] bg-[#fafafa] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                              <Select
+                                value={careerDraft.targetRole}
+                                onValueChange={(value) =>
+                                  setCareerDraft((d) => ({
+                                    ...d,
+                                    targetRole: value,
+                                  }))
+                                }
+                              >
+                                <SelectTrigger className="h-9 w-[148px] rounded-full border-0 bg-white px-3 text-[13px] font-medium text-[#333] shadow-none ring-0 focus:ring-0">
+                                  <div className="flex items-center gap-2">
+                                    {careerDraft.targetRole === "swe_job" ? (
+                                      <Briefcase className="h-3.5 w-3.5 text-[#3772cf]" />
+                                    ) : (
+                                      <Target className="h-3.5 w-3.5 text-[#0fa76e]" />
+                                    )}
+                                    <SelectValue />
+                                  </div>
+                                </SelectTrigger>
+                                <SelectContent className="rounded-2xl border-[rgba(0,0,0,0.08)] bg-white p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.08)]">
+                                  <SelectItem
+                                    value="swe_intern"
+                                    className="rounded-xl px-3 py-2 text-[13px] font-medium text-[#333]"
+                                  >
+                                    SWE Intern
+                                  </SelectItem>
+                                  <SelectItem
+                                    value="swe_job"
+                                    className="rounded-xl px-3 py-2 text-[13px] font-medium text-[#333]"
+                                  >
+                                    SWE Job
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <div className="flex items-center gap-2 rounded-full bg-white px-3 py-2">
+                                <GraduationCap className="h-3.5 w-3.5 text-[#666]" />
+                                <Input
+                                  type="number"
+                                  value={careerDraft.graduationYear}
+                                  onChange={(e) =>
+                                    setCareerDraft((d) => ({
+                                      ...d,
+                                      graduationYear:
+                                        parseInt(e.target.value) || 2028,
+                                    }))
+                                  }
+                                  className="h-auto w-[58px] rounded-none border-0 bg-transparent px-0 py-0 text-[13px] font-medium text-[#333] shadow-none focus-visible:ring-0"
+                                  min={2024}
+                                  max={2032}
+                                />
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                onClick={handleSaveCareer}
+                                disabled={savingCareer}
+                                className="h-9 rounded-full bg-[#0d0d0d] px-4 text-[12px] font-medium text-white"
+                              >
+                                {savingCareer && (
+                                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                                 )}
-                                <SelectValue />
+                                Save
+                              </Button>
+                              <button
+                                onClick={() => setEditingCareer(false)}
+                                className="text-[12px] font-medium text-[#888] hover:text-[#0d0d0d]"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : profile?.targetRole ? (
+                          <button
+                            onClick={() => {
+                              setCareerDraft({
+                                targetRole: profile.targetRole || "swe_intern",
+                                graduationYear:
+                                  profile.graduationYear ||
+                                  new Date().getFullYear() + 2,
+                              });
+                              setEditingCareer(true);
+                            }}
+                            className="flex items-center gap-2 rounded-full border border-[rgba(0,0,0,0.08)] bg-[#fafafa] px-3 py-1.5 text-[13px] font-medium text-[#333] transition-colors hover:border-[rgba(0,0,0,0.15)] hover:bg-[#f0f0f0]"
+                          >
+                            {profile.targetRole === "swe_job" ? (
+                              <Briefcase className="h-3.5 w-3.5 text-[#3772cf]" />
+                            ) : (
+                              <Target className="h-3.5 w-3.5 text-[#0fa76e]" />
+                            )}
+                            {profile.targetRole === "swe_job"
+                              ? "SWE Job"
+                              : "SWE Intern"}
+                            {profile.graduationYear && (
+                              <>
+                                <span className="text-[#ccc]">&middot;</span>
+                                <span className="text-[#666]">
+                                  {profile.graduationYear}
+                                </span>
+                              </>
+                            )}
+                            {level && (
+                              <>
+                                <span className="text-[#ccc]">&middot;</span>
+                                <span
+                                  className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                    level === "Freshman"
+                                      ? "bg-[#e8d8f8] text-[#7c3aed]"
+                                      : level === "Sophomore"
+                                        ? "bg-[#d4fae8] text-[#0fa76e]"
+                                        : level === "Junior"
+                                          ? "bg-[#f8ebd8] text-[#c37d0d]"
+                                          : level === "Senior"
+                                            ? "bg-[#e7eefb] text-[#3772cf]"
+                                            : "bg-[#f5f5f5] text-[#666]"
+                                  }`}
+                                >
+                                  {level}
+                                </span>
+                              </>
+                            )}
+                          </button>
+                        ) : (
+                          <Select
+                            onValueChange={(role) => {
+                              setCareerDraft({
+                                targetRole: role,
+                                graduationYear: new Date().getFullYear() + 2,
+                              });
+                              setEditingCareer(true);
+                            }}
+                          >
+                            <SelectTrigger className="h-10 w-[168px] rounded-full border-[rgba(0,0,0,0.08)] bg-[#fafafa] px-4 text-[13px] font-medium text-[#666] shadow-none transition-colors hover:border-[rgba(0,0,0,0.15)] hover:bg-[#f5f5f5] focus:ring-0">
+                              <div className="flex items-center gap-2">
+                                <Target className="h-3.5 w-3.5 text-[#999]" />
+                                <SelectValue placeholder="Select Goal" />
                               </div>
                             </SelectTrigger>
                             <SelectContent className="rounded-2xl border-[rgba(0,0,0,0.08)] bg-white p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.08)]">
-                              <SelectItem value="swe_intern" className="rounded-xl px-3 py-2 text-[13px] font-medium text-[#333]">
+                              <SelectItem
+                                value="swe_intern"
+                                className="rounded-xl px-3 py-2 text-[13px] font-medium text-[#333]"
+                              >
                                 SWE Intern
                               </SelectItem>
-                              <SelectItem value="swe_job" className="rounded-xl px-3 py-2 text-[13px] font-medium text-[#333]">
+                              <SelectItem
+                                value="swe_job"
+                                className="rounded-xl px-3 py-2 text-[13px] font-medium text-[#333]"
+                              >
                                 SWE Job
                               </SelectItem>
                             </SelectContent>
                           </Select>
-                          <div className="flex items-center gap-2 rounded-full bg-white px-3 py-2">
-                            <GraduationCap className="h-3.5 w-3.5 text-[#666]" />
-                            <Input
-                              type="number"
-                              value={careerDraft.graduationYear}
-                              onChange={(e) => setCareerDraft((d) => ({ ...d, graduationYear: parseInt(e.target.value) || 2028 }))}
-                              className="h-auto w-[58px] rounded-none border-0 bg-transparent px-0 py-0 text-[13px] font-medium text-[#333] shadow-none focus-visible:ring-0"
-                              min={2024}
-                              max={2032}
+                        )}
+                      </div>
+                    </div>
+                    {radarData.length > 0 ? (
+                      <div className="[&_.recharts-surface:focus]:outline-none [&_svg:focus]:outline-none">
+                        <ResponsiveContainer width="100%" height={320}>
+                          <RadarChart data={radarData} outerRadius="75%">
+                            <PolarGrid stroke="#e5e5e5" />
+                            <PolarAngleAxis
+                              dataKey="axis"
+                              tick={{ fontSize: 12, fill: "#333" }}
                             />
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button onClick={handleSaveCareer} disabled={savingCareer} className="h-9 rounded-full bg-[#0d0d0d] px-4 text-[12px] font-medium text-white">
-                            {savingCareer && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-                            Save
-                          </Button>
-                          <button onClick={() => setEditingCareer(false)} className="text-[12px] font-medium text-[#888] hover:text-[#0d0d0d]">
-                            Cancel
-                          </button>
-                        </div>
+                            <PolarRadiusAxis
+                              angle={90}
+                              domain={[0, 100]}
+                              tick={{ fontSize: 10, fill: "#999" }}
+                              tickCount={5}
+                            />
+                            <Radar
+                              dataKey="score"
+                              stroke="#18E299"
+                              fill="#18E299"
+                              fillOpacity={0.2}
+                              strokeWidth={2}
+                            />
+                          </RadarChart>
+                        </ResponsiveContainer>
                       </div>
-                    ) : profile?.targetRole ? (
-                      <button
-                        onClick={() => {
-                          setCareerDraft({
-                            targetRole: profile.targetRole || "swe_intern",
-                            graduationYear: profile.graduationYear || new Date().getFullYear() + 2,
-                          });
-                          setEditingCareer(true);
-                        }}
-                        className="flex items-center gap-2 rounded-full border border-[rgba(0,0,0,0.08)] bg-[#fafafa] px-3 py-1.5 text-[13px] font-medium text-[#333] transition-colors hover:border-[rgba(0,0,0,0.15)] hover:bg-[#f0f0f0]"
-                      >
-                        {profile.targetRole === "swe_job" ? (
-                          <Briefcase className="h-3.5 w-3.5 text-[#3772cf]" />
-                        ) : (
-                          <Target className="h-3.5 w-3.5 text-[#0fa76e]" />
-                        )}
-                        {profile.targetRole === "swe_job" ? "SWE Job" : "SWE Intern"}
-                        {profile.graduationYear && (
-                          <>
-                            <span className="text-[#ccc]">&middot;</span>
-                            <span className="text-[#666]">{profile.graduationYear}</span>
-                          </>
-                        )}
-                        {level && (
-                          <>
-                            <span className="text-[#ccc]">&middot;</span>
-                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                              level === "Freshman" ? "bg-[#e8d8f8] text-[#7c3aed]" :
-                              level === "Sophomore" ? "bg-[#d4fae8] text-[#0fa76e]" :
-                              level === "Junior" ? "bg-[#f8ebd8] text-[#c37d0d]" :
-                              level === "Senior" ? "bg-[#e7eefb] text-[#3772cf]" :
-                              "bg-[#f5f5f5] text-[#666]"
-                            }`}>
-                              {level}
-                            </span>
-                          </>
-                        )}
-                      </button>
                     ) : (
-                      <Select
-                        onValueChange={(role) => {
-                          setCareerDraft({ targetRole: role, graduationYear: new Date().getFullYear() + 2 });
-                          setEditingCareer(true);
-                        }}
-                      >
-                        <SelectTrigger className="h-10 w-[168px] rounded-full border-[rgba(0,0,0,0.08)] bg-[#fafafa] px-4 text-[13px] font-medium text-[#666] shadow-none transition-colors hover:border-[rgba(0,0,0,0.15)] hover:bg-[#f5f5f5] focus:ring-0">
-                          <div className="flex items-center gap-2">
-                            <Target className="h-3.5 w-3.5 text-[#999]" />
-                            <SelectValue placeholder="Select Goal" />
-                          </div>
-                        </SelectTrigger>
-                        <SelectContent className="rounded-2xl border-[rgba(0,0,0,0.08)] bg-white p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.08)]">
-                          <SelectItem value="swe_intern" className="rounded-xl px-3 py-2 text-[13px] font-medium text-[#333]">
-                            SWE Intern
-                          </SelectItem>
-                          <SelectItem value="swe_job" className="rounded-xl px-3 py-2 text-[13px] font-medium text-[#333]">
-                            SWE Job
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <p className="py-12 text-center text-[14px] text-[#666666]">
+                        Complete assessments to see your radar chart.
+                      </p>
                     )}
-                  </div>
-                </div>
-                {radarData.length > 0 ? (
-                  <div className="[&_.recharts-surface:focus]:outline-none [&_svg:focus]:outline-none">
-                    <ResponsiveContainer width="100%" height={320}>
-                      <RadarChart data={radarData} outerRadius="75%">
-                        <PolarGrid stroke="#e5e5e5" />
-                        <PolarAngleAxis
-                          dataKey="axis"
-                          tick={{ fontSize: 12, fill: "#333" }}
-                        />
-                        <PolarRadiusAxis
-                          angle={90}
-                          domain={[0, 100]}
-                          tick={{ fontSize: 10, fill: "#999" }}
-                          tickCount={5}
-                        />
-                        <Radar
-                          dataKey="score"
-                          stroke="#18E299"
-                          fill="#18E299"
-                          fillOpacity={0.2}
-                          strokeWidth={2}
-                        />
-                      </RadarChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <p className="py-12 text-center text-[14px] text-[#666666]">
-                    Complete assessments to see your radar chart.
-                  </p>
-                )}
-              </article>
+                  </article>
 
-              <article className="rounded-[24px] border border-[rgba(0,0,0,0.05)] bg-white p-8 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
-                <div className="mb-3 flex items-center gap-2 font-mono text-[12px] font-medium uppercase tracking-[0.6px] text-[#666666]">
-                  <Bot className="h-4 w-4 text-[#18E299]" />
-                  AI Insights
-                </div>
-                {loadingInsights ? (
-                  <div className="space-y-2">
-                    <div className="h-4 w-full animate-pulse rounded bg-[#f5f5f5]" />
-                    <div className="h-4 w-3/4 animate-pulse rounded bg-[#f5f5f5]" />
-                    <div className="h-4 w-5/6 animate-pulse rounded bg-[#f5f5f5]" />
-                  </div>
-                ) : insights ? (
-                  <ol className="space-y-3">
-                    {insights
-                      .split("\n")
-                      .filter((line) => line.trim().length > 0)
-                      .map((line, i) => (
-                        <li
-                          key={i}
-                          className="flex items-start gap-3 text-[15px] leading-[1.6] text-[#333333]"
-                        >
-                          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#d4fae8] font-mono text-[11px] font-semibold text-[#0fa76e]">
-                            {i + 1}
-                          </span>
-                          <span>{line.replace(/^\d+\.\s*/, "")}</span>
-                        </li>
-                      ))}
-                  </ol>
-                ) : (
-                  <p className="text-[16px] leading-[1.5] text-[#999999]">
-                    Click &quot;Get AI Insights&quot; for personalized SWE career advice based on your scores.
-                  </p>
-                )}
-              </article>
-            </section>
-
-            {/* 5 Axis Cards */}
-            <section>
-              <h2 className="mb-4 text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
-                Assessment Axes
-              </h2>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {/* DSA */}
-                <AxisCard
-                  label="DSA"
-                  score={axes?.dsa ?? 0}
-                  description="LeetCode solved count, difficulty mix"
-                  connected={!!profile?.leetcodeUsername}
-                >
-                  {profile?.leetcodeUsername ? (
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <p className="text-[13px] text-[#666]">
-                          Connected as <span className="font-medium text-[#0d0d0d]">{profile.leetcodeUsername}</span>
-                        </p>
-                        <button
-                          onClick={refreshLeetCode}
-                          disabled={loadingLeetCode}
-                          className="text-[#666] hover:text-[#0d0d0d]"
-                        >
-                          <RefreshCw className={`h-4 w-4 ${loadingLeetCode ? "animate-spin" : ""}`} />
-                        </button>
-                      </div>
-                      {profile.leetcodeStats && (
-                        <div className="mt-3 grid grid-cols-4 gap-2">
-                          <div className="rounded-lg bg-[#f5f5f5] p-2 text-center">
-                            <p className="text-[18px] font-bold text-[#0d0d0d]">{profile.leetcodeStats.total}</p>
-                            <p className="text-[10px] text-[#999]">Total</p>
-                          </div>
-                          <div className="rounded-lg bg-[#d4fae8] p-2 text-center">
-                            <p className="text-[18px] font-bold text-[#0fa76e]">{profile.leetcodeStats.easy}</p>
-                            <p className="text-[10px] text-[#0fa76e]">Easy</p>
-                          </div>
-                          <div className="rounded-lg bg-[#f8ebd8] p-2 text-center">
-                            <p className="text-[18px] font-bold text-[#c37d0d]">{profile.leetcodeStats.medium}</p>
-                            <p className="text-[10px] text-[#c37d0d]">Med</p>
-                          </div>
-                          <div className="rounded-lg bg-[#f7e5e5] p-2 text-center">
-                            <p className="text-[18px] font-bold text-[#d45656]">{profile.leetcodeStats.hard}</p>
-                            <p className="text-[10px] text-[#d45656]">Hard</p>
-                          </div>
-                        </div>
-                      )}
+                  <article className="rounded-[24px] border border-[rgba(0,0,0,0.05)] bg-white p-8 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
+                    <div className="mb-3 flex items-center gap-2 font-mono text-[12px] font-medium uppercase tracking-[0.6px] text-[#666666]">
+                      <Bot className="h-4 w-4 text-[#18E299]" />
+                      AI Insights
                     </div>
-                  ) : (
-                    <div>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          placeholder="LeetCode username"
-                          value={lcUsername}
-                          onChange={(e) => setLcUsername(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && handleConnectLC()}
-                          className="flex-1 rounded-lg border border-[rgba(0,0,0,0.1)] px-3 py-2 text-[14px] outline-none focus:border-[#0d0d0d]"
-                        />
-                        <Button
-                          onClick={handleConnectLC}
-                          disabled={loadingLeetCode || !lcUsername.trim()}
-                          className="h-auto rounded-lg bg-[#0d0d0d] px-4 py-2 text-[13px] text-white"
-                        >
-                          {loadingLeetCode ? <Loader2 className="h-4 w-4 animate-spin" /> : "Connect"}
-                        </Button>
+                    {loadingInsights ? (
+                      <div className="space-y-2">
+                        <div className="h-4 w-full animate-pulse rounded bg-[#f5f5f5]" />
+                        <div className="h-4 w-3/4 animate-pulse rounded bg-[#f5f5f5]" />
+                        <div className="h-4 w-5/6 animate-pulse rounded bg-[#f5f5f5]" />
                       </div>
-                      {lcError && <p className="mt-2 text-[13px] text-[#d45656]">{lcError}</p>}
-                    </div>
-                  )}
-                </AxisCard>
+                    ) : insights ? (
+                      <ol className="space-y-3">
+                        {insights
+                          .split("\n")
+                          .filter((line) => line.trim().length > 0)
+                          .map((line, i) => (
+                            <li
+                              key={i}
+                              className="flex items-start gap-3 text-[15px] leading-[1.6] text-[#333333]"
+                            >
+                              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#d4fae8] font-mono text-[11px] font-semibold text-[#0fa76e]">
+                                {i + 1}
+                              </span>
+                              <span>{line.replace(/^\d+\.\s*/, "")}</span>
+                            </li>
+                          ))}
+                      </ol>
+                    ) : (
+                      <p className="text-[16px] leading-[1.5] text-[#999999]">
+                        Click &quot;Get AI Insights&quot; for personalized SWE
+                        career advice based on your scores.
+                      </p>
+                    )}
+                  </article>
+                  </div>
+                </section>
 
-                {/* Projects */}
-                <AxisCard
-                  label="Projects"
-                  score={axes?.projects ?? 0}
-                  description="From resume — deployed status, tech depth, impact"
-                  connected={(axes?.projects ?? 0) > 0}
-                >
-                  <p className="text-[13px] text-[#999]">
-                    Upload your resume below to auto-extract project data. LLM scoring coming soon.
-                  </p>
-                </AxisCard>
-
-                {/* System Design */}
-                <AxisCard
-                  label="System Design"
-                  score={axes?.systemDesign ?? 0}
-                  description="APIs, scaling, caching, cloud, tradeoffs"
-                  connected={(axes?.systemDesign ?? 0) > 0}
-                >
-                  {(() => {
-                    const progress = getAssessmentProgress(profile?.systemDesignAnswers ?? null, "systemDesign");
-                    return (
-                      <>
-                        {progress && (
-                          <p className="mb-2 text-[12px] text-[#999]">
-                            {progress.completed} of {progress.total} sections complete
-                          </p>
-                        )}
-                        <Button
-                          onClick={() => setShowSDAssessment(true)}
-                          variant="outline"
-                          className="h-auto w-full rounded-lg px-4 py-2 text-[13px]"
-                        >
-                          {progress && progress.completed > 0
-                            ? progress.completed >= progress.total ? "Retake assessment" : "Continue assessment"
-                            : (axes?.systemDesign ?? 0) > 0 ? "Retake assessment" : "Take assessment"}
-                        </Button>
-                      </>
-                    );
-                  })()}
-                </AxisCard>
-
-                {/* Core CS */}
-                <AxisCard
-                  label="Core CS"
-                  score={axes?.coreCs ?? 0}
-                  description="OS, networking, concurrency, DB internals"
-                  connected={(axes?.coreCs ?? 0) > 0}
-                >
-                  {(() => {
-                    const progress = getAssessmentProgress(profile?.coreCsAnswers ?? null, "coreCs");
-                    return (
-                      <>
-                        {progress && (
-                          <p className="mb-2 text-[12px] text-[#999]">
-                            {progress.completed} of {progress.total} sections complete
-                          </p>
-                        )}
-                        <Button
-                          onClick={() => setShowCSAssessment(true)}
-                          variant="outline"
-                          className="h-auto w-full rounded-lg px-4 py-2 text-[13px]"
-                        >
-                          {progress && progress.completed > 0
-                            ? progress.completed >= progress.total ? "Retake assessment" : "Continue assessment"
-                            : (axes?.coreCs ?? 0) > 0 ? "Retake assessment" : "Take assessment"}
-                        </Button>
-                      </>
-                    );
-                  })()}
-                </AxisCard>
-
-                {/* Resume */}
-                <AxisCard
-                  label="Resume"
-                  score={axes?.resume ?? 0}
-                  description="Formatting, bullet quality, metrics, ATS readability"
-                  connected={!!profile?.hasResume}
-                >
-                  {profile?.hasResume ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-[#666]" />
-                          <p className="text-[13px] text-[#333]">{profile.resumeFilename}</p>
-                        </div>
-                        <div className="flex gap-1">
-                          <button
-                            onClick={scoreResume}
-                            disabled={scoringResume}
-                            className="rounded-lg p-1.5 text-[#666] hover:bg-[#f5f5f5] hover:text-[#0d0d0d]"
-                            title="Re-score"
-                          >
-                            {scoringResume ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                          </button>
-                          <button
-                            onClick={() => fileInputRef.current?.click()}
-                            className="rounded-lg p-1.5 text-[#666] hover:bg-[#f5f5f5] hover:text-[#0d0d0d]"
-                            title="Replace"
-                          >
-                            <Upload className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={deleteResume}
-                            className="rounded-lg p-1.5 text-[#666] hover:bg-[#f5f5f5] hover:text-[#d45656]"
-                            title="Delete"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-                      <ResumeBreakdownView breakdown={profile.resumeScoreBreakdown} />
-                    </div>
-                  ) : (
-                    <Button
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={loadingResume}
-                      variant="outline"
-                      className="h-auto w-full rounded-lg px-4 py-2 text-[13px]"
+                {/* Assessment Axes */}
+                <section>
+                  <h2 className="mb-4 text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
+                    Assessment Axes
+                  </h2>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {/* DSA */}
+                    <AxisCard
+                      label="DSA"
+                      score={axes?.dsa ?? 0}
+                      description="LeetCode solved count, difficulty mix"
+                      connected={!!profile?.leetcodeUsername}
                     >
-                      {loadingResume ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {profile?.leetcodeUsername ? (
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <p className="text-[13px] text-[#666]">
+                              Connected as{" "}
+                              <span className="font-medium text-[#0d0d0d]">
+                                {profile.leetcodeUsername}
+                              </span>
+                            </p>
+                            <button
+                              onClick={refreshLeetCode}
+                              disabled={loadingLeetCode}
+                              className="text-[#666] hover:text-[#0d0d0d]"
+                            >
+                              <RefreshCw
+                                className={`h-4 w-4 ${loadingLeetCode ? "animate-spin" : ""}`}
+                              />
+                            </button>
+                          </div>
+                          {profile.leetcodeStats && (
+                            <div className="mt-3 grid grid-cols-4 gap-2">
+                              <div className="rounded-lg bg-[#f5f5f5] p-2 text-center">
+                                <p className="text-[18px] font-bold text-[#0d0d0d]">
+                                  {profile.leetcodeStats.total}
+                                </p>
+                                <p className="text-[10px] text-[#999]">Total</p>
+                              </div>
+                              <div className="rounded-lg bg-[#d4fae8] p-2 text-center">
+                                <p className="text-[18px] font-bold text-[#0fa76e]">
+                                  {profile.leetcodeStats.easy}
+                                </p>
+                                <p className="text-[10px] text-[#0fa76e]">
+                                  Easy
+                                </p>
+                              </div>
+                              <div className="rounded-lg bg-[#f8ebd8] p-2 text-center">
+                                <p className="text-[18px] font-bold text-[#c37d0d]">
+                                  {profile.leetcodeStats.medium}
+                                </p>
+                                <p className="text-[10px] text-[#c37d0d]">
+                                  Med
+                                </p>
+                              </div>
+                              <div className="rounded-lg bg-[#f7e5e5] p-2 text-center">
+                                <p className="text-[18px] font-bold text-[#d45656]">
+                                  {profile.leetcodeStats.hard}
+                                </p>
+                                <p className="text-[10px] text-[#d45656]">
+                                  Hard
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       ) : (
-                        <Upload className="mr-2 h-4 w-4" />
+                        <div>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="LeetCode username"
+                              value={lcUsername}
+                              onChange={(e) => setLcUsername(e.target.value)}
+                              onKeyDown={(e) =>
+                                e.key === "Enter" && handleConnectLC()
+                              }
+                              className="flex-1 rounded-lg border border-[rgba(0,0,0,0.1)] px-3 py-2 text-[14px] outline-none focus:border-[#0d0d0d]"
+                            />
+                            <Button
+                              onClick={handleConnectLC}
+                              disabled={loadingLeetCode || !lcUsername.trim()}
+                              className="h-auto rounded-lg bg-[#0d0d0d] px-4 py-2 text-[13px] text-white"
+                            >
+                              {loadingLeetCode ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                "Connect"
+                              )}
+                            </Button>
+                          </div>
+                          {lcError && (
+                            <p className="mt-2 text-[13px] text-[#d45656]">
+                              {lcError}
+                            </p>
+                          )}
+                        </div>
                       )}
-                      Upload resume (PDF)
-                    </Button>
-                  )}
-                </AxisCard>
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-            </section>
+                    </AxisCard>
 
-            {/* AI Tasks */}
-            {tasks.length > 0 && (
-              <section>
+                    {/* Projects */}
+                    <AxisCard
+                      label="Projects"
+                      score={axes?.projects ?? 0}
+                      description="From resume — deployed status, tech depth, impact"
+                      connected={(axes?.projects ?? 0) > 0}
+                    >
+                      <p className="text-[13px] text-[#999]">
+                        Upload your resume below to auto-extract project data.
+                        LLM scoring coming soon.
+                      </p>
+                    </AxisCard>
+
+                    {/* System Design */}
+                    <AxisCard
+                      label="System Design"
+                      score={axes?.systemDesign ?? 0}
+                      description="APIs, scaling, caching, cloud, tradeoffs"
+                      connected={(axes?.systemDesign ?? 0) > 0}
+                    >
+                      {(() => {
+                        const progress = getAssessmentProgress(
+                          profile?.systemDesignAnswers ?? null,
+                          "systemDesign",
+                        );
+                        return (
+                          <>
+                            {progress && (
+                              <p className="mb-2 text-[12px] text-[#999]">
+                                {progress.completed} of {progress.total}{" "}
+                                sections complete
+                              </p>
+                            )}
+                            <Button
+                              onClick={() => setShowSDAssessment(true)}
+                              variant="outline"
+                              className="h-auto w-full rounded-lg px-4 py-2 text-[13px]"
+                            >
+                              {progress && progress.completed > 0
+                                ? progress.completed >= progress.total
+                                  ? "Retake assessment"
+                                  : "Continue assessment"
+                                : (axes?.systemDesign ?? 0) > 0
+                                  ? "Retake assessment"
+                                  : "Take assessment"}
+                            </Button>
+                          </>
+                        );
+                      })()}
+                    </AxisCard>
+
+                    {/* Core CS */}
+                    <AxisCard
+                      label="Core CS"
+                      score={axes?.coreCs ?? 0}
+                      description="OS, networking, concurrency, DB internals"
+                      connected={(axes?.coreCs ?? 0) > 0}
+                    >
+                      {(() => {
+                        const progress = getAssessmentProgress(
+                          profile?.coreCsAnswers ?? null,
+                          "coreCs",
+                        );
+                        return (
+                          <>
+                            {progress && (
+                              <p className="mb-2 text-[12px] text-[#999]">
+                                {progress.completed} of {progress.total}{" "}
+                                sections complete
+                              </p>
+                            )}
+                            <Button
+                              onClick={() => setShowCSAssessment(true)}
+                              variant="outline"
+                              className="h-auto w-full rounded-lg px-4 py-2 text-[13px]"
+                            >
+                              {progress && progress.completed > 0
+                                ? progress.completed >= progress.total
+                                  ? "Retake assessment"
+                                  : "Continue assessment"
+                                : (axes?.coreCs ?? 0) > 0
+                                  ? "Retake assessment"
+                                  : "Take assessment"}
+                            </Button>
+                          </>
+                        );
+                      })()}
+                    </AxisCard>
+
+                    {/* Resume */}
+                    <AxisCard
+                      label="Resume"
+                      score={axes?.resume ?? 0}
+                      description="Formatting, bullet quality, metrics, ATS readability"
+                      connected={!!profile?.hasResume}
+                    >
+                      {profile?.hasResume ? (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4 text-[#666]" />
+                              <p className="text-[13px] text-[#333]">
+                                {profile.resumeFilename}
+                              </p>
+                            </div>
+                            <div className="flex gap-1">
+                              <button
+                                onClick={scoreResume}
+                                disabled={scoringResume}
+                                className="rounded-lg p-1.5 text-[#666] hover:bg-[#f5f5f5] hover:text-[#0d0d0d]"
+                                title="Re-score"
+                              >
+                                {scoringResume ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="h-4 w-4" />
+                                )}
+                              </button>
+                              <button
+                                onClick={() => fileInputRef.current?.click()}
+                                className="rounded-lg p-1.5 text-[#666] hover:bg-[#f5f5f5] hover:text-[#0d0d0d]"
+                                title="Replace"
+                              >
+                                <Upload className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={deleteResume}
+                                className="rounded-lg p-1.5 text-[#666] hover:bg-[#f5f5f5] hover:text-[#d45656]"
+                                title="Delete"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                          <ResumeBreakdownView
+                            breakdown={profile.resumeScoreBreakdown}
+                          />
+                        </div>
+                      ) : (
+                        <Button
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={loadingResume}
+                          variant="outline"
+                          className="h-auto w-full rounded-lg px-4 py-2 text-[13px]"
+                        >
+                          {loadingResume ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Upload className="mr-2 h-4 w-4" />
+                          )}
+                          Upload resume (PDF)
+                        </Button>
+                      )}
+                    </AxisCard>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                </section>
+              </div>
+
+              <div className="lg:sticky lg:top-6">
                 <h2 className="mb-4 text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
                   Study Plan
                 </h2>
                 <div className="space-y-3">
-                  {Object.entries(
-                    tasks.reduce<Record<string, AiTask[]>>((acc, task) => {
-                      const key = task.axis;
-                      if (!acc[key]) acc[key] = [];
-                      acc[key].push(task);
-                      return acc;
-                    }, {})
-                  ).map(([axis, axisTasks]) => (
-                    <article
-                      key={axis}
-                      className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-5 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]"
-                    >
-                      <h3 className="mb-3 text-[15px] font-semibold capitalize text-[#0d0d0d]">
-                        {axis === "coreCs" ? "Core CS" : axis === "systemDesign" ? "System Design" : axis.toUpperCase()}
-                      </h3>
-                      <div className="space-y-2">
-                        {axisTasks.map((task) => (
-                          <label
-                            key={task.id}
-                            className="flex cursor-pointer items-start gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-[#fafafa]"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={task.completed}
-                              onChange={() => toggleTask(task.id)}
-                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-[#ccc] accent-[#0fa76e]"
-                            />
-                            <div className="min-w-0">
-                              <p className={`text-[14px] leading-[1.5] ${task.completed ? "text-[#999] line-through" : "text-[#333]"}`}>
-                                {task.title}
-                              </p>
-                              {task.description && (
-                                <p className="mt-0.5 text-[12px] leading-[1.5] text-[#999]">
-                                  {task.description}
+                  {tasks.length > 0 ? (
+                    Object.entries(
+                      tasks.reduce<Record<string, AiTask[]>>((acc, task) => {
+                        const key = task.axis;
+                        if (!acc[key]) acc[key] = [];
+                        acc[key].push(task);
+                        return acc;
+                      }, {}),
+                    ).map(([axis, axisTasks]) => (
+                      <article
+                        key={axis}
+                        className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-5 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]"
+                      >
+                        <h3 className="mb-3 text-[15px] font-semibold capitalize text-[#0d0d0d]">
+                          {axis === "coreCs"
+                            ? "Core CS"
+                            : axis === "systemDesign"
+                              ? "System Design"
+                              : axis.toUpperCase()}
+                        </h3>
+                        <div className="space-y-2">
+                          {axisTasks.map((task) => (
+                            <label
+                              key={task.id}
+                              className="flex cursor-pointer items-start gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-[#fafafa]"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={task.completed}
+                                onChange={() => toggleTask(task.id)}
+                                className="mt-0.5 h-4 w-4 shrink-0 rounded border-[#ccc] accent-[#0fa76e]"
+                              />
+                              <div className="min-w-0">
+                                <p
+                                  className={`text-[14px] leading-[1.5] ${task.completed ? "text-[#999] line-through" : "text-[#333]"}`}
+                                >
+                                  {task.title}
                                 </p>
+                                {task.description && (
+                                  <p className="mt-0.5 text-[12px] leading-[1.5] text-[#999]">
+                                    {task.description}
+                                  </p>
+                                )}
+                              </div>
+                              {task.priority === 0 && !task.completed && (
+                                <span className="mt-0.5 shrink-0 rounded-full bg-[#f7e5e5] px-2 py-0.5 text-[10px] font-semibold text-[#d45656]">
+                                  High
+                                </span>
                               )}
-                            </div>
-                            {task.priority === 0 && !task.completed && (
-                              <span className="mt-0.5 shrink-0 rounded-full bg-[#f7e5e5] px-2 py-0.5 text-[10px] font-semibold text-[#d45656]">
-                                High
-                              </span>
-                            )}
-                          </label>
-                        ))}
-                      </div>
+                            </label>
+                          ))}
+                        </div>
+                      </article>
+                    ))
+                  ) : (
+                    <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-5 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
+                      <p className="text-[14px] leading-[1.6] text-[#666]">
+                        Your study plan will appear here once tasks are
+                        generated from your assessments and resume signals.
+                      </p>
                     </article>
-                  ))}
+                  )}
                 </div>
-              </section>
-            )}
-
+              </div>
+            </section>
           </div>
         </div>
       </DashboardLayout>
