@@ -11,7 +11,6 @@ import {
   Clock3,
   Link2,
   Loader2,
-  Mail,
   PanelsTopLeft,
   RefreshCw,
 } from "lucide-react";
@@ -34,17 +33,6 @@ const PROVIDER_CONFIG: Record<
     connectedSubtext?: string;
   }
 > = {
-  gmail: {
-    name: "Gmail",
-    description: "Connect your sending account",
-    icon: Mail,
-    iconTone: "bg-[#fde7d7] text-[#d14836]",
-    pitch: "Connect Gmail so future sending features can use your Google account.",
-    connectLabel: "Connect Gmail",
-    connectType: "oauth",
-    syncedAtDisconnected: "Google OAuth - gmail.send",
-    connectedSubtext: "Connected for future sending features",
-  },
   github: {
     name: "GitHub",
     description: "Commits, PRs, issues",
@@ -87,7 +75,7 @@ const PROVIDER_CONFIG: Record<
   },
 };
 
-const PROVIDER_ORDER = ["gmail", "github", "obsidian", "slack", "linear"];
+const PROVIDER_ORDER = ["github", "obsidian", "slack", "linear"];
 
 const comingSoon = [
   { name: "Notion", description: "Pages, databases, updates", icon: PanelsTopLeft },

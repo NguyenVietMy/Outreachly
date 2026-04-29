@@ -190,7 +190,7 @@ resource "aws_ecs_task_definition" "api" {
         { name = "GOOGLE_GMAIL_REDIRECT_URI", value = "https://api.outreach-ly.com/login/oauth2/code/google-gmail" },
         { name = "FRONTEND_URL", value = "https://www.outreach-ly.com" },
         { name = "AWS_FROM_EMAIL", value = "noreply@outreach-ly.com" },
-        { name = "AWS_FROM_NAME", value = "Outreachly" },
+        { name = "AWS_FROM_NAME", value = "Pulse" },
         { name = "AWS_BOUNCE_EMAIL", value = "bounces@outreach-ly.com" },
         { name = "AWS_COMPLAINT_EMAIL", value = "complaints@outreach-ly.com" }
       ]

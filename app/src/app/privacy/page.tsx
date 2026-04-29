@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import DashboardLayout from "@/components/DashboardLayout";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Outreachly",
-  description: "Privacy Policy for Outreachly",
+  title: "Privacy Policy | Pulse",
+  description: "Privacy Policy for Pulse",
 };
 
 export default function PrivacyPolicyPage() {
@@ -13,7 +13,7 @@ export default function PrivacyPolicyPage() {
         <div className="mx-auto max-w-3xl px-6 py-12 sm:py-16">
           <header className="mb-10">
             <h1 className="text-3xl font-bold tracking-tight text-foreground">
-              Outreachly Privacy Policy
+              Pulse Privacy Policy
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               Effective date: October 9, 2025
@@ -22,7 +22,7 @@ export default function PrivacyPolicyPage() {
 
           <div className="prose prose-slate max-w-none">
             <p>
-              This Privacy Policy explains how Outreachly ("we", "us", or "our")
+              This Privacy Policy explains how Pulse ("we", "us", or "our")
               collects, uses, and protects information when you use our services
               (the "Service").
             </p>

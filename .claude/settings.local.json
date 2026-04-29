@@ -29,7 +29,10 @@
       "WebFetch(domain:developers.openai.com)",
       "Bash(npm run *)",
       "Bash(sort -t'V' -k2 -n)",
-      "Bash(./mvnw clean *)"
+      "Bash(./mvnw clean *)",
+      "Bash(cp -r api/src/main/java/com/outreachly/outreachly/* api/src/main/java/com/pulse/pulse/)",
+      "Bash(cp -r api/src/test/java/com/outreachly/outreachly/* api/src/test/java/com/pulse/pulse/)",
+      "Bash(xargs sed *)"
     ]
   }
 }

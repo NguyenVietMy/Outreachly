@@ -13,7 +13,7 @@ export default function Header() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <Link href="/" className="text-lg font-semibold text-foreground tracking-tight">
-                Outreachly
+                Pulse
               </Link>
             </div>
             <div className="animate-pulse bg-muted h-8 w-24 rounded-full"></div>
@@ -29,7 +29,7 @@ export default function Header() {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
             <Link href="/" className="text-lg font-semibold text-foreground tracking-tight">
-              Outreachly
+              Pulse
             </Link>
           </div>
 

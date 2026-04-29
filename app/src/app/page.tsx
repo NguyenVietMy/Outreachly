@@ -101,7 +101,7 @@ export default function Home() {
             </h2>
             <p className="max-w-[700px] text-muted-foreground md:text-xl/relaxed">
               Join thousands of sales teams who've improved their response rates
-              with Outreachly AI.
+              with Pulse AI.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Button
@@ -123,7 +123,7 @@ export default function Home() {
         <div className="container px-4 md:px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             <div className="space-y-4">
-              <h4 className="text-lg font-semibold">Outreachly AI</h4>
+              <h4 className="text-lg font-semibold">Pulse AI</h4>
               <p className="text-sm text-muted-foreground">
                 Smarter lead enrichment and cold outreach that actually gets
                 replies.
@@ -224,7 +224,7 @@ export default function Home() {
           <Separator className="my-8" />
           <div className="flex flex-col md:flex-row items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              © 2025 Outreachly AI. All rights reserved.
+              © 2025 Pulse AI. All rights reserved.
             </p>
             <div className="flex items-center space-x-4 mt-4 md:mt-0">
               <a

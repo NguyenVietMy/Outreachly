@@ -32,12 +32,24 @@ function getCompletedSectionIds(
   return new Set(existing.sections.map((s) => s.sectionId));
 }
 
-function getExistingSectionData(
-  existing: AxisAssessmentPayload | Record<string, unknown> | null,
-  sectionId: string
-): SectionAssessment | null {
-  if (!isNewFormat(existing)) return null;
-  return existing.sections.find((s) => s.sectionId === sectionId) ?? null;
+function getRetakeBatchIds(
+  existing: AxisAssessmentPayload | Record<string, unknown> | null
+): Set<string> {
+  if (!isNewFormat(existing) || existing.sections.length === 0) return new Set();
+  const sorted = [...existing.sections].sort(
+    (a, b) => new Date(a.completedAt).getTime() - new Date(b.completedAt).getTime()
+  );
+  let splitIndex = 0;
+  let maxGap = 0;
+  for (let i = 1; i < sorted.length; i++) {
+    const gap = new Date(sorted[i].completedAt).getTime() - new Date(sorted[i - 1].completedAt).getTime();
+    if (gap > maxGap) {
+      maxGap = gap;
+      splitIndex = i;
+    }
+  }
+  if (maxGap < 60_000) return new Set();
+  return new Set(sorted.slice(splitIndex).map((s) => s.sectionId));
 }
 
 const CONFIDENCE_OPTIONS = [
@@ -67,17 +79,39 @@ export default function MilestoneAssessmentModal({
   onComplete,
   onClose,
 }: MilestoneAssessmentModalProps) {
-  const completedIds = useMemo(
-    () => getCompletedSectionIds(existingAssessment),
-    [existingAssessment]
-  );
+  const [{ completedIds, isRetake, startIndex }] = useState(() => {
+    const allIds = getCompletedSectionIds(existingAssessment);
+    const firstIncomplete = sections.findIndex((s) => !allIds.has(s.id));
 
-  const firstIncomplete = sections.findIndex((s) => !completedIds.has(s.id));
+    if (firstIncomplete >= 0) {
+      return { completedIds: allIds, isRetake: false, startIndex: firstIncomplete };
+    }
 
-  const [currentIndex, setCurrentIndex] = useState(
-    firstIncomplete >= 0 ? firstIncomplete : sections.length
-  );
+    if (allIds.size === 0) {
+      return { completedIds: allIds, isRetake: false, startIndex: 0 };
+    }
+
+    const retakeBatch = getRetakeBatchIds(existingAssessment);
+    if (retakeBatch.size > 0 && retakeBatch.size < allIds.size) {
+      return { completedIds: retakeBatch, isRetake: true, startIndex: sections.findIndex((s) => !retakeBatch.has(s.id)) };
+    }
+
+    return { completedIds: new Set<string>(), isRetake: true, startIndex: 0 };
+  });
+
+  const [currentIndex, setCurrentIndex] = useState(startIndex >= 0 ? startIndex : 0);
   const [answers, setAnswers] = useState<Record<string, number>>(() => {
+    if (isRetake) {
+      if (!isNewFormat(existingAssessment)) return {};
+      const map: Record<string, number> = {};
+      for (const sec of existingAssessment.sections) {
+        if (!completedIds.has(sec.sectionId)) continue;
+        for (const ss of sec.subskills) {
+          map[ss.subskillId] = ss.tier;
+        }
+      }
+      return map;
+    }
     if (!isNewFormat(existingAssessment)) return {};
     const map: Record<string, number> = {};
     for (const sec of existingAssessment.sections) {
@@ -91,7 +125,7 @@ export default function MilestoneAssessmentModal({
     "low" | "medium" | "high" | null
   >(null);
   const [phase, setPhase] = useState<"subskills" | "confidence" | "done">(
-    firstIncomplete < 0 ? "done" : "subskills"
+    "subskills"
   );
   const [submitting, setSubmitting] = useState(false);
   const [completedDuringSession, setCompletedDuringSession] = useState<

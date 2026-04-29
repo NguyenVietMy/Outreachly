@@ -9,9 +9,9 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Outreachly - Lead Enrichment & Cold Outreach",
+  title: "Pulse - CS Career Development Platform",
   description:
-    "Lead enrichment + cold outreach SaaS built with Next.js and Spring Boot",
+    "Personal CS career development platform built with Next.js and Spring Boot",
 };
 
 export default function RootLayout({

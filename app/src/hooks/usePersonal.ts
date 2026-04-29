@@ -337,7 +337,6 @@ export function usePersonal() {
         const data = await res.json();
         setProfile(data);
         fetchTasks();
-        fetchProfile();
         return data;
       }
       throw new Error("Failed to submit questionnaire");

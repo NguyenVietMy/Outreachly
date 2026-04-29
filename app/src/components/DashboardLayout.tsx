@@ -8,7 +8,6 @@ import {
   LogOut,
   Menu,
   X,
-  Layers,
   User,
   Zap,
   ChevronDown,
@@ -45,7 +44,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
     { name: "Personal", href: "/personal", icon: User },
-    { name: "Workspace", href: "/workspace", icon: Layers },
     { name: "Settings", href: "/settings", icon: Settings },
   ];
   const integrationNavigation = [
@@ -78,7 +76,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             href="/dashboard"
             className="text-[15px] font-semibold text-[#0d0d0d] tracking-tight"
           >
-            Outreachly
+            Pulse
           </Link>
           <span className="hidden text-[#e5e5e5] sm:inline">/</span>
           <span className="hidden text-[13px] text-[#666666] sm:inline">
@@ -159,8 +157,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             const Icon = item.icon;
             const isActive =
               pathname === item.href ||
-              pathname?.startsWith(`${item.href}/`) ||
-              (item.href === "/workspace" && pathname === "/leads/modify");
+              pathname?.startsWith(`${item.href}/`);
             return (
               <Link
                 key={item.name}

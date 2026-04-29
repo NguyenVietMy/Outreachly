@@ -75,7 +75,7 @@ export default function OrganizationOnboarding() {
           <CardHeader>
             <CardTitle>Create your organization</CardTitle>
             <CardDescription>
-              You must belong to an organization to use Outreachly.
+              You must belong to an organization to use Pulse.
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -59,7 +59,7 @@ These guidelines are working if: fewer unnecessary changes in diffs, fewer rewri
 
 ## Project Overview
 
-Outreachly is a cold outreach SaaS — lead enrichment (Hunter.io), AI-generated email/LinkedIn templates (OpenAI GPT-4o), multi-provider email campaigns (Gmail API, AWS SES, Resend), and delivery tracking. Live at outreach-ly.com.
+Pulse is a personal CS career development platform — SWE readiness assessments, resume scoring, goal tracking, and productivity integrations (GitHub, Obsidian, Slack, Linear).
 
 ## Repository Structure
 
@@ -94,8 +94,8 @@ The API URL defaults to `http://localhost:8080` in development (set via `NEXT_PU
 ### Docker (api/)
 ```bash
 cd api
-docker build -t outreachly-api .
-docker run -p 8080:8080 --env-file .env.local.properties outreachly-api
+docker build -t pulse-api .
+docker run -p 8080:8080 --env-file .env.local.properties pulse-api
 ```
 
 ### Infrastructure (infra/)
@@ -105,44 +105,43 @@ terraform init
 terraform plan
 terraform apply
 ```
-Modules: `network` (VPC/subnets), `ecs_api` (ECS Fargate cluster/task/ALB), `ses` (SES sending config).
+Modules: `network` (VPC/subnets), `ecs_api` (ECS Fargate cluster/task/ALB).
 
 ## Architecture
 
 ### Backend Package Structure
-All Java code under `com.outreachly.outreachly`:
-- `controller/` — REST endpoints (leads, campaigns, templates, import, enrichment, email, AI, webhooks, auth, settings)
+All Java code under `com.pulse.pulse`:
+- `controller/` — REST endpoints (dashboard, personal, integrations, organizations, auth, settings)
 - `service/` — Business logic. Key services:
-  - `CheckpointScheduler` — `@Scheduled` (60s) job that fires campaign checkpoints with timezone-aware delivery
-  - `EnrichmentService` — Polls pending enrichment jobs (5s interval), calls Hunter.io, caches results by SHA-256 key
-  - `EmailDeliveryService` / `UnifiedEmailService` — Orchestrates sending across providers
-  - `OpenAiService` — WebFlux client to GPT-4o for template generation/improvement
-  - `RateLimitService` — 100 emails/day per user/org quota
-- `service/email/` — Strategy pattern for email providers:
-  - `EmailProvider` interface → `ResendEmailProvider`, `MockEmailProvider`, plus `GmailService` and `SesEmailService` at the service level
-  - `EmailProviderFactory` selects implementation by `email.provider` config property
+  - `DashboardService` — Aggregates integration activity metrics, trends, and AI digest generation
+  - `IntegrationService` — Manages user integrations (GitHub, Obsidian, Slack, Linear) with OAuth and API key flows
+  - `IntegrationSyncScheduler` — Background auto-sync for connected integrations
+  - `OpenAiService` — WebFlux client to OpenAI for digest, personal insights, resume scoring, and task generation
+  - `PersonalService` — SWE profile, goals, resume scoring, and AI-driven study tasks
+  - `ResumeService` — PDF parsing and resume text extraction
+- `service/integration/` — Per-provider sync implementations:
+  - `IntegrationProvider` interface → `GitHubIntegrationProvider`, `ObsidianIntegrationProvider`, `SlackIntegrationProvider`, `LinearIntegrationProvider`
 - `entity/` — JPA entities (Lombok throughout)
-- `config/` — CORS, OAuth2, email provider config
+- `config/` — CORS, OAuth2, integration config
 - `security/` — OAuth2 success/failure handlers
 - `dto/` — Request/response DTOs
 - `repository/` — Spring Data JPA repositories
 
 ### Database
-PostgreSQL on Supabase. Schema managed by **Flyway** migrations (`api/src/main/resources/db/migration/`, V1–V43). `ddl-auto=none` — always use migrations for schema changes.
+PostgreSQL on Supabase. Schema managed by **Flyway** migrations (`api/src/main/resources/db/migration/`, V1–V54). `ddl-auto=none` — always use migrations for schema changes.
 
 ### Frontend Structure
-- `src/app/` — Next.js App Router pages: dashboard, leads, campaigns, templates, import, send-email, send-gmail, send-email-ses, settings, onboarding, about, privacy, terms
-- `src/components/` — UI components organized by domain (campaigns/, dashboard/, email/, import/, templates/, companies/) plus shared/ and ui/ (shadcn)
-- `src/hooks/` — Domain-specific data hooks (useCampaigns, useLeads, useCampaignCheckpoints, useDeliveryMetrics, useActivityFeed, etc.)
-- `src/lib/` — Utilities (aiService, emailValidation, linkTracking, config)
+- `src/app/` — Next.js App Router pages: dashboard, personal, integrations, settings, onboarding, privacy, terms
+- `src/components/` — UI components organized by domain (assessment/, icons/, personal/) plus shared/ and ui/ (shadcn)
+- `src/hooks/` — Domain-specific data hooks (useDashboard, useIntegrations, usePersonal)
+- `src/lib/` — Utilities (config, utils)
 - `src/contexts/AuthContext.tsx` — Google OAuth2 auth state via session cookie (`credentials: "include"` on all API calls)
 
 ### Auth Flow
-Google OAuth2 with two registrations: `google` (login: openid,profile,email) and `google-gmail` (incremental: adds gmail.send scope). Backend manages sessions; frontend reads auth state from `GET /api/auth/user` and sends cookies with every request.
+Google OAuth2 with one registration: `google` (login: openid,profile,email). Backend manages sessions; frontend reads auth state from `GET /api/auth/user` and sends cookies with every request.
 
 ### Key Design Patterns
-- **Email provider strategy**: `EmailProvider` interface + `EmailProviderFactory`. Adding a provider = one class + one enum entry.
-- **Enrichment cache**: SHA-256 content-addressed cache in `enrichment_cache` table. Same lead lookup is a DB read, not an API call.
+- **Integration provider strategy**: `IntegrationProvider` interface per provider. Adding a provider = one class implementing the interface.
 - **Frontend hooks pattern**: Each domain entity has a custom hook that encapsulates fetch logic, loading/error state, and CRUD operations.
 
 ## Deployment
@@ -150,4 +149,3 @@ Google OAuth2 with two registrations: `google` (login: openid,profile,email) and
 - **Frontend**: Vercel (auto-deploys from main)
 - **Backend**: Docker → AWS ECR → ECS Fargate (0.25 vCPU / 512MB), behind ALB with HTTPS
 - **Secrets**: AWS Secrets Manager, injected at ECS task startup
-- **Email tracking**: SES → SNS webhooks → `EmailWebhookController` for delivery/bounce/complaint events

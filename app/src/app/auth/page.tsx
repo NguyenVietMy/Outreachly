@@ -31,7 +31,7 @@ export default function AuthPage() {
       <div className="max-w-md w-full space-y-8 rounded-xl border bg-card p-8 shadow-card">
         <div>
           <h2 className="mt-2 text-center text-3xl font-semibold text-foreground tracking-tight">
-            Sign in to Outreachly
+            Sign in to Pulse
           </h2>
           <p className="mt-2 text-center text-sm text-muted-foreground">
             Choose your preferred sign-in method

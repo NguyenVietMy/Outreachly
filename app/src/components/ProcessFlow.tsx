@@ -91,7 +91,7 @@ const ProcessFlow = () => {
     <section className="py-20 px-4 bg-background">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
-          <h2 className="text-[40px] font-semibold tracking-[-0.02em] leading-[1.10] mb-4">How Outreachly Works</h2>
+          <h2 className="text-[40px] font-semibold tracking-[-0.02em] leading-[1.10] mb-4">How Pulse Works</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
             Our streamlined process helps you go from raw lead lists to
             enriched, personalized outreach data in minutes

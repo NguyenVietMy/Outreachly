@@ -24,7 +24,7 @@ export default function PricingCards() {
     {
       name: "Free",
       price: "$0",
-      description: "Perfect for trying out Outreachly",
+      description: "Perfect for trying out Pulse",
       features: [
         "Up to 100 leads per month",
         "Basic email verification",

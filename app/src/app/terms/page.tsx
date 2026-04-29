@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import DashboardLayout from "@/components/DashboardLayout";
 
 export const metadata: Metadata = {
-  title: "Terms of Service | Outreachly",
-  description: "Terms of Service for using Outreachly",
+  title: "Terms of Service | Pulse",
+  description: "Terms of Service for using Pulse",
 };
 
 export default function TermsOfServicePage() {
@@ -13,7 +13,7 @@ export default function TermsOfServicePage() {
         <div className="mx-auto max-w-3xl px-6 py-12 sm:py-16">
           <header className="mb-10">
             <h1 className="text-3xl font-bold tracking-tight text-foreground">
-              Outreachly Terms of Service
+              Pulse Terms of Service
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               Effective date: October 9, 2025
@@ -23,7 +23,7 @@ export default function TermsOfServicePage() {
           <div className="prose prose-slate max-w-none">
             <p>
               These Terms of Service ("Terms") govern your access to and use of
-              Outreachly (the "Service"). By accessing or using the Service, you
+              Pulse (the "Service"). By accessing or using the Service, you
               agree to be bound by these Terms. If you do not agree, do not use
               the Service.
             </p>
@@ -46,7 +46,7 @@ export default function TermsOfServicePage() {
 
             <h2>3. Gmail Integration and Third-Party Services</h2>
             <p>
-              Outreachly may offer optional integrations, including the Gmail
+              Pulse may offer optional integrations, including the Gmail
               API. When you choose to connect your Google account, Google will
               present a consent screen requesting permissions (e.g.,{" "}
               <code>gmail.send</code>) to enable the Gmail integration flow. You
@@ -75,14 +75,14 @@ export default function TermsOfServicePage() {
             <h2>5. Content and License</h2>
             <p>
               You retain ownership of any content you submit to the Service. You
-              grant Outreachly a non-exclusive, worldwide, royalty-free license
+              grant Pulse a non-exclusive, worldwide, royalty-free license
               to host, process, and display your content solely to provide and
               improve the Service.
             </p>
 
             <h2>6. Intellectual Property</h2>
             <p>
-              Outreachly and its licensors own all right, title, and interest in
+              Pulse and its licensors own all right, title, and interest in
               and to the Service, including its software, features, and
               branding. Except for the limited rights expressly granted in these
               Terms, no rights are transferred to you.
@@ -98,14 +98,14 @@ export default function TermsOfServicePage() {
             <h2>8. Disclaimers</h2>
             <p>
               The Service is provided on an “as is” and “as available” basis. To
-              the fullest extent permitted by law, Outreachly disclaims all
+              the fullest extent permitted by law, Pulse disclaims all
               warranties, express or implied, including merchantability, fitness
               for a particular purpose, and non-infringement.
             </p>
 
             <h2>9. Limitation of Liability</h2>
             <p>
-              To the maximum extent permitted by law, Outreachly will not be
+              To the maximum extent permitted by law, Pulse will not be
               liable for any indirect, incidental, special, consequential, or
               punitive damages, or for any loss of profits, revenues, data, or
               goodwill, arising out of or related to your use of the Service.
@@ -113,7 +113,7 @@ export default function TermsOfServicePage() {
 
             <h2>10. Indemnification</h2>
             <p>
-              You agree to indemnify and hold harmless Outreachly and its
+              You agree to indemnify and hold harmless Pulse and its
               affiliates, officers, agents, and employees from any claim,
               demand, losses, or damages arising out of or related to your use
               of the Service or your violation of these Terms.
@@ -139,7 +139,7 @@ export default function TermsOfServicePage() {
             <p>
               Your use of the Service is subject to our{" "}
               <a href="/privacy">Privacy Policy</a>, which explains how we
-              collect, use, and protect your personal information. Outreachly
+              collect, use, and protect your personal information. Pulse
               processes personal data in accordance with applicable privacy
               laws, including the GDPR. We implement appropriate technical and
               organizational measures to protect your data.

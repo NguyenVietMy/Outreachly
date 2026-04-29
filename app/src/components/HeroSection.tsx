@@ -67,7 +67,7 @@ const HeroSection = ({
           <div className="aspect-[16/9] rounded-xl overflow-hidden border border-border/50 shadow-2xl">
             <img
               src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&q=80"
-              alt="Outreachly AI Dashboard"
+              alt="Pulse AI Dashboard"
               className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent"></div>
