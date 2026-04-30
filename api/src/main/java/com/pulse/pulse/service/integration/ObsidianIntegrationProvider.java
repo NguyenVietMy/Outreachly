@@ -101,6 +101,21 @@ public class ObsidianIntegrationProvider implements IntegrationProvider {
     }
 
     @Override
+    public String getAccountLabel() {
+        return "Vault repo";
+    }
+
+    @Override
+    public String getAccountValue(Map<String, Object> metadata) {
+        return metadata != null ? (String) metadata.getOrDefault("repoFullName", "unknown") : "unknown";
+    }
+
+    @Override
+    public String getEventsLabel() {
+        return "Notes tracked";
+    }
+
+    @Override
     public Map<String, Object> fetchMetadata(String accessToken) {
         return Collections.emptyMap();
     }

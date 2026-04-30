@@ -7,8 +7,8 @@ import com.pulse.pulse.entity.UserIntegration;
 import com.pulse.pulse.service.IntegrationService;
 import com.pulse.pulse.service.IntegrationSyncScheduler;
 import com.pulse.pulse.service.UserService;
+import com.pulse.pulse.service.integration.IntegrationProvider;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -21,22 +21,26 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/integrations")
-@RequiredArgsConstructor
 @Slf4j
 public class IntegrationController {
 
     private final IntegrationService integrationService;
     private final IntegrationSyncScheduler syncScheduler;
     private final UserService userService;
+    private final Map<String, IntegrationProvider> providers;
 
     @Value("${integrations.frontend-url:http://localhost:3000}")
     private String frontendUrl;
 
-    @Value("${github.integration.redirect-uri:http://localhost:8080/api/integrations/github/callback}")
-    private String githubRedirectUri;
-
-    @Value("${slack.redirect-uri:http://localhost:8080/api/integrations/slack/callback}")
-    private String slackRedirectUri;
+    public IntegrationController(IntegrationService integrationService,
+                                  IntegrationSyncScheduler syncScheduler,
+                                  UserService userService,
+                                  Map<String, IntegrationProvider> providers) {
+        this.integrationService = integrationService;
+        this.syncScheduler = syncScheduler;
+        this.userService = userService;
+        this.providers = providers;
+    }
 
     @GetMapping
     public ResponseEntity<List<IntegrationDto>> getIntegrations(Authentication authentication) {
@@ -46,13 +50,12 @@ public class IntegrationController {
         List<UserIntegration> integrations = integrationService.getIntegrations(user.getId());
         List<IntegrationDto> dtos = new ArrayList<>();
 
-        Set<String> allProviders = Set.of("github", "obsidian", "slack", "linear");
         Map<String, UserIntegration> byProvider = new HashMap<>();
         for (UserIntegration i : integrations) {
             byProvider.put(i.getProvider(), i);
         }
 
-        for (String provider : allProviders) {
+        for (String provider : providers.keySet()) {
             UserIntegration integration = byProvider.get(provider);
             if (integration != null && "connected".equals(integration.getStatus())) {
                 dtos.add(buildConnectedDto(integration, user.getId()));
@@ -181,39 +184,13 @@ public class IntegrationController {
 
     private IntegrationDto buildConnectedDto(UserIntegration integration, Long userId) {
         Map<String, Object> meta = integration.getMetadata();
-        String provider = integration.getProvider();
-        List<Integer> sparkline = integrationService.getActivitySparkline(userId, provider);
+        String providerName = integration.getProvider();
+        List<Integer> sparkline = integrationService.getActivitySparkline(userId, providerName);
 
-        String accountLabel;
-        String accountValue;
-        String eventsLabel;
-
-        switch (provider) {
-            case "github":
-                accountLabel = "Account";
-                accountValue = "@" + (meta != null ? meta.getOrDefault("login", "unknown") : "unknown");
-                eventsLabel = "Events synced";
-                break;
-            case "obsidian":
-                accountLabel = "Vault repo";
-                accountValue = meta != null ? (String) meta.getOrDefault("repoFullName", "unknown") : "unknown";
-                eventsLabel = "Notes tracked";
-                break;
-            case "slack":
-                accountLabel = "Workspace";
-                accountValue = meta != null ? (String) meta.getOrDefault("team", "unknown") : "unknown";
-                eventsLabel = "Messages synced";
-                break;
-            case "linear":
-                accountLabel = "Account";
-                accountValue = meta != null ? (String) meta.getOrDefault("name", "unknown") : "unknown";
-                eventsLabel = "Issues tracked";
-                break;
-            default:
-                accountLabel = "Account";
-                accountValue = "unknown";
-                eventsLabel = "Events";
-        }
+        IntegrationProvider provider = providers.get(providerName);
+        String accountLabel = provider != null ? provider.getAccountLabel() : "Account";
+        String accountValue = provider != null ? provider.getAccountValue(meta) : "unknown";
+        String eventsLabel = provider != null ? provider.getEventsLabel() : "Events";
 
         int totalEvents = sparkline.stream().mapToInt(Integer::intValue).sum();
         String eventsValue = totalEvents + " this week";
@@ -228,7 +205,7 @@ public class IntegrationController {
         }
 
         return new IntegrationDto(
-                provider,
+                providerName,
                 "connected",
                 true,
                 accountLabel,
@@ -254,12 +231,12 @@ public class IntegrationController {
         );
     }
 
-    private String getRedirectUri(String provider) {
-        return switch (provider) {
-            case "github" -> githubRedirectUri;
-            case "slack" -> slackRedirectUri;
-            default -> throw new IllegalArgumentException("No redirect URI for: " + provider);
-        };
+    private String getRedirectUri(String providerName) {
+        IntegrationProvider provider = providers.get(providerName);
+        if (provider == null || provider.getRedirectUri() == null) {
+            throw new IllegalArgumentException("No redirect URI for: " + providerName);
+        }
+        return provider.getRedirectUri();
     }
 
     private User getUser(Authentication authentication) {

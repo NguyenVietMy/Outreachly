@@ -205,14 +205,13 @@ public class IntegrationService {
         return impl;
     }
 
-    private String getRedirectUri(String provider) {
-        return switch (provider) {
-            case "github" -> System.getProperty("github.integration.redirect-uri",
-                    "http://localhost:8080/api/integrations/github/callback");
-            case "slack" -> System.getProperty("slack.redirect-uri",
-                    "http://localhost:8080/api/integrations/slack/callback");
-            default -> throw new IllegalArgumentException("No redirect URI for: " + provider);
-        };
+    private String getRedirectUri(String providerName) {
+        IntegrationProvider impl = getProvider(providerName);
+        String uri = impl.getRedirectUri();
+        if (uri == null) {
+            throw new IllegalArgumentException("No redirect URI for: " + providerName);
+        }
+        return uri;
     }
 
     private void cleanExpiredStates() {

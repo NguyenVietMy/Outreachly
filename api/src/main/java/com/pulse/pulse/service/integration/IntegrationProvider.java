@@ -20,4 +20,14 @@ public interface IntegrationProvider {
     List<IntegrationEvent> fetchRecentEvents(UserIntegration integration, LocalDateTime since);
 
     Map<String, Object> fetchMetadata(String accessToken);
+
+    String getAccountLabel();
+
+    String getAccountValue(Map<String, Object> metadata);
+
+    String getEventsLabel();
+
+    default String getRedirectUri() {
+        return null;
+    }
 }

@@ -28,6 +28,9 @@ public class GitHubIntegrationProvider implements IntegrationProvider {
     @Value("${github.integration.client-secret:}")
     private String clientSecret;
 
+    @Value("${github.integration.redirect-uri:http://localhost:8080/api/integrations/github/callback}")
+    private String redirectUri;
+
     public GitHubIntegrationProvider(@Qualifier("gitHubWebClient") WebClient gitHubWebClient) {
         this.gitHubWebClient = gitHubWebClient;
         this.tokenClient = WebClient.builder()
@@ -110,7 +113,7 @@ public class GitHubIntegrationProvider implements IntegrationProvider {
             String eventType;
             switch (type) {
                 case "PushEvent":
-                    int commitCount = event.path("payload").path("commits").size();
+                    int commitCount = event.path("payload").path("size").asInt(0);
                     String repo = event.path("repo").path("name").asText();
                     title = commitCount + " commit" + (commitCount != 1 ? "s" : "") + " to " + repo;
                     eventType = "commit";
@@ -150,6 +153,26 @@ public class GitHubIntegrationProvider implements IntegrationProvider {
         }
 
         return result;
+    }
+
+    @Override
+    public String getAccountLabel() {
+        return "Account";
+    }
+
+    @Override
+    public String getAccountValue(Map<String, Object> metadata) {
+        return "@" + (metadata != null ? metadata.getOrDefault("login", "unknown") : "unknown");
+    }
+
+    @Override
+    public String getEventsLabel() {
+        return "Events synced";
+    }
+
+    @Override
+    public String getRedirectUri() {
+        return redirectUri;
     }
 
     @Override

@@ -26,6 +26,9 @@ public class SlackIntegrationProvider implements IntegrationProvider {
     @Value("${slack.client-secret:}")
     private String clientSecret;
 
+    @Value("${slack.redirect-uri:http://localhost:8080/api/integrations/slack/callback}")
+    private String redirectUri;
+
     public SlackIntegrationProvider(@Qualifier("slackWebClient") WebClient slackWebClient) {
         this.slackWebClient = slackWebClient;
     }
@@ -141,6 +144,26 @@ public class SlackIntegrationProvider implements IntegrationProvider {
         }
 
         return result;
+    }
+
+    @Override
+    public String getAccountLabel() {
+        return "Workspace";
+    }
+
+    @Override
+    public String getAccountValue(Map<String, Object> metadata) {
+        return metadata != null ? (String) metadata.getOrDefault("team", "unknown") : "unknown";
+    }
+
+    @Override
+    public String getEventsLabel() {
+        return "Messages synced";
+    }
+
+    @Override
+    public String getRedirectUri() {
+        return redirectUri;
     }
 
     @Override

@@ -37,7 +37,9 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-type IconComponent = ComponentType<{ className?: string } & SVGProps<SVGSVGElement>>;
+type IconComponent = ComponentType<
+  { className?: string } & SVGProps<SVGSVGElement>
+>;
 
 const PROVIDER_META: Record<
   string,
@@ -47,7 +49,11 @@ const PROVIDER_META: Record<
     icon: IconComponent;
     tone: string;
     sub: string;
-    metricsKey: "githubCommits" | "obsidianNotes" | "slackMessages" | "linearTickets";
+    metricsKey:
+      | "githubCommits"
+      | "obsidianNotes"
+      | "slackMessages"
+      | "linearTickets";
   }
 > = {
   github: {
@@ -160,7 +166,9 @@ function PulseStrip({
                     <span className="text-[18px] font-semibold leading-tight text-[#0d0d0d]">
                       {value}
                     </span>
-                    <span className="text-[11px] text-[#999999]">{meta.sub}</span>
+                    <span className="text-[11px] text-[#999999]">
+                      {meta.sub}
+                    </span>
                   </div>
                 )}
                 {!loading && breakdown && Object.keys(breakdown).length > 0 && (
@@ -201,7 +209,7 @@ function TrendChart({ trendData }: { trendData: TrendData }) {
   }, [trendData]);
 
   const hasData = chartData.some(
-    (d) => d.github + d.obsidian + d.slack + d.linear > 0
+    (d) => d.github + d.obsidian + d.slack + d.linear > 0,
   );
 
   if (!hasData) {
@@ -389,7 +397,7 @@ function ReadinessSnapshot({
 
   const scores = profile.axisScores;
   const entries = Object.entries(scores).filter(
-    ([, v]) => typeof v === "number" && v > 0
+    ([, v]) => typeof v === "number" && v > 0,
   ) as [string, number][];
 
   if (entries.length === 0) {
@@ -399,7 +407,8 @@ function ReadinessSnapshot({
           SWE Readiness
         </h2>
         <p className="text-[14px] text-[#666666]">
-          Complete assessments on the Personal page to see your readiness snapshot.
+          Complete assessments on the Personal page to see your readiness
+          snapshot.
         </p>
         <Link
           href="/personal"
@@ -472,7 +481,7 @@ function ReadinessSnapshot({
 // --- Integration Health Bar ---
 function HealthBar({ integrations }: { integrations: Integration[] }) {
   const syncable = integrations.filter(
-    (i) => i.supportsSync && i.status === "connected"
+    (i) => i.supportsSync && i.status === "connected",
   );
 
   if (syncable.length === 0) return null;
@@ -527,7 +536,8 @@ function HealthBar({ integrations }: { integrations: Integration[] }) {
               {meta?.label ?? i.provider}
               {hasFailed ? (
                 <span className="font-mono text-[11px]">
-                  {i.consecutiveFailures} failure{i.consecutiveFailures > 1 ? "s" : ""}
+                  {i.consecutiveFailures} failure
+                  {i.consecutiveFailures > 1 ? "s" : ""}
                 </span>
               ) : (
                 <>
@@ -668,7 +678,6 @@ export default function Dashboard() {
                 <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-6 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
                   <div className="mb-3 flex items-center justify-between">
                     <div className="flex items-center gap-2 font-mono text-[12px] font-medium uppercase tracking-[0.6px] text-[#666666]">
-                      <Bot className="h-4 w-4 text-[#18E299]" />
                       AI digest
                     </div>
                     <Button

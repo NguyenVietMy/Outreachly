@@ -125,6 +125,21 @@ public class LinearIntegrationProvider implements IntegrationProvider {
     }
 
     @Override
+    public String getAccountLabel() {
+        return "Account";
+    }
+
+    @Override
+    public String getAccountValue(Map<String, Object> metadata) {
+        return metadata != null ? (String) metadata.getOrDefault("name", "unknown") : "unknown";
+    }
+
+    @Override
+    public String getEventsLabel() {
+        return "Issues tracked";
+    }
+
+    @Override
     public Map<String, Object> fetchMetadata(String accessToken) {
         String query = "{ viewer { id name email } }";
 
