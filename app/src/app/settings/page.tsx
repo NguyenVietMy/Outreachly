@@ -6,14 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -22,14 +14,8 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Settings,
-  Shield,
-  AlertCircle,
-  CheckCircle,
   Loader2,
   Save,
-  Clock,
-  Brain,
   Trash2,
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
@@ -183,48 +169,40 @@ function SettingsContent() {
   return (
     <AuthGuard>
       <DashboardLayout>
-        <div className="min-h-screen bg-background">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="mb-8">
-              <div className="flex items-center gap-3 mb-2">
-                <Settings className="h-8 w-8 text-blue-600" />
-                <h1 className="text-3xl font-bold text-foreground">Settings</h1>
-              </div>
-              <p className="text-muted-foreground">
+        <div className="min-h-full bg-transparent px-6 py-10 text-[#0d0d0d] md:px-8 md:py-12">
+          <div className="flex w-full flex-col gap-8 max-w-4xl">
+            <div>
+              <p className="font-mono text-[12px] font-medium uppercase tracking-[0.6px] text-[#666666]">
+                Account
+              </p>
+              <h1 className="mt-2 font-mono text-[40px] font-semibold leading-[1.1] tracking-[-0.8px] text-[#0d0d0d]">
+                Settings
+              </h1>
+              <p className="mt-3 max-w-2xl text-[18px] leading-[1.5] text-[#333333]">
                 Manage your account preferences.
               </p>
             </div>
 
             <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
               <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="timezone" className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  Timezone
-                </TabsTrigger>
-                <TabsTrigger value="account" className="flex items-center gap-2">
-                  <Shield className="h-4 w-4" />
-                  Account
-                </TabsTrigger>
-                <TabsTrigger value="memory" className="flex items-center gap-2">
-                  <Brain className="h-4 w-4" />
-                  Memory
-                </TabsTrigger>
+                <TabsTrigger value="timezone">Timezone</TabsTrigger>
+                <TabsTrigger value="account">Account</TabsTrigger>
+                <TabsTrigger value="memory">Memory</TabsTrigger>
               </TabsList>
 
               <TabsContent value="timezone" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Clock className="h-5 w-5" />
-                      Timezone Settings
-                    </CardTitle>
-                    <CardDescription>
-                      Set your timezone preference for times shown across the app.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
+                <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-6 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
+                  <h2 className="text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
+                    Timezone Settings
+                  </h2>
+                  <p className="mt-1 text-[14px] text-[#666666]">
+                    Set your timezone preference for times shown across the app.
+                  </p>
+                  <div className="mt-6 space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="timezone">Current Timezone</Label>
+                      <Label htmlFor="timezone" className="text-[14px] font-medium text-[#333333]">
+                        Current Timezone
+                      </Label>
                       <div className="flex items-center gap-2">
                         <Select
                           value={selectedTimezone || user?.timezone || "UTC±0"}
@@ -244,7 +222,7 @@ function SettingsContent() {
                         <Button
                           onClick={handleTimezoneUpdate}
                           disabled={isUpdatingTimezone || !selectedTimezone}
-                          size="sm"
+                          className="rounded-full bg-[#0d0d0d] px-6 py-2 text-[15px] font-medium text-white hover:opacity-90"
                         >
                           {isUpdatingTimezone ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -255,80 +233,72 @@ function SettingsContent() {
                         </Button>
                       </div>
                       {timezoneOffset && (
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-[13px] text-[#666666]">
                           Offset: {timezoneOffset}
                         </p>
                       )}
                     </div>
 
                     {timezoneError && (
-                      <Alert variant="destructive">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>{timezoneError}</AlertDescription>
-                      </Alert>
+                      <div className="rounded-[12px] border border-[rgba(212,86,86,0.3)] bg-[#fef2f2] px-4 py-3">
+                        <p className="text-[14px] text-[#d45656]">{timezoneError}</p>
+                      </div>
                     )}
 
                     {timezoneSuccess && (
-                      <Alert>
-                        <CheckCircle className="h-4 w-4" />
-                        <AlertDescription>
+                      <div className="rounded-[12px] border border-[rgba(24,226,153,0.3)] bg-[#d4fae8] px-4 py-3">
+                        <p className="text-[14px] text-[#0fa76e]">
                           Timezone updated successfully.
-                        </AlertDescription>
-                      </Alert>
+                        </p>
+                      </div>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </article>
               </TabsContent>
 
               <TabsContent value="account" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Shield className="h-5 w-5" />
-                      Account Management
-                    </CardTitle>
-                    <CardDescription>
-                      Basic account details for your current workspace membership.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="p-4 border rounded-lg bg-secondary">
-                      <h4 className="font-medium mb-2">Account Information</h4>
-                      <div className="space-y-2 text-sm text-muted-foreground">
-                        <p>
-                          <span className="font-medium">Email:</span> {user.email}
-                        </p>
-                        <p>
-                          <span className="font-medium">Member since:</span>{" "}
-                          {user.createdAt
-                            ? new Date(user.createdAt).toLocaleDateString()
-                            : "Unknown"}
-                        </p>
-                        <p>
-                          <span className="font-medium">Timezone:</span>{" "}
-                          {selectedTimezone || user.timezone || "UTC±0"}
-                        </p>
-                      </div>
+                <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-6 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
+                  <h2 className="text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
+                    Account Information
+                  </h2>
+                  <p className="mt-1 text-[14px] text-[#666666]">
+                    Basic account details for your current membership.
+                  </p>
+                  <div className="mt-6 space-y-3 text-[14px]">
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-medium text-[#333333]">Email</span>
+                      <span className="text-[#666666]">{user.email}</span>
                     </div>
-                  </CardContent>
-                </Card>
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-medium text-[#333333]">Member since</span>
+                      <span className="text-[#666666]">
+                        {user.createdAt
+                          ? new Date(user.createdAt).toLocaleDateString()
+                          : "Unknown"}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-medium text-[#333333]">Timezone</span>
+                      <span className="text-[#666666]">
+                        {selectedTimezone || user.timezone || "UTC±0"}
+                      </span>
+                    </div>
+                  </div>
+                </article>
               </TabsContent>
 
               <TabsContent value="memory" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Brain className="h-5 w-5" />
-                      Memory
-                    </CardTitle>
-                    <CardDescription>
-                      This is what the system knows about you, built from your onboarding and activity.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
+                <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-6 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
+                  <h2 className="text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
+                    Memory
+                  </h2>
+                  <p className="mt-1 text-[14px] text-[#666666]">
+                    What the system knows about you, built from your onboarding and activity.
+                  </p>
+                  <div className="mt-6">
                     {profile?.profileMarkdown ? (
                       <>
-                        <pre className="whitespace-pre-wrap font-mono text-sm leading-[1.7] text-foreground">
+                        <pre className="whitespace-pre-wrap font-mono text-[12px] leading-[1.7] tracking-[0.6px] text-[#333333]">
                           {profile.profileMarkdown}
                         </pre>
                         <div className="mt-6 flex justify-end">
@@ -336,7 +306,7 @@ function SettingsContent() {
                             onClick={handleClearMemory}
                             onBlur={() => setConfirmClear(false)}
                             disabled={isClearingMemory}
-                            className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[15px] font-medium transition-colors"
+                            className="inline-flex items-center gap-2 rounded-full border px-6 py-2 text-[15px] font-medium transition-colors"
                             style={{
                               color: confirmClear ? "#ffffff" : "#d45656",
                               borderColor: confirmClear ? "#d45656" : "rgba(212,86,86,0.3)",
@@ -353,12 +323,12 @@ function SettingsContent() {
                         </div>
                       </>
                     ) : (
-                      <p className="text-muted-foreground">
+                      <p className="text-[14px] text-[#666666]">
                         No profile data yet. Complete onboarding on the Personal page to get started.
                       </p>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </article>
               </TabsContent>
             </Tabs>
           </div>
