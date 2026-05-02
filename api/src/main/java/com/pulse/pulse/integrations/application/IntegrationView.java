@@ -1,0 +1,22 @@
+package com.pulse.pulse.integrations.application;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+
+public record IntegrationView(
+        Long userId,
+        String provider,
+        String status,
+        String accessToken,
+        Map<String, Object> metadata,
+        LocalDateTime lastSyncedAt,
+        Integer consecutiveFailures,
+        Boolean autoSyncEnabled,
+        String accountLabel,
+        String accountValue,
+        String eventsLabel,
+        String eventsValue,
+        String lastSyncedLabel,
+        List<Integer> sparkline) {
+}
