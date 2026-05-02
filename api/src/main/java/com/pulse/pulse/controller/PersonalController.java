@@ -2,9 +2,11 @@ package com.pulse.pulse.controller;
 
 import com.pulse.pulse.dto.*;
 import com.pulse.pulse.entity.AiTask;
+import com.pulse.pulse.entity.DailySuggestion;
 import com.pulse.pulse.entity.UserGoal;
 import com.pulse.pulse.entity.UserProfile;
 import com.pulse.pulse.entity.User;
+import com.pulse.pulse.service.DailySuggestionService;
 import com.pulse.pulse.service.PersonalService;
 import com.pulse.pulse.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +15,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -23,6 +26,7 @@ import java.util.UUID;
 public class PersonalController {
 
     private final PersonalService personalService;
+    private final DailySuggestionService dailySuggestionService;
     private final UserService userService;
 
     @GetMapping("/profile")
@@ -242,6 +246,44 @@ public class PersonalController {
 
         UserProfile profile = personalService.updateCareer(user.getId(), targetRole, gradYear);
         return ResponseEntity.ok(toDto(profile));
+    }
+
+    @GetMapping("/suggestions/today")
+    public ResponseEntity<Map<String, Object>> getSuggestionsToday(Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        try {
+            DailySuggestion suggestion = dailySuggestionService.getSuggestionsForToday(user.getId());
+            return ResponseEntity.ok(Map.of(
+                    "date", suggestion.getSuggestionDate().toString(),
+                    "generatedAt", suggestion.getGeneratedAt().toString(),
+                    "tasks", suggestion.getTasks()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/suggestions/regenerate")
+    public ResponseEntity<Map<String, Object>> regenerateSuggestions(Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        DailySuggestion suggestion = dailySuggestionService.regenerateSuggestions(user.getId());
+        if (suggestion == null) {
+            LocalDateTime nextAllowed = dailySuggestionService.getNextAllowedRegenerateTime(user.getId());
+            return ResponseEntity.status(429).body(Map.of(
+                    "error", "Too many regeneration requests",
+                    "nextAllowedAt", nextAllowed != null ? nextAllowed.toString() : ""
+            ));
+        }
+        return ResponseEntity.ok(Map.of(
+                "date", suggestion.getSuggestionDate().toString(),
+                "generatedAt", suggestion.getGeneratedAt().toString(),
+                "tasks", suggestion.getTasks()
+        ));
     }
 
     private UserProfileDto toDto(UserProfile profile) {

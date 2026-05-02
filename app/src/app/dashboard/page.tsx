@@ -9,6 +9,7 @@ import {
   UserGoal,
   Integration,
   TrendData,
+  DailySuggestionTask,
 } from "@/hooks/useDashboard";
 import {
   ArrowRight,
@@ -27,7 +28,7 @@ import {
   ObsidianIcon,
 } from "@/components/icons/BrandIcons";
 import Link from "next/link";
-import { ComponentType, SVGProps, useMemo } from "react";
+import { ComponentType, SVGProps, useMemo, useState } from "react";
 import {
   AreaChart,
   Area,
@@ -91,14 +92,6 @@ const PROVIDER_META: Record<
 };
 
 const PROVIDER_ORDER = ["github", "obsidian", "slack", "linear"];
-
-const AXIS_LABELS: Record<string, string> = {
-  dsa: "DSA",
-  projects: "Projects",
-  systemDesign: "System Design",
-  coreCs: "Core CS",
-  resume: "Resume",
-};
 
 function getIconAndTone(activity: ActivityItem) {
   const meta = PROVIDER_META[activity.provider];
@@ -370,114 +363,6 @@ function GoalsPanel({ goals }: { goals: UserGoal[] }) {
   );
 }
 
-// --- SWE Readiness Snapshot ---
-function ReadinessSnapshot({
-  profile,
-}: {
-  profile: ReturnType<typeof useDashboard>["profile"];
-}) {
-  if (!profile?.axisScores) {
-    return (
-      <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-6 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
-        <h2 className="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.6px] text-[#666666]">
-          SWE Readiness
-        </h2>
-        <p className="text-[14px] text-[#666666]">
-          Complete your SWE profile to unlock readiness tracking.
-        </p>
-        <Link
-          href="/personal"
-          className="mt-2 inline-flex items-center gap-1 text-[13px] font-medium text-[#18E299] hover:underline"
-        >
-          Get started <ArrowRight className="h-3 w-3" />
-        </Link>
-      </article>
-    );
-  }
-
-  const scores = profile.axisScores;
-  const entries = Object.entries(scores).filter(
-    ([, v]) => typeof v === "number" && v > 0,
-  ) as [string, number][];
-
-  if (entries.length === 0) {
-    return (
-      <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-6 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
-        <h2 className="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.6px] text-[#666666]">
-          SWE Readiness
-        </h2>
-        <p className="text-[14px] text-[#666666]">
-          Complete assessments on the Personal page to see your readiness
-          snapshot.
-        </p>
-        <Link
-          href="/personal"
-          className="mt-2 inline-flex items-center gap-1 text-[13px] font-medium text-[#18E299] hover:underline"
-        >
-          Start assessments <ArrowRight className="h-3 w-3" />
-        </Link>
-      </article>
-    );
-  }
-
-  const sorted = [...entries].sort((a, b) => b[1] - a[1]);
-  const best = sorted[0];
-  const worst = sorted[sorted.length - 1];
-  const resumeDecision = profile.resumeScoreBreakdown?.decision;
-
-  return (
-    <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-6 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="font-mono text-[12px] font-medium uppercase tracking-[0.6px] text-[#666666]">
-          SWE Readiness
-        </h2>
-        <Link
-          href="/personal"
-          className="text-[12px] font-medium text-[#999999] hover:text-[#18E299]"
-        >
-          Full profile
-        </Link>
-      </div>
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-[13px] text-[#333333]">
-            {AXIS_LABELS[best[0]] || best[0]}
-          </span>
-          <span className="rounded-full bg-[#d4fae8] px-2.5 py-0.5 font-mono text-[11px] font-semibold text-[#0fa76e]">
-            {best[1]} — strongest
-          </span>
-        </div>
-        {best[0] !== worst[0] && (
-          <div className="flex items-center justify-between">
-            <span className="text-[13px] text-[#333333]">
-              {AXIS_LABELS[worst[0]] || worst[0]}
-            </span>
-            <span className="rounded-full bg-red-50 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-red-600">
-              {worst[1]} — needs work
-            </span>
-          </div>
-        )}
-        {resumeDecision && (
-          <div className="flex items-center justify-between">
-            <span className="text-[13px] text-[#333333]">Resume</span>
-            <span
-              className={`rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold ${
-                resumeDecision === "ADVANCE"
-                  ? "bg-[#d4fae8] text-[#0fa76e]"
-                  : resumeDecision === "HOLD"
-                    ? "bg-amber-50 text-amber-600"
-                    : "bg-red-50 text-red-600"
-              }`}
-            >
-              {resumeDecision}
-            </span>
-          </div>
-        )}
-      </div>
-    </article>
-  );
-}
-
 // --- Integration Health Bar ---
 function HealthBar({ integrations }: { integrations: Integration[] }) {
   const syncable = integrations.filter(
@@ -561,15 +446,19 @@ export default function Dashboard() {
     metrics,
     activity,
     trendData,
-    profile,
     goals,
     integrations,
     digest,
+    suggestions,
     loadingMetrics,
     loadingActivity,
     loadingDigest,
+    loadingSuggestions,
     requestDigest,
+    regenerateSuggestions,
   } = useDashboard();
+
+  const [regenError, setRegenError] = useState("");
 
   return (
     <AuthGuard>
@@ -671,9 +560,111 @@ export default function Dashboard() {
                 </div>
               </article>
 
-              {/* Right column: Readiness + Digest */}
+              {/* Right column: Today's Focus + Digest */}
               <div className="flex flex-col gap-6">
-                <ReadinessSnapshot profile={profile} />
+                <div>
+                  <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
+                      Today&apos;s Focus
+                    </h2>
+                    <button
+                      onClick={async () => {
+                        setRegenError("");
+                        try {
+                          await regenerateSuggestions();
+                        } catch (e) {
+                          setRegenError(e instanceof Error ? e.message : "Failed");
+                        }
+                      }}
+                      disabled={loadingSuggestions}
+                      className="flex items-center gap-1.5 rounded-full border border-[rgba(0,0,0,0.08)] px-3 py-1.5 text-[12px] font-medium text-[#666] transition-colors hover:border-[rgba(0,0,0,0.15)] hover:text-[#0d0d0d] disabled:opacity-50"
+                      title="Regenerate suggestions"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${loadingSuggestions ? "animate-spin" : ""}`} />
+                      Refresh
+                    </button>
+                  </div>
+                  {regenError && (
+                    <p className="mb-3 text-[12px] text-[#d45656]">{regenError}</p>
+                  )}
+                  {loadingSuggestions && !suggestions ? (
+                    <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-5 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
+                      <div className="space-y-3">
+                        {[1, 2, 3].map((i) => (
+                          <div key={i} className="space-y-1.5">
+                            <div className="h-4 w-3/4 animate-pulse rounded bg-[#f5f5f5]" />
+                            <div className="h-3 w-full animate-pulse rounded bg-[#f5f5f5]" />
+                          </div>
+                        ))}
+                      </div>
+                    </article>
+                  ) : suggestions && suggestions.tasks.length > 0 ? (
+                    <div className="space-y-2">
+                      {suggestions.tasks.map((task: DailySuggestionTask, i: number) => {
+                        const categoryColors: Record<string, string> = {
+                          project: "bg-[#e7eefb] text-[#3772cf]",
+                          review: "bg-[#f8ebd8] text-[#c37d0d]",
+                          learning: "bg-[#d4fae8] text-[#0fa76e]",
+                          career: "bg-[#e8d8f8] text-[#7c3aed]",
+                        };
+                        const priorityLabels: Record<number, string> = { 0: "Today", 1: "This week", 2: "Nice to have" };
+                        return (
+                          <article
+                            key={i}
+                            className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-4 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="text-[14px] font-medium leading-[1.4] text-[#0d0d0d]">
+                                    {task.title}
+                                  </p>
+                                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${categoryColors[task.category] || "bg-[#f5f5f5] text-[#666]"}`}>
+                                    {task.category}
+                                  </span>
+                                </div>
+                                <p className="mt-1 text-[13px] leading-[1.5] text-[#555]">
+                                  {task.description}
+                                </p>
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                  {task.repoContext && (
+                                    <span className="rounded bg-[#f5f5f5] px-1.5 py-0.5 font-mono text-[11px] text-[#666]">
+                                      {task.repoContext}
+                                    </span>
+                                  )}
+                                  <span className="text-[11px] text-[#999]">
+                                    {priorityLabels[task.priority] || ""}
+                                  </span>
+                                </div>
+                              </div>
+                              {task.priority === 0 && (
+                                <span className="mt-0.5 shrink-0 rounded-full bg-[#f7e5e5] px-2 py-0.5 text-[10px] font-semibold text-[#d45656]">
+                                  High
+                                </span>
+                              )}
+                            </div>
+                            {task.rationale && (
+                              <p className="mt-2 border-t border-[rgba(0,0,0,0.04)] pt-2 text-[11px] leading-[1.5] text-[#999]">
+                                {task.rationale}
+                              </p>
+                            )}
+                          </article>
+                        );
+                      })}
+                      {suggestions.generatedAt && (
+                        <p className="text-right text-[11px] text-[#bbb]">
+                          Generated {new Date(suggestions.generatedAt).toLocaleTimeString()}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-5 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
+                      <p className="text-[14px] leading-[1.6] text-[#666]">
+                        Connect GitHub and sync your projects to get daily task suggestions powered by your activity, goals, and project context.
+                      </p>
+                    </article>
+                  )}
+                </div>
 
                 <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-6 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
                   <div className="mb-3 flex items-center justify-between">

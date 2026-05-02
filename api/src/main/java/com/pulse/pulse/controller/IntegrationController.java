@@ -2,8 +2,11 @@ package com.pulse.pulse.controller;
 
 import com.pulse.pulse.dto.ConnectApiKeyRequest;
 import com.pulse.pulse.dto.IntegrationDto;
+import com.pulse.pulse.entity.GitHubRepository;
 import com.pulse.pulse.entity.User;
 import com.pulse.pulse.entity.UserIntegration;
+import com.pulse.pulse.repository.GitHubRepositoryRepository;
+import com.pulse.pulse.service.GitHubProjectSyncService;
 import com.pulse.pulse.service.IntegrationService;
 import com.pulse.pulse.service.IntegrationSyncScheduler;
 import com.pulse.pulse.service.UserService;
@@ -26,6 +29,8 @@ public class IntegrationController {
 
     private final IntegrationService integrationService;
     private final IntegrationSyncScheduler syncScheduler;
+    private final GitHubProjectSyncService gitHubProjectSyncService;
+    private final GitHubRepositoryRepository gitHubRepositoryRepository;
     private final UserService userService;
     private final Map<String, IntegrationProvider> providers;
 
@@ -34,10 +39,14 @@ public class IntegrationController {
 
     public IntegrationController(IntegrationService integrationService,
                                   IntegrationSyncScheduler syncScheduler,
+                                  GitHubProjectSyncService gitHubProjectSyncService,
+                                  GitHubRepositoryRepository gitHubRepositoryRepository,
                                   UserService userService,
                                   Map<String, IntegrationProvider> providers) {
         this.integrationService = integrationService;
         this.syncScheduler = syncScheduler;
+        this.gitHubProjectSyncService = gitHubProjectSyncService;
+        this.gitHubRepositoryRepository = gitHubRepositoryRepository;
         this.userService = userService;
         this.providers = providers;
     }
@@ -180,6 +189,48 @@ public class IntegrationController {
         if (user == null) return ResponseEntity.status(401).build();
         syncScheduler.resetBackoff(user.getId(), provider);
         return ResponseEntity.ok(Map.of("status", "reset"));
+    }
+
+    @GetMapping("/github/repositories")
+    public ResponseEntity<List<Map<String, Object>>> getGitHubRepositories(Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        List<GitHubRepository> repos = gitHubRepositoryRepository.findByUserIdOrderByPushedAtDesc(user.getId());
+        List<Map<String, Object>> result = repos.stream().map(repo -> {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("repoFullName", repo.getRepoFullName());
+            map.put("repoName", repo.getRepoName());
+            map.put("description", repo.getDescription());
+            map.put("primaryLanguage", repo.getPrimaryLanguage());
+            map.put("topics", repo.getTopics());
+            map.put("languages", repo.getLanguages());
+            map.put("pushedAt", repo.getPushedAt() != null ? repo.getPushedAt().toString() : null);
+            map.put("openIssuesCount", repo.getOpenIssuesCount());
+            map.put("isFork", repo.isFork());
+            map.put("defaultBranch", repo.getDefaultBranch());
+            map.put("lastSyncedAt", repo.getLastSyncedAt() != null ? repo.getLastSyncedAt().toString() : null);
+            return map;
+        }).toList();
+
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/github/sync-projects")
+    public ResponseEntity<Map<String, Object>> syncGitHubProjects(Authentication authentication) {
+        User user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        try {
+            UserIntegration github = integrationService.getIntegration(user.getId(), "github")
+                    .orElseThrow(() -> new RuntimeException("GitHub not connected"));
+            int count = gitHubProjectSyncService.syncProjects(github);
+            return ResponseEntity.ok(Map.of("reposSynced", count));
+        } catch (Exception e) {
+            log.error("GitHub project sync error: {}", e.getMessage());
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", e.getMessage()));
+        }
     }
 
     private IntegrationDto buildConnectedDto(UserIntegration integration, Long userId) {

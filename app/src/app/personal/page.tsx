@@ -1118,9 +1118,6 @@ export default function PersonalPage() {
               </div>
 
               <div className="flex min-h-0 flex-col">
-                <h2 className="mb-4 text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
-                  Study Plan
-                </h2>
                 <div className="relative min-h-0 lg:flex-1">
                   <div
                     ref={rightScrollRef}
@@ -1130,8 +1127,14 @@ export default function PersonalPage() {
                         setShowRightFade,
                       )
                     }
-                    className="min-h-0 space-y-3 lg:h-full lg:overflow-y-auto lg:[scrollbar-width:none] lg:[-ms-overflow-style:none] lg:[&::-webkit-scrollbar]:hidden"
+                    className="min-h-0 space-y-6 lg:h-full lg:overflow-y-auto lg:[scrollbar-width:none] lg:[-ms-overflow-style:none] lg:[&::-webkit-scrollbar]:hidden"
                   >
+                    {/* Study Plan */}
+                    <div>
+                    <h2 className="mb-4 text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
+                      Study Plan
+                    </h2>
+                    <div className="space-y-3">
                     {tasks.length > 0 ? (
                       Object.entries(
                         tasks.reduce<Record<string, AiTask[]>>((acc, task) => {
@@ -1194,6 +1197,8 @@ export default function PersonalPage() {
                         </p>
                       </article>
                     )}
+                    </div>
+                    </div>
                   </div>
                   <div
                     className={`pointer-events-none absolute inset-x-0 bottom-0 hidden h-24 bg-gradient-to-t from-background via-background to-transparent transition-opacity duration-200 lg:block ${showRightFade ? "opacity-100" : "opacity-0"}`}

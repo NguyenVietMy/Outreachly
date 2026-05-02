@@ -124,6 +124,21 @@ export interface AiTask {
   orderIndex: number;
 }
 
+export interface DailySuggestionTask {
+  title: string;
+  description: string;
+  priority: 0 | 1 | 2;
+  category: "project" | "learning" | "career" | "review";
+  repoContext: string | null;
+  rationale: string;
+}
+
+export interface DailySuggestionsResponse {
+  date: string;
+  generatedAt: string;
+  tasks: DailySuggestionTask[];
+}
+
 export interface OnboardingData {
   knowledgeAreas: KnowledgeArea[];
   goals: { title: string; category: string; targetValue: number | null; unit: string }[];
@@ -136,11 +151,13 @@ export function usePersonal() {
   const [heatmap, setHeatmap] = useState<Record<string, number>>({});
   const [tasks, setTasks] = useState<AiTask[]>([]);
   const [insights, setInsights] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<DailySuggestionsResponse | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [loadingGoals, setLoadingGoals] = useState(true);
   const [loadingHeatmap, setLoadingHeatmap] = useState(true);
   const [loadingTasks, setLoadingTasks] = useState(true);
   const [loadingInsights, setLoadingInsights] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [loadingLeetCode, setLoadingLeetCode] = useState(false);
   const [loadingResume, setLoadingResume] = useState(false);
   const [loadingQuestionnaire, setLoadingQuestionnaire] = useState(false);
@@ -396,6 +413,45 @@ export function usePersonal() {
     await fetchGoals();
   };
 
+  const fetchSuggestions = useCallback(async () => {
+    if (!user) return;
+    setLoadingSuggestions(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/personal/suggestions/today`, {
+        credentials: "include",
+      });
+      if (res.ok) {
+        setSuggestions(await res.json());
+      }
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  }, [user]);
+
+  const regenerateSuggestions = async () => {
+    setLoadingSuggestions(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/personal/suggestions/regenerate`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSuggestions(data);
+        return data;
+      }
+      if (res.status === 429) {
+        const err = await res.json();
+        throw new Error(err.nextAllowedAt
+          ? `Try again after ${new Date(err.nextAllowedAt).toLocaleTimeString()}`
+          : "Too many requests");
+      }
+      throw new Error("Failed to regenerate suggestions");
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
   const requestInsights = async () => {
     setLoadingInsights(true);
     try {
@@ -417,7 +473,8 @@ export function usePersonal() {
     fetchGoals();
     fetchHeatmap();
     fetchTasks();
-  }, [fetchProfile, fetchGoals, fetchHeatmap, fetchTasks]);
+    fetchSuggestions();
+  }, [fetchProfile, fetchGoals, fetchHeatmap, fetchTasks, fetchSuggestions]);
 
   return {
     profile,
@@ -430,6 +487,8 @@ export function usePersonal() {
     loadingHeatmap,
     loadingTasks,
     loadingInsights,
+    loadingSuggestions,
+    suggestions,
     loadingLeetCode,
     loadingResume,
     scoringResume,
@@ -448,6 +507,8 @@ export function usePersonal() {
     updateGoal,
     deleteGoal,
     requestInsights,
-    refetch: () => { fetchProfile(); fetchGoals(); fetchHeatmap(); fetchTasks(); },
+    fetchSuggestions,
+    regenerateSuggestions,
+    refetch: () => { fetchProfile(); fetchGoals(); fetchHeatmap(); fetchTasks(); fetchSuggestions(); },
   };
 }

@@ -34,7 +34,13 @@
       "Bash(cp -r api/src/test/java/com/outreachly/outreachly/* api/src/test/java/com/pulse/pulse/)",
       "Bash(xargs sed *)",
       "Bash(git commit *)",
-      "Bash(timeout 10)"
+      "Bash(timeout 10)",
+      "WebFetch(domain:docs.github.com)",
+      "Bash(git status *)",
+      "Bash(git -C \"C:/Users/VietM/OneDrive/Documents/VietMySpace/Outreachly\" log --oneline --diff-filter=A -- \"**/.env*\" \"**/*.env*\" \"**/.env.local.properties\" \"**/.env.prod.properties\")",
+      "Bash(git -C \"C:/Users/VietM/OneDrive/Documents/VietMySpace/Outreachly\" log --all --oneline --name-only -- \"api/.env.local.properties\" \"api/.env.prod.properties\")",
+      "Bash(git -C \"C:/Users/VietM/OneDrive/Documents/VietMySpace/Outreachly\" status --short)",
+      "Bash(git *)"
     ]
   }
 }

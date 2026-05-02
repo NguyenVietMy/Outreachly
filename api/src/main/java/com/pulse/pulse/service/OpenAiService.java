@@ -240,6 +240,53 @@ public class OpenAiService {
             "\"total_score\":0,\"max_score\":100," +
             "\"decision\":\"ADVANCE|HOLD|REJECT\",\"flags\":[],\"summary\":\"\"}";
 
+    public Mono<String> generateDailySuggestions(String contextPrompt) {
+        String systemPrompt = "You are a daily work planning assistant for a software developer. " +
+                "Given their active projects, open work items, goals, and recent activity, " +
+                "suggest the 5-8 most impactful tasks they should work on today.\n\n" +
+                "Mix project-specific tasks with career growth tasks based on what's most urgent.\n" +
+                "Prioritize:\n" +
+                "1. Anything with an approaching deadline\n" +
+                "2. Open PRs that need attention (reviews, merge conflicts, stale drafts)\n" +
+                "3. Assigned issues that are in-progress or unstarted\n" +
+                "4. Logical next steps based on recent commit messages and project context\n" +
+                "5. Career/learning tasks to fill gaps in their readiness scores\n\n" +
+                "Return ONLY a JSON array where each object has:\n" +
+                "- \"title\": actionable task, max 80 chars\n" +
+                "- \"description\": 1-2 sentences with specific context (mention the repo, issue, or PR)\n" +
+                "- \"priority\": 0 (do today), 1 (do this week), 2 (nice to have)\n" +
+                "- \"category\": \"project\" | \"learning\" | \"career\" | \"review\"\n" +
+                "- \"repoContext\": repo full name if task is repo-specific, null otherwise\n" +
+                "- \"rationale\": one sentence explaining why this is suggested today\n\n" +
+                "Return ONLY the JSON array, no markdown fences.";
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", "gpt-4o-mini");
+        requestBody.put("messages", new Object[] {
+                Map.of("role", "system", "content", systemPrompt),
+                Map.of("role", "user", "content", contextPrompt)
+        });
+        requestBody.put("max_tokens", 1200);
+        requestBody.put("temperature", 0.5);
+
+        return webClient.post()
+                .uri("/chat/completions")
+                .bodyValue(requestBody)
+                .retrieve()
+                .bodyToMono(JsonNode.class)
+                .map(response -> {
+                    JsonNode choices = response.get("choices");
+                    if (choices != null && choices.isArray() && choices.size() > 0) {
+                        JsonNode message = choices.get(0).get("message");
+                        if (message != null) {
+                            return message.get("content").asText();
+                        }
+                    }
+                    throw new RuntimeException("No response from OpenAI");
+                })
+                .doOnError(error -> log.error("OpenAI daily suggestions error: ", error));
+    }
+
     public Mono<String> generateSectionTasks(String sectionContext) {
         String systemPrompt = "You are a CS study coach. Given a student's assessment results for a specific section, " +
                 "generate a checklist of concrete topics and skills to learn or master. " +

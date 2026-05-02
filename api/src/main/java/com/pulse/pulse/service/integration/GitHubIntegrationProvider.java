@@ -113,9 +113,10 @@ public class GitHubIntegrationProvider implements IntegrationProvider {
             String eventType;
             switch (type) {
                 case "PushEvent":
-                    int commitCount = event.path("payload").path("size").asInt(0);
+                    String pushRef = event.path("payload").path("ref").asText("");
+                    String branch = pushRef.replaceFirst("^refs/heads/", "");
                     String repo = event.path("repo").path("name").asText();
-                    title = commitCount + " commit" + (commitCount != 1 ? "s" : "") + " to " + repo;
+                    title = "Pushed to " + branch + " on " + repo;
                     eventType = "commit";
                     break;
                 case "PullRequestEvent":

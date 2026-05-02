@@ -24,6 +24,7 @@ public class IntegrationSyncScheduler {
 
     private final UserIntegrationRepository integrationRepo;
     private final IntegrationService integrationService;
+    private final GitHubProjectSyncService gitHubProjectSyncService;
     private final Map<String, IntegrationProvider> providers;
     private final ExecutorService syncExecutor;
 
@@ -69,9 +70,11 @@ public class IntegrationSyncScheduler {
 
     public IntegrationSyncScheduler(UserIntegrationRepository integrationRepo,
                                      IntegrationService integrationService,
+                                     GitHubProjectSyncService gitHubProjectSyncService,
                                      Map<String, IntegrationProvider> providers) {
         this.integrationRepo = integrationRepo;
         this.integrationService = integrationService;
+        this.gitHubProjectSyncService = gitHubProjectSyncService;
         this.providers = providers;
         this.syncExecutor = Executors.newFixedThreadPool(4);
     }
@@ -196,6 +199,14 @@ public class IntegrationSyncScheduler {
             } else {
                 log.debug("Auto-sync provider='{}' userId={}: no new events ({}ms)",
                         provider, userId, durationMs);
+            }
+
+            if ("github".equals(provider) && gitHubProjectSyncService.shouldSync(integration)) {
+                try {
+                    gitHubProjectSyncService.syncProjects(integration);
+                } catch (Exception projectSyncEx) {
+                    log.warn("Project sync failed for userId={}: {}", userId, projectSyncEx.getMessage());
+                }
             }
 
         } catch (Exception e) {

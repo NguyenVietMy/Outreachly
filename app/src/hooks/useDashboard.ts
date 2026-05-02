@@ -71,6 +71,21 @@ export interface UserGoal {
   status: string;
 }
 
+export interface DailySuggestionTask {
+  title: string;
+  description: string;
+  priority: 0 | 1 | 2;
+  category: "project" | "learning" | "career" | "review";
+  repoContext: string | null;
+  rationale: string;
+}
+
+export interface DailySuggestionsResponse {
+  date: string;
+  generatedAt: string;
+  tasks: DailySuggestionTask[];
+}
+
 export function useDashboard() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
@@ -80,9 +95,11 @@ export function useDashboard() {
   const [goals, setGoals] = useState<UserGoal[]>([]);
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [digest, setDigest] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<DailySuggestionsResponse | null>(null);
   const [loadingMetrics, setLoadingMetrics] = useState(true);
   const [loadingActivity, setLoadingActivity] = useState(true);
   const [loadingDigest, setLoadingDigest] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
@@ -96,7 +113,7 @@ export function useDashboard() {
       setLoadingMetrics(true);
       setLoadingActivity(true);
 
-      const [metricsRes, activityRes, sourceRes, trendRes, profileRes, goalsRes, integrationsRes] =
+      const [metricsRes, activityRes, sourceRes, trendRes, profileRes, goalsRes, integrationsRes, suggestionsRes] =
         await Promise.all([
           fetch(`${API_BASE_URL}/api/dashboard/metrics`, { credentials: "include" }),
           fetch(`${API_BASE_URL}/api/dashboard/activity?limit=8`, { credentials: "include" }),
@@ -105,6 +122,7 @@ export function useDashboard() {
           fetch(`${API_BASE_URL}/api/personal/profile`, { credentials: "include" }),
           fetch(`${API_BASE_URL}/api/personal/goals`, { credentials: "include" }),
           fetch(`${API_BASE_URL}/api/integrations`, { credentials: "include" }),
+          fetch(`${API_BASE_URL}/api/personal/suggestions/today`, { credentials: "include" }),
         ]);
 
       if (metricsRes.ok) setMetrics(await metricsRes.json());
@@ -114,6 +132,7 @@ export function useDashboard() {
       if (profileRes.ok) setProfile(await profileRes.json());
       if (goalsRes.ok) setGoals(await goalsRes.json());
       if (integrationsRes.ok) setIntegrations(await integrationsRes.json());
+      if (suggestionsRes.ok) setSuggestions(await suggestionsRes.json());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch dashboard data");
     } finally {
@@ -139,6 +158,30 @@ export function useDashboard() {
     }
   };
 
+  const regenerateSuggestions = async () => {
+    setLoadingSuggestions(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/personal/suggestions/regenerate`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSuggestions(data);
+        return data;
+      }
+      if (res.status === 429) {
+        const err = await res.json();
+        throw new Error(err.nextAllowedAt
+          ? `Try again after ${new Date(err.nextAllowedAt).toLocaleTimeString()}`
+          : "Too many requests");
+      }
+      throw new Error("Failed to regenerate suggestions");
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
@@ -152,11 +195,14 @@ export function useDashboard() {
     goals,
     integrations,
     digest,
+    suggestions,
     loadingMetrics,
     loadingActivity,
     loadingDigest,
+    loadingSuggestions,
     error,
     requestDigest,
+    regenerateSuggestions,
     refetch: fetchAll,
   };
 }
