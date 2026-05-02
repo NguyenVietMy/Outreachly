@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { API_BASE_URL } from "@/lib/config";
 
@@ -102,6 +102,8 @@ export function useDashboard() {
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
+  const activityRef = useRef<ActivityItem[]>([]);
+  const autoDigestFired = useRef(false);
 
   const fetchAll = useCallback(async () => {
     if (!user) {
@@ -151,6 +153,10 @@ export function useDashboard() {
       if (!res.ok) throw new Error("Failed to generate digest");
       const data = await res.json();
       setDigest(data.digest);
+      const latest = activityRef.current[0]?.timestamp;
+      if (latest) {
+        localStorage.setItem("pulse_digest_activity_ts", latest);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate digest");
     } finally {
@@ -185,6 +191,19 @@ export function useDashboard() {
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  useEffect(() => {
+    activityRef.current = activity;
+    if (activity.length === 0 || loadingDigest || autoDigestFired.current) return;
+    const lastTs = localStorage.getItem("pulse_digest_activity_ts");
+    const newCount = lastTs
+      ? activity.filter((a) => a.timestamp > lastTs).length
+      : activity.length;
+    if (newCount >= 3) {
+      autoDigestFired.current = true;
+      requestDigest();
+    }
+  }, [activity, loadingDigest]);
 
   return {
     metrics,

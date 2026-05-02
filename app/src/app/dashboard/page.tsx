@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import {
   useDashboard,
   ActivityItem,
-  UserGoal,
   Integration,
   TrendData,
   DailySuggestionTask,
@@ -15,7 +14,6 @@ import {
   ArrowRight,
   Bot,
   Loader2,
-  Target,
   AlertTriangle,
   CheckCircle2,
   Clock,
@@ -101,18 +99,6 @@ function getIconAndTone(activity: ActivityItem) {
 
 function formatEventType(eventType: string): string {
   return eventType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function daysUntil(deadline: string): number {
-  const d = new Date(deadline);
-  const now = new Date();
-  return Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-function deadlineColor(days: number): string {
-  if (days <= 3) return "bg-red-100 text-red-700";
-  if (days <= 7) return "bg-amber-100 text-amber-700";
-  return "bg-[#f5f5f5] text-[#666666]";
 }
 
 // --- Pulse Strip ---
@@ -288,81 +274,6 @@ function TrendChart({ trendData }: { trendData: TrendData }) {
   );
 }
 
-// --- Goals Panel ---
-function GoalsPanel({ goals }: { goals: UserGoal[] }) {
-  const activeGoals = goals.filter((g) => g.status === "active").slice(0, 3);
-
-  return (
-    <article className="flex h-full flex-col rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-6 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="flex items-center gap-2 font-mono text-[12px] font-medium uppercase tracking-[0.6px] text-[#666666]">
-          <Target className="h-3.5 w-3.5 text-[#18E299]" />
-          Active goals
-        </h2>
-        <Link
-          href="/personal"
-          className="text-[12px] font-medium text-[#999999] hover:text-[#18E299]"
-        >
-          Manage
-        </Link>
-      </div>
-      {activeGoals.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center">
-          <div className="text-center">
-            <p className="text-[14px] text-[#666666]">No active goals yet.</p>
-            <Link
-              href="/personal"
-              className="mt-1 inline-flex items-center gap-1 text-[13px] font-medium text-[#18E299] hover:underline"
-            >
-              Set your first goal <ArrowRight className="h-3 w-3" />
-            </Link>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-1 flex-col justify-center gap-4">
-          {activeGoals.map((goal) => {
-            const progress =
-              goal.targetValue && goal.targetValue > 0
-                ? Math.min((goal.currentValue / goal.targetValue) * 100, 100)
-                : 0;
-            const days = goal.deadline ? daysUntil(goal.deadline) : null;
-
-            return (
-              <div key={goal.id}>
-                <div className="mb-1 flex items-center justify-between">
-                  <p className="text-[13px] font-medium text-[#0d0d0d] truncate pr-2">
-                    {goal.title}
-                  </p>
-                  {days !== null && (
-                    <span
-                      className={`shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] font-medium ${deadlineColor(days)}`}
-                    >
-                      {days <= 0 ? "Overdue" : `${days}d left`}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#f0f0f0]">
-                    <div
-                      className="h-full rounded-full bg-[#18E299] transition-all duration-500"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                  {goal.targetValue && (
-                    <span className="shrink-0 font-mono text-[10px] text-[#999999]">
-                      {goal.currentValue}/{goal.targetValue} {goal.unit}
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </article>
-  );
-}
-
 // --- Integration Health Bar ---
 function HealthBar({ integrations }: { integrations: Integration[] }) {
   const syncable = integrations.filter(
@@ -446,7 +357,6 @@ export default function Dashboard() {
     metrics,
     activity,
     trendData,
-    goals,
     integrations,
     digest,
     suggestions,
@@ -490,13 +400,43 @@ export default function Dashboard() {
             {/* Row 1: Pulse Strip */}
             <PulseStrip metrics={metrics} loading={loadingMetrics} />
 
-            {/* Row 2: Trend + Goals */}
+            {/* Row 2: Trend + Digest */}
             <section className="grid gap-6 xl:grid-cols-[3fr_2fr]">
               <TrendChart trendData={trendData} />
-              <GoalsPanel goals={goals} />
+              <article className="flex h-full flex-col rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-6 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-mono text-[12px] font-medium uppercase tracking-[0.6px] text-[#666666]">
+                    AI digest
+                  </div>
+                  <Button
+                    onClick={requestDigest}
+                    disabled={loadingDigest}
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto px-2 py-1 text-[12px] font-medium text-[#999999] hover:text-[#18E299]"
+                  >
+                    {loadingDigest ? (
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    ) : (
+                      <RefreshCw className="mr-1 h-3 w-3" />
+                    )}
+                    {loadingDigest ? "Generating..." : "Generate"}
+                  </Button>
+                </div>
+                {digest ? (
+                  <p className="text-[14px] leading-[1.6] text-[#333333]">
+                    {digest}
+                  </p>
+                ) : (
+                  <p className="text-[14px] leading-[1.6] text-[#999999]">
+                    Generate an AI summary of your recent activity across all
+                    integrations.
+                  </p>
+                )}
+              </article>
             </section>
 
-            {/* Row 3: Activity + Readiness/Digest */}
+            {/* Row 3: Activity + Focus/Goals */}
             <section className="grid gap-6 xl:grid-cols-2">
               {/* Activity Feed */}
               <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-6 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
@@ -560,7 +500,7 @@ export default function Dashboard() {
                 </div>
               </article>
 
-              {/* Right column: Today's Focus + Digest */}
+              {/* Right column: Today's Focus + Goals */}
               <div className="flex flex-col gap-6">
                 <div>
                   <div className="mb-4 flex items-center justify-between">
@@ -666,37 +606,6 @@ export default function Dashboard() {
                   )}
                 </div>
 
-                <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-6 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
-                  <div className="mb-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2 font-mono text-[12px] font-medium uppercase tracking-[0.6px] text-[#666666]">
-                      AI digest
-                    </div>
-                    <Button
-                      onClick={requestDigest}
-                      disabled={loadingDigest}
-                      variant="ghost"
-                      size="sm"
-                      className="h-auto px-2 py-1 text-[12px] font-medium text-[#999999] hover:text-[#18E299]"
-                    >
-                      {loadingDigest ? (
-                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                      ) : (
-                        <RefreshCw className="mr-1 h-3 w-3" />
-                      )}
-                      {loadingDigest ? "Generating..." : "Generate"}
-                    </Button>
-                  </div>
-                  {digest ? (
-                    <p className="text-[14px] leading-[1.6] text-[#333333]">
-                      {digest}
-                    </p>
-                  ) : (
-                    <p className="text-[14px] leading-[1.6] text-[#999999]">
-                      Generate an AI summary of your recent activity across all
-                      integrations.
-                    </p>
-                  )}
-                </article>
               </div>
             </section>
 
