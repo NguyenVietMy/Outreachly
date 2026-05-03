@@ -10,10 +10,18 @@ export interface Integration {
   accountValue: string | null;
   eventsLabel: string | null;
   eventsValue: string | null;
-  lastSyncedAt: string | null;
+  lastActivityLabel: string | null;
+  scopeSummary: string | null;
+  selectedResourceIds: string[];
   activitySparkline: number[];
-  consecutiveFailures: number;
-  autoSyncEnabled: boolean;
+  webhookStatus: string;
+  webhookError: string | null;
+}
+
+export interface IntegrationResourceOption {
+  id: string;
+  label: string;
+  type: string;
 }
 
 export function useIntegrations() {
@@ -59,18 +67,14 @@ export function useIntegrations() {
     window.location.href = data.url;
   };
 
-  const connectApiKey = async (
-    provider: string,
-    apiKey: string | null,
-    metadata?: Record<string, unknown>
-  ) => {
+  const connect = async (provider: string) => {
     const res = await fetch(
       `${API_BASE_URL}/api/integrations/${provider}/connect`,
       {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey, metadata }),
+        body: JSON.stringify({}),
       }
     );
     if (!res.ok) {
@@ -78,6 +82,36 @@ export function useIntegrations() {
       throw new Error(text || "Failed to connect");
     }
     await fetchIntegrations();
+  };
+
+  const getResources = async (provider: string) => {
+    const res = await fetch(
+      `${API_BASE_URL}/api/integrations/${provider}/resources`,
+      { credentials: "include" }
+    );
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || "Failed to load resources");
+    }
+    return (await res.json()) as IntegrationResourceOption[];
+  };
+
+  const updateScope = async (provider: string, selectedResourceIds: string[]) => {
+    const res = await fetch(
+      `${API_BASE_URL}/api/integrations/${provider}/scope`,
+      {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ selectedResourceIds }),
+      }
+    );
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || "Failed to update scope");
+    }
+    await fetchIntegrations();
+    return (await res.json()) as Integration;
   };
 
   const disconnect = async (provider: string) => {
@@ -112,7 +146,9 @@ export function useIntegrations() {
     error,
     refetch: fetchIntegrations,
     connectOAuth,
-    connectApiKey,
+    connect,
+    getResources,
+    updateScope,
     disconnect,
     sync,
   };

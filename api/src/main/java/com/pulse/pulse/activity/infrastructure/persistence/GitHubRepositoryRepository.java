@@ -19,6 +19,8 @@ public interface GitHubRepositoryRepository extends JpaRepository<GitHubReposito
 
     Optional<GitHubRepository> findByUserIdAndRepoFullName(Long userId, String repoFullName);
 
+    void deleteByUserId(Long userId);
+
     @Query("SELECT r FROM GitHubRepository r WHERE r.userId = :userId AND r.pushedAt >= :since ORDER BY r.pushedAt DESC")
     List<GitHubRepository> findActiveByUserId(@Param("userId") Long userId, @Param("since") LocalDateTime since);
 

@@ -6,15 +6,25 @@ import AuthGuard from "@/components/AuthGuard";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { useIntegrations, Integration } from "@/hooks/useIntegrations";
 import {
-  Clock3,
+  useIntegrations,
+  Integration,
+  IntegrationResourceOption,
+} from "@/hooks/useIntegrations";
+import {
+  Check,
   Link2,
   Loader2,
   PanelsTopLeft,
   RefreshCw,
+  Settings2,
 } from "lucide-react";
-import { GitHubIcon, SlackIcon, LinearIcon, ObsidianIcon } from "@/components/icons/BrandIcons";
+import {
+  GitHubIcon,
+  SlackIcon,
+  LinearIcon,
+  ObsidianIcon,
+} from "@/components/icons/BrandIcons";
 import { ComponentType, SVGProps } from "react";
 
 type IconComponent = ComponentType<{ className?: string } & SVGProps<SVGSVGElement>>;
@@ -28,50 +38,53 @@ const PROVIDER_CONFIG: Record<
     iconTone: string;
     pitch: string;
     connectLabel: string;
-    connectType: "oauth" | "apikey" | "obsidian";
-    syncedAtDisconnected: string;
-    connectedSubtext?: string;
+    connectType: "oauth" | "manual";
+    disconnectedHint: string;
   }
 > = {
   github: {
     name: "GitHub",
-    description: "Commits, PRs, issues",
+    description: "Repo webhooks, commits, PRs, issues",
     icon: GitHubIcon,
     iconTone: "bg-[#d4fae8] text-[#0fa76e]",
-    pitch: "Track your commits, pull requests, and issues. See your coding activity across all repositories.",
-    connectLabel: "Connect GitHub",
+    pitch:
+      "Install the Pulse GitHub App, choose the repositories you want to track, and stream repo activity into your workspace.",
+    connectLabel: "Install GitHub App",
     connectType: "oauth",
-    syncedAtDisconnected: "OAuth - repo access",
+    disconnectedHint: "GitHub App install required",
   },
   obsidian: {
     name: "Obsidian",
-    description: "Notes via Git sync",
+    description: "Vault activity through a Git-backed repo",
     icon: ObsidianIcon,
     iconTone: "bg-[#e5e5e5] text-[#6c31e3]",
-    pitch: "Track your Obsidian vault activity through its Git sync repo. Requires GitHub to be connected first.",
-    connectLabel: "Connect Obsidian",
-    connectType: "obsidian",
-    syncedAtDisconnected: "Requires GitHub connection",
+    pitch:
+      "Pick one GitHub-tracked repo as your vault source so note edits flow in without separate polling.",
+    connectLabel: "Enable Obsidian",
+    connectType: "manual",
+    disconnectedHint: "Requires GitHub first",
   },
   slack: {
     name: "Slack",
-    description: "Messages, threads, channels",
+    description: "Channel message events",
     icon: SlackIcon,
     iconTone: "bg-[#f8ebd8] text-[#c37d0d]",
-    pitch: "Track your message activity, surface active threads, and include Slack highlights in your daily digest.",
+    pitch:
+      "Install the Slack app, then limit tracking to the channels that should contribute activity to Pulse.",
     connectLabel: "Connect Slack",
     connectType: "oauth",
-    syncedAtDisconnected: "OAuth - workspace access",
+    disconnectedHint: "OAuth workspace install",
   },
   linear: {
     name: "Linear",
-    description: "Issues, cycles, projects",
+    description: "Team issues, projects, cycles",
     icon: LinearIcon,
     iconTone: "bg-[#f7e5e5] text-[#d45656]",
-    pitch: "See tickets you closed, issues you opened, and cycle progress alongside your code and notes.",
+    pitch:
+      "Authorize the Linear app and choose the teams whose activity should appear in your Pulse feed.",
     connectLabel: "Connect Linear",
-    connectType: "apikey",
-    syncedAtDisconnected: "API key - read-only",
+    connectType: "oauth",
+    disconnectedHint: "OAuth workspace install",
   },
 };
 
@@ -79,7 +92,6 @@ const PROVIDER_ORDER = ["github", "obsidian", "slack", "linear"];
 
 const comingSoon = [
   { name: "Notion", description: "Pages, databases, updates", icon: PanelsTopLeft },
-  { name: "Toggl", description: "Time tracking, projects", icon: Clock3 },
 ];
 
 export default function IntegrationsPage() {
@@ -91,22 +103,33 @@ export default function IntegrationsPage() {
 }
 
 function IntegrationsContent() {
-  const { integrations, loading, connectOAuth, connectApiKey, disconnect, sync, refetch } =
-    useIntegrations();
+  const {
+    integrations,
+    loading,
+    connectOAuth,
+    connect,
+    getResources,
+    updateScope,
+    disconnect,
+    sync,
+    refetch,
+  } = useIntegrations();
   const { toast } = useToast();
   const searchParams = useSearchParams();
 
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
   const [syncingProvider, setSyncingProvider] = useState<string | null>(null);
-  const [apiKeyInput, setApiKeyInput] = useState("");
-  const [repoInput, setRepoInput] = useState("");
-  const [showInputFor, setShowInputFor] = useState<string | null>(null);
+  const [loadingResourcesFor, setLoadingResourcesFor] = useState<string | null>(null);
+  const [savingScopeFor, setSavingScopeFor] = useState<string | null>(null);
+  const [scopeEditorFor, setScopeEditorFor] = useState<string | null>(null);
+  const [resourceOptions, setResourceOptions] = useState<Record<string, IntegrationResourceOption[]>>({});
+  const [scopeDrafts, setScopeDrafts] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     const connected = searchParams.get("connected");
     const error = searchParams.get("error");
     if (connected) {
-      toast({ title: `${PROVIDER_CONFIG[connected]?.name || connected} connected!` });
+      toast({ title: `${PROVIDER_CONFIG[connected]?.name || connected} connected` });
       refetch();
       window.history.replaceState({}, "", "/integrations");
     }
@@ -120,8 +143,8 @@ function IntegrationsContent() {
   }, [searchParams, toast, refetch]);
 
   const integrationMap: Record<string, Integration> = {};
-  for (const i of integrations) {
-    integrationMap[i.provider] = i;
+  for (const integration of integrations) {
+    integrationMap[integration.provider] = integration;
   }
 
   const connectedCount = integrations.filter((i) => i.status === "connected").length;
@@ -133,44 +156,70 @@ function IntegrationsContent() {
     try {
       if (config.connectType === "oauth") {
         await connectOAuth(provider);
-      } else if (config.connectType === "apikey") {
-        setShowInputFor(provider);
-        setConnectingProvider(null);
-      } else if (config.connectType === "obsidian") {
-        setShowInputFor(provider);
-        setConnectingProvider(null);
+        return;
       }
-    } catch {
-      toast({ title: "Connection failed", variant: "destructive" });
-      setConnectingProvider(null);
-    }
-  };
 
-  const handleApiKeySubmit = async (provider: string) => {
-    setConnectingProvider(provider);
-    try {
-      await connectApiKey(provider, apiKeyInput, undefined);
-      toast({ title: `${PROVIDER_CONFIG[provider].name} connected!` });
-      setShowInputFor(null);
-      setApiKeyInput("");
-    } catch {
-      toast({ title: "Invalid API key", variant: "destructive" });
+      await connect(provider);
+      toast({ title: `${config.name} connected` });
+    } catch (error) {
+      toast({
+        title: error instanceof Error ? error.message : "Connection failed",
+        variant: "destructive",
+      });
     } finally {
       setConnectingProvider(null);
     }
   };
 
-  const handleObsidianSubmit = async () => {
-    setConnectingProvider("obsidian");
+  const openScopeEditor = async (provider: string, integration: Integration) => {
+    setLoadingResourcesFor(provider);
     try {
-      await connectApiKey("obsidian", null, { repoFullName: repoInput });
-      toast({ title: "Obsidian connected!" });
-      setShowInputFor(null);
-      setRepoInput("");
-    } catch {
-      toast({ title: "Failed to connect Obsidian. Is GitHub connected?", variant: "destructive" });
+      const options = await getResources(provider);
+      setResourceOptions((current) => ({ ...current, [provider]: options }));
+      setScopeDrafts((current) => ({
+        ...current,
+        [provider]: integration.selectedResourceIds ?? [],
+      }));
+      setScopeEditorFor(provider);
+    } catch (error) {
+      toast({
+        title: error instanceof Error ? error.message : "Failed to load scope options",
+        variant: "destructive",
+      });
     } finally {
-      setConnectingProvider(null);
+      setLoadingResourcesFor(null);
+    }
+  };
+
+  const toggleDraftSelection = (provider: string, resourceId: string) => {
+    setScopeDrafts((current) => {
+      const existing = current[provider] ?? [];
+      const alreadySelected = existing.includes(resourceId);
+      if (provider === "obsidian") {
+        return { ...current, [provider]: alreadySelected ? [] : [resourceId] };
+      }
+      return {
+        ...current,
+        [provider]: alreadySelected
+          ? existing.filter((id) => id !== resourceId)
+          : [...existing, resourceId],
+      };
+    });
+  };
+
+  const handleSaveScope = async (provider: string) => {
+    setSavingScopeFor(provider);
+    try {
+      await updateScope(provider, scopeDrafts[provider] ?? []);
+      toast({ title: `${PROVIDER_CONFIG[provider].name} scope updated` });
+      setScopeEditorFor(null);
+    } catch (error) {
+      toast({
+        title: error instanceof Error ? error.message : "Failed to save scope",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingScopeFor(null);
     }
   };
 
@@ -178,6 +227,7 @@ function IntegrationsContent() {
     try {
       await disconnect(provider);
       toast({ title: `${PROVIDER_CONFIG[provider].name} disconnected` });
+      setScopeEditorFor((current) => (current === provider ? null : current));
     } catch {
       toast({ title: "Failed to disconnect", variant: "destructive" });
     }
@@ -187,9 +237,9 @@ function IntegrationsContent() {
     setSyncingProvider(provider);
     try {
       const result = await sync(provider);
-      toast({ title: `Synced ${result?.newEvents ?? 0} new events` });
+      toast({ title: `Synced ${result.newEvents} new events` });
     } catch {
-      toast({ title: "Sync failed", variant: "destructive" });
+      toast({ title: "Manual sync failed", variant: "destructive" });
     } finally {
       setSyncingProvider(null);
     }
@@ -204,8 +254,9 @@ function IntegrationsContent() {
               <h1 className="text-[40px] font-semibold leading-[1.1] tracking-[-0.8px] text-[#0d0d0d]">
                 Integrations
               </h1>
-              <p className="mt-3 text-[16px] leading-[1.5] text-[#666666]">
-                Connect your tools. Activity syncs automatically in the background.
+              <p className="mt-3 max-w-3xl text-[16px] leading-[1.6] text-[#666666]">
+                Connect your tools, choose the repos, channels, and teams that matter,
+                and let activity arrive through webhooks instead of background polling.
               </p>
             </section>
 
@@ -219,11 +270,15 @@ function IntegrationsContent() {
                   const integration = integrationMap[providerKey];
                   const isConnected = integration?.status === "connected";
                   const Icon = config.icon;
+                  const statusTone =
+                    integration?.webhookStatus === "active"
+                      ? "bg-[#d4fae8] text-[#0fa76e]"
+                      : "bg-[#fff4db] text-[#a16207]";
 
                   return (
                     <article
                       key={providerKey}
-                      className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-6 shadow-[rgba(0,0,0,0.03)_0px_2px_4px] transition-colors hover:border-[rgba(0,0,0,0.08)]"
+                      className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-6 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3">
@@ -244,9 +299,7 @@ function IntegrationsContent() {
                         <span
                           className={
                             "inline-flex items-center gap-1 rounded-full px-3 py-1 font-mono text-[12px] font-semibold uppercase tracking-[0.6px] " +
-                            (isConnected
-                              ? "bg-[#d4fae8] text-[#0fa76e]"
-                              : "bg-[#f5f5f5] text-[#666666]")
+                            (isConnected ? "bg-[#d4fae8] text-[#0fa76e]" : "bg-[#f5f5f5] text-[#666666]")
                           }
                         >
                           <span
@@ -262,7 +315,7 @@ function IntegrationsContent() {
                       {isConnected && integration ? (
                         <div className="mt-5 space-y-3">
                           {integration.accountLabel && integration.accountValue && (
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between gap-3">
                               <p className="text-[14px] leading-[1.5] text-[#666666]">
                                 {integration.accountLabel}
                               </p>
@@ -271,8 +324,8 @@ function IntegrationsContent() {
                               </p>
                             </div>
                           )}
-                          {integration.supportsSync && integration.eventsLabel && integration.eventsValue && (
-                            <div className="flex items-center justify-between">
+                          {integration.eventsLabel && integration.eventsValue && (
+                            <div className="flex items-center justify-between gap-3">
                               <p className="text-[14px] leading-[1.5] text-[#666666]">
                                 {integration.eventsLabel}
                               </p>
@@ -281,89 +334,112 @@ function IntegrationsContent() {
                               </p>
                             </div>
                           )}
-                          {integration.supportsSync && integration.activitySparkline.length > 0 ? (
-                            <div className="flex items-center justify-between">
-                              <p className="text-[14px] leading-[1.5] text-[#666666]">Activity</p>
-                              <div className="flex h-6 items-end gap-1">
-                                {integration.activitySparkline.map((value, idx) => {
-                                  const max = Math.max(...integration.activitySparkline, 1);
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-[14px] leading-[1.5] text-[#666666]">Scope</p>
+                            <p className="font-mono text-[12px] font-medium text-[#333333]">
+                              {integration.scopeSummary || "Not configured"}
+                            </p>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-[14px] leading-[1.5] text-[#666666]">Webhook</p>
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.6px] ${statusTone}`}
+                            >
+                              <span
+                                className={
+                                  "h-1.5 w-1.5 rounded-full " +
+                                  (integration.webhookStatus === "active"
+                                    ? "bg-[#18E299]"
+                                    : "bg-[#d97706]")
+                                }
+                              />
+                              {integration.webhookStatus.replace(/_/g, " ")}
+                            </span>
+                          </div>
+                          {integration.webhookError && (
+                            <p className="rounded-[12px] bg-[#fff4db] px-3 py-2 text-[12px] leading-[1.5] text-[#9a6700]">
+                              {integration.webhookError}
+                            </p>
+                          )}
+
+                          {scopeEditorFor === providerKey && (
+                            <div className="rounded-[14px] border border-[rgba(0,0,0,0.06)] bg-[#fafafa] p-4">
+                              <div className="mb-3 flex items-center justify-between gap-3">
+                                <div>
+                                  <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.6px] text-[#666666]">
+                                    Select scope
+                                  </p>
+                                  <p className="mt-1 text-[13px] leading-[1.5] text-[#666666]">
+                                    {providerKey === "obsidian"
+                                      ? "Choose one Git-backed vault repo."
+                                      : "Only selected resources will feed activity into Pulse."}
+                                  </p>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  className="h-auto px-2 py-1 text-[12px] text-[#666666]"
+                                  onClick={() => setScopeEditorFor(null)}
+                                >
+                                  Close
+                                </Button>
+                              </div>
+
+                              <div className="max-h-[220px] space-y-2 overflow-y-auto">
+                                {(resourceOptions[providerKey] ?? []).map((option) => {
+                                  const checked = (scopeDrafts[providerKey] ?? []).includes(option.id);
                                   return (
-                                    <div
-                                      key={`${providerKey}-bar-${idx}`}
-                                      className="w-1.5 rounded-[2px]"
-                                      style={{
-                                        height: `${(value / max) * 100}%`,
-                                        minHeight: value > 0 ? "2px" : "0px",
-                                        backgroundColor:
-                                          config.iconTone.includes("0fa76e")
-                                            ? "#18E299"
-                                            : config.iconTone.includes("3772cf")
-                                              ? "#3772cf"
-                                              : config.iconTone.includes("c37d0d")
-                                                ? "#c37d0d"
-                                                : "#d45656",
-                                      }}
-                                    />
+                                    <label
+                                      key={option.id}
+                                      className="flex cursor-pointer items-center gap-3 rounded-[12px] border border-[rgba(0,0,0,0.05)] bg-white px-3 py-2"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={() => toggleDraftSelection(providerKey, option.id)}
+                                        className="h-4 w-4 rounded border-[rgba(0,0,0,0.2)]"
+                                      />
+                                      <div className="min-w-0">
+                                        <p className="text-[14px] leading-[1.4] text-[#0d0d0d]">
+                                          {option.label}
+                                        </p>
+                                        <p className="font-mono text-[11px] uppercase tracking-[0.6px] text-[#999999]">
+                                          {option.type}
+                                        </p>
+                                      </div>
+                                      {checked && <Check className="ml-auto h-4 w-4 text-[#18E299]" />}
+                                    </label>
                                   );
                                 })}
                               </div>
+
+                              <div className="mt-4 flex items-center justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  className="h-auto rounded-full px-4 py-2 text-[14px]"
+                                  onClick={() => setScopeEditorFor(null)}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  className="h-auto rounded-full bg-[#0d0d0d] px-4 py-2 text-[14px] text-white"
+                                  onClick={() => handleSaveScope(providerKey)}
+                                  disabled={savingScopeFor === providerKey}
+                                >
+                                  {savingScopeFor === providerKey ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Settings2 className="mr-2 h-4 w-4" />
+                                  )}
+                                  Save scope
+                                </Button>
+                              </div>
                             </div>
-                          ) : (
-                            <p className="text-[14px] leading-[1.5] text-[#666666]">
-                              {config.connectedSubtext || "Connected"}
-                            </p>
                           )}
                         </div>
                       ) : (
-                        <>
-                          <p className="mt-5 text-[14px] leading-[1.5] text-[#666666]">
-                            {config.pitch}
-                          </p>
-                          {showInputFor === providerKey && config.connectType === "apikey" && (
-                            <div className="mt-3 flex gap-2">
-                              <input
-                                type="password"
-                                placeholder="Paste your API key"
-                                value={apiKeyInput}
-                                onChange={(e) => setApiKeyInput(e.target.value)}
-                                className="flex-1 rounded-lg border border-[rgba(0,0,0,0.1)] px-3 py-2 text-[14px] outline-none focus:border-[#0d0d0d]"
-                              />
-                              <Button
-                                onClick={() => handleApiKeySubmit(providerKey)}
-                                disabled={!apiKeyInput || connectingProvider === providerKey}
-                                className="h-auto rounded-lg bg-[#0d0d0d] px-4 py-2 text-[14px] text-white"
-                              >
-                                {connectingProvider === providerKey ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  "Connect"
-                                )}
-                              </Button>
-                            </div>
-                          )}
-                          {showInputFor === providerKey && config.connectType === "obsidian" && (
-                            <div className="mt-3 flex gap-2">
-                              <input
-                                type="text"
-                                placeholder="owner/vault-repo"
-                                value={repoInput}
-                                onChange={(e) => setRepoInput(e.target.value)}
-                                className="flex-1 rounded-lg border border-[rgba(0,0,0,0.1)] px-3 py-2 text-[14px] outline-none focus:border-[#0d0d0d]"
-                              />
-                              <Button
-                                onClick={handleObsidianSubmit}
-                                disabled={!repoInput || connectingProvider === "obsidian"}
-                                className="h-auto rounded-lg bg-[#0d0d0d] px-4 py-2 text-[14px] text-white"
-                              >
-                                {connectingProvider === "obsidian" ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  "Connect"
-                                )}
-                              </Button>
-                            </div>
-                          )}
-                        </>
+                        <p className="mt-5 text-[14px] leading-[1.6] text-[#666666]">
+                          {config.pitch}
+                        </p>
                       )}
 
                       <div className="my-5 h-px bg-[rgba(0,0,0,0.05)]" />
@@ -371,26 +447,37 @@ function IntegrationsContent() {
                       <div className="flex items-center justify-between gap-3">
                         <p className="font-mono text-[12px] font-medium uppercase tracking-[0.6px] text-[#666666]">
                           {isConnected
-                            ? integration?.lastSyncedAt || "Never synced"
-                            : config.syncedAtDisconnected}
+                            ? integration?.lastActivityLabel || "Waiting for events"
+                            : config.disconnectedHint}
                         </p>
                         {isConnected ? (
-                          <div className="flex gap-2">
-                            {integration?.supportsSync && (
-                              <Button
-                                variant="outline"
-                                onClick={() => handleSync(providerKey)}
-                                disabled={syncingProvider === providerKey}
-                                className="h-auto rounded-full border-[rgba(0,0,0,0.08)] bg-white px-4 py-2 text-[15px] font-medium text-[#0d0d0d]"
-                              >
-                                {syncingProvider === providerKey ? (
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                  <RefreshCw className="mr-2 h-4 w-4" />
-                                )}
-                                Sync
-                              </Button>
-                            )}
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              onClick={() => openScopeEditor(providerKey, integration!)}
+                              disabled={loadingResourcesFor === providerKey}
+                              className="h-auto rounded-full border-[rgba(0,0,0,0.08)] bg-white px-4 py-2 text-[15px] font-medium text-[#0d0d0d]"
+                            >
+                              {loadingResourcesFor === providerKey ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Settings2 className="mr-2 h-4 w-4" />
+                              )}
+                              Scope
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => handleSync(providerKey)}
+                              disabled={syncingProvider === providerKey}
+                              className="h-auto rounded-full border-[rgba(0,0,0,0.08)] bg-white px-4 py-2 text-[15px] font-medium text-[#0d0d0d]"
+                            >
+                              {syncingProvider === providerKey ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                              )}
+                              Sync
+                            </Button>
                             <Button
                               variant="outline"
                               onClick={() => handleDisconnect(providerKey)}

@@ -49,19 +49,18 @@ public class UserIntegration {
     @Column(name = "last_synced_at")
     private LocalDateTime lastSyncedAt;
 
-    @Column(name = "auto_sync_enabled", nullable = false)
+    @Column(name = "webhook_status", nullable = false, length = 30)
     @Builder.Default
-    private Boolean autoSyncEnabled = true;
+    private String webhookStatus = "pending";
 
-    @Column(name = "consecutive_failures", nullable = false)
-    @Builder.Default
-    private Integer consecutiveFailures = 0;
+    @Column(name = "last_webhook_received_at")
+    private LocalDateTime lastWebhookReceivedAt;
 
-    @Column(name = "next_sync_after")
-    private LocalDateTime nextSyncAfter;
+    @Column(name = "last_webhook_error_at")
+    private LocalDateTime lastWebhookErrorAt;
 
-    @Column(name = "last_sync_duration_ms")
-    private Long lastSyncDurationMs;
+    @Column(name = "last_webhook_error", columnDefinition = "TEXT")
+    private String lastWebhookError;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

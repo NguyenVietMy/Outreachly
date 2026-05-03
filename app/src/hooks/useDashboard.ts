@@ -33,9 +33,11 @@ export interface Integration {
   provider: string;
   status: "connected" | "disconnected";
   supportsSync: boolean;
-  lastSyncedAt: string | null;
-  consecutiveFailures: number;
-  autoSyncEnabled: boolean;
+  lastActivityLabel: string | null;
+  scopeSummary: string | null;
+  selectedResourceIds: string[];
+  webhookStatus: string;
+  webhookError: string | null;
 }
 
 export interface AxisScores {

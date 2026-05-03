@@ -14,9 +14,6 @@ import {
   ArrowRight,
   Bot,
   Loader2,
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
   RefreshCw,
 } from "lucide-react";
 import {
@@ -274,75 +271,33 @@ function TrendChart({ trendData }: { trendData: TrendData }) {
   );
 }
 
-// --- Integration Health Bar ---
+// --- Integration Status Bar ---
 function HealthBar({ integrations }: { integrations: Integration[] }) {
-  const syncable = integrations.filter(
+  const connected = integrations.filter(
     (i) => i.supportsSync && i.status === "connected",
   );
 
-  if (syncable.length === 0) return null;
-
-  const allHealthy = syncable.every((i) => i.consecutiveFailures === 0);
-  if (allHealthy && syncable.every((i) => i.lastSyncedAt)) {
-    return (
-      <section className="hidden xl:flex items-center gap-4 rounded-[12px] border border-[rgba(0,0,0,0.03)] bg-[#fafafa] px-4 py-2.5">
-        <CheckCircle2 className="h-3.5 w-3.5 text-[#18E299]" />
-        <div className="flex flex-wrap items-center gap-4">
-          {syncable.map((i) => {
-            const meta = PROVIDER_META[i.provider];
-            return (
-              <span
-                key={i.provider}
-                className="flex items-center gap-1.5 text-[12px] text-[#999999]"
-              >
-                <span
-                  className="h-1.5 w-1.5 rounded-full"
-                  style={{ backgroundColor: meta?.color ?? "#ccc" }}
-                />
-                {meta?.label ?? i.provider}
-                <Clock className="h-3 w-3" />
-                <span className="font-mono text-[11px]">{i.lastSyncedAt}</span>
-              </span>
-            );
-          })}
-        </div>
-      </section>
-    );
-  }
+  if (connected.length === 0) return null;
 
   return (
     <section className="hidden xl:flex items-center gap-4 rounded-[12px] border border-[rgba(0,0,0,0.03)] bg-[#fafafa] px-4 py-2.5">
       <div className="flex flex-wrap items-center gap-4">
-        {syncable.map((i) => {
-          const meta = PROVIDER_META[i.provider];
-          const hasFailed = i.consecutiveFailures > 0;
+        {connected.map((integration) => {
+          const meta = PROVIDER_META[integration.provider];
+          const active = integration.webhookStatus === "active";
           return (
             <span
-              key={i.provider}
-              className={`flex items-center gap-1.5 text-[12px] ${hasFailed ? "text-amber-600" : "text-[#999999]"}`}
+              key={integration.provider}
+              className={`flex items-center gap-1.5 text-[12px] ${active ? "text-[#999999]" : "text-amber-600"}`}
             >
-              {hasFailed ? (
-                <AlertTriangle className="h-3 w-3" />
-              ) : (
-                <span
-                  className="h-1.5 w-1.5 rounded-full"
-                  style={{ backgroundColor: meta?.color ?? "#ccc" }}
-                />
-              )}
-              {meta?.label ?? i.provider}
-              {hasFailed ? (
-                <span className="font-mono text-[11px]">
-                  {i.consecutiveFailures} failure
-                  {i.consecutiveFailures > 1 ? "s" : ""}
-                </span>
-              ) : (
-                <>
-                  <Clock className="h-3 w-3" />
-                  <span className="font-mono text-[11px]">
-                    {i.lastSyncedAt ?? "Never"}
-                  </span>
-                </>
-              )}
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: active ? meta?.color ?? "#ccc" : "#d97706" }}
+              />
+              {meta?.label ?? integration.provider}
+              <span className="font-mono text-[11px]">
+                {integration.lastActivityLabel ?? integration.scopeSummary ?? "Waiting"}
+              </span>
             </span>
           );
         })}

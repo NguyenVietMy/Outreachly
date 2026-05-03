@@ -14,7 +14,12 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @Slf4j
@@ -32,71 +37,69 @@ public class GitHubProjectSyncService {
     private static final long PROJECT_SYNC_COOLDOWN_HOURS = 6;
 
     public GitHubProjectSyncService(@Qualifier("gitHubWebClient") WebClient gitHubWebClient,
-                                     GitHubRepositoryRepository repoRepository) {
+                                    GitHubRepositoryRepository repoRepository) {
         this.gitHubWebClient = gitHubWebClient;
         this.repoRepository = repoRepository;
     }
 
     public boolean shouldSync(GitHubProjectSyncRequest request) {
         Map<String, Object> meta = request.metadata();
-        if (meta == null) return true;
+        if (meta == null) {
+            return true;
+        }
         Object lastRun = meta.get("projectSyncLastRun");
-        if (lastRun == null) return true;
+        if (lastRun == null) {
+            return true;
+        }
         LocalDateTime lastRunTime = LocalDateTime.parse(lastRun.toString());
         return lastRunTime.plusHours(PROJECT_SYNC_COOLDOWN_HOURS).isBefore(LocalDateTime.now());
     }
 
     @Transactional
     public int syncProjects(GitHubProjectSyncRequest request) {
-        String token = request.accessToken();
-        Long userId = request.userId();
+        return syncSelectedRepositories(request.userId(), request.accessToken(), request.selectedRepositories());
+    }
 
-        List<JsonNode> repos = fetchUserRepos(token);
-        if (repos.isEmpty()) {
-            log.debug("No active repos found for userId={}", userId);
+    @Transactional
+    public void clearRepositories(Long userId) {
+        repoRepository.deleteByUserId(userId);
+    }
+
+    @Transactional
+    public int syncSelectedRepositories(Long userId, String token, List<String> selectedRepositories) {
+        if (selectedRepositories == null || selectedRepositories.isEmpty()) {
+            repoRepository.deleteByUserId(userId);
             return 0;
         }
 
-        LocalDateTime ninetyDaysAgo = LocalDateTime.now().minusDays(90);
         LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
-        List<String> activeRepoNames = new ArrayList<>();
+        List<String> trackedRepos = new ArrayList<>();
         int synced = 0;
 
-        for (JsonNode repoNode : repos) {
-            String fullName = repoNode.path("full_name").asText();
-            String pushedAtStr = repoNode.path("pushed_at").asText("");
-            if (pushedAtStr.isEmpty()) continue;
+        for (String fullName : selectedRepositories) {
+            String[] parts = fullName.split("/");
+            if (parts.length != 2) {
+                continue;
+            }
 
-            LocalDateTime pushedAt = parseGitHubTimestamp(pushedAtStr);
-            if (pushedAt.isBefore(ninetyDaysAgo)) continue;
-            if (repoNode.path("fork").asBoolean(false)) continue;
+            JsonNode repoNode = fetchRepository(token, parts[0], parts[1]);
+            if (repoNode == null) {
+                continue;
+            }
 
-            activeRepoNames.add(fullName);
-
+            trackedRepos.add(fullName);
             GitHubRepository repo = repoRepository.findByUserIdAndRepoFullName(userId, fullName)
                     .orElse(GitHubRepository.builder()
                             .userId(userId)
                             .repoFullName(fullName)
                             .build());
 
-            repo.setRepoName(repoNode.path("name").asText());
-            repo.setDescription(repoNode.path("description").asText(null));
-            repo.setPrimaryLanguage(repoNode.path("language").asText(null));
-            repo.setPushedAt(pushedAt);
-            repo.setOpenIssuesCount(repoNode.path("open_issues_count").asInt(0));
-            repo.setFork(false);
-            repo.setDefaultBranch(repoNode.path("default_branch").asText("main"));
+            populateRepositorySummary(repo, repoNode);
 
-            List<String> topics = new ArrayList<>();
-            JsonNode topicsNode = repoNode.path("topics");
-            if (topicsNode.isArray()) {
-                for (JsonNode t : topicsNode) topics.add(t.asText());
-            }
-            repo.setTopics(topics);
-
-            boolean isRecentlyActive = pushedAt.isAfter(sevenDaysAgo);
+            LocalDateTime pushedAt = repo.getPushedAt();
+            boolean isRecentlyActive = pushedAt != null && pushedAt.isAfter(sevenDaysAgo);
             if (isRecentlyActive && synced < MAX_ACTIVE_REPOS) {
-                syncRepoDetails(repo, token);
+                syncRepoDetails(repo, token, parts[0], parts[1]);
                 synced++;
             }
 
@@ -104,45 +107,56 @@ public class GitHubProjectSyncService {
             repoRepository.save(repo);
         }
 
-        if (!activeRepoNames.isEmpty()) {
-            repoRepository.deleteStaleRepos(userId, activeRepoNames);
+        if (trackedRepos.isEmpty()) {
+            repoRepository.deleteByUserId(userId);
+            return 0;
         }
 
-        fetchAndDistributeAssignedIssues(userId, token, activeRepoNames);
-
-        log.info("Project sync for userId={}: {} repos tracked, {} with full details", userId, activeRepoNames.size(), synced);
-        return activeRepoNames.size();
+        repoRepository.deleteStaleRepos(userId, trackedRepos);
+        log.info("Project sync for userId={}: {} repos tracked, {} with full details", userId, trackedRepos.size(), synced);
+        return trackedRepos.size();
     }
 
-    private void syncRepoDetails(GitHubRepository repo, String token) {
-        String fullName = repo.getRepoFullName();
-        String[] parts = fullName.split("/");
-        if (parts.length != 2) return;
-
-        fetchCommits(repo, token, parts[0], parts[1]);
-        fetchOpenPrs(repo, token, parts[0], parts[1]);
-        fetchReadmeIfStale(repo, token, parts[0], parts[1]);
-        fetchLanguagesIfStale(repo, token, parts[0], parts[1]);
-    }
-
-    private List<JsonNode> fetchUserRepos(String token) {
+    private JsonNode fetchRepository(String token, String owner, String repoName) {
         try {
-            JsonNode response = gitHubWebClient.get()
-                    .uri("/user/repos?sort=pushed&per_page=30&affiliation=owner,collaborator")
+            return gitHubWebClient.get()
+                    .uri("/repos/{owner}/{repo}", owner, repoName)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                     .retrieve()
                     .bodyToMono(JsonNode.class)
                     .block();
-
-            if (response == null || !response.isArray()) return Collections.emptyList();
-
-            List<JsonNode> repos = new ArrayList<>();
-            for (JsonNode r : response) repos.add(r);
-            return repos;
         } catch (Exception e) {
-            log.error("Failed to fetch repos: {}", e.getMessage());
-            return Collections.emptyList();
+            log.warn("Failed to fetch repo {}/{}: {}", owner, repoName, e.getMessage());
+            return null;
         }
+    }
+
+    private void populateRepositorySummary(GitHubRepository repo, JsonNode repoNode) {
+        repo.setRepoName(repoNode.path("name").asText(repo.getRepoName()));
+        repo.setDescription(repoNode.path("description").asText(null));
+        repo.setPrimaryLanguage(repoNode.path("language").asText(null));
+
+        String pushedAtStr = repoNode.path("pushed_at").asText("");
+        repo.setPushedAt(pushedAtStr.isBlank() ? null : parseGitHubTimestamp(pushedAtStr));
+        repo.setOpenIssuesCount(repoNode.path("open_issues_count").asInt(0));
+        repo.setFork(repoNode.path("fork").asBoolean(false));
+        repo.setDefaultBranch(repoNode.path("default_branch").asText("main"));
+
+        List<String> topics = new ArrayList<>();
+        JsonNode topicsNode = repoNode.path("topics");
+        if (topicsNode.isArray()) {
+            for (JsonNode t : topicsNode) {
+                topics.add(t.asText());
+            }
+        }
+        repo.setTopics(topics);
+    }
+
+    private void syncRepoDetails(GitHubRepository repo, String token, String owner, String repoName) {
+        fetchCommits(repo, token, owner, repoName);
+        fetchOpenPrs(repo, token, owner, repoName);
+        fetchReadmeIfStale(repo, token, owner, repoName);
+        fetchLanguagesIfStale(repo, token, owner, repoName);
     }
 
     private void fetchCommits(GitHubRepository repo, String token, String owner, String repoName) {
@@ -154,7 +168,9 @@ public class GitHubProjectSyncService {
                     .bodyToMono(JsonNode.class)
                     .block();
 
-            if (commits == null || !commits.isArray()) return;
+            if (commits == null || !commits.isArray()) {
+                return;
+            }
 
             List<Map<String, Object>> commitList = new ArrayList<>();
             boolean firstCommit = true;
@@ -195,15 +211,21 @@ public class GitHubProjectSyncService {
                     .bodyToMono(JsonNode.class)
                     .block();
 
-            if (detail == null) return Collections.emptyList();
+            if (detail == null) {
+                return Collections.emptyList();
+            }
 
             JsonNode files = detail.path("files");
-            if (!files.isArray()) return Collections.emptyList();
+            if (!files.isArray()) {
+                return Collections.emptyList();
+            }
 
             List<Map<String, Object>> result = new ArrayList<>();
             int count = 0;
             for (JsonNode file : files) {
-                if (count >= MAX_FILES_PER_COMMIT) break;
+                if (count >= MAX_FILES_PER_COMMIT) {
+                    break;
+                }
                 result.add(Map.of(
                         "filename", file.path("filename").asText(),
                         "additions", file.path("additions").asInt(0),
@@ -227,7 +249,9 @@ public class GitHubProjectSyncService {
                     .bodyToMono(JsonNode.class)
                     .block();
 
-            if (prs == null || !prs.isArray()) return;
+            if (prs == null || !prs.isArray()) {
+                return;
+            }
 
             List<Map<String, Object>> prList = new ArrayList<>();
             for (JsonNode pr : prs) {
@@ -261,7 +285,9 @@ public class GitHubProjectSyncService {
                     .bodyToMono(JsonNode.class)
                     .block();
 
-            if (readme == null) return;
+            if (readme == null) {
+                return;
+            }
 
             String content = readme.path("content").asText("");
             String encoding = readme.path("encoding").asText("");
@@ -296,61 +322,15 @@ public class GitHubProjectSyncService {
                     .bodyToMono(JsonNode.class)
                     .block();
 
-            if (langs == null) return;
+            if (langs == null) {
+                return;
+            }
 
             Map<String, Object> langMap = new LinkedHashMap<>();
             langs.fields().forEachRemaining(entry -> langMap.put(entry.getKey(), entry.getValue().asLong()));
             repo.setLanguages(langMap);
         } catch (Exception e) {
             log.warn("Failed to fetch languages for {}/{}: {}", owner, repoName, e.getMessage());
-        }
-    }
-
-    private void fetchAndDistributeAssignedIssues(Long userId, String token, List<String> activeRepoNames) {
-        try {
-            JsonNode issues = gitHubWebClient.get()
-                    .uri("/issues?filter=assigned&state=open&per_page=30")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                    .retrieve()
-                    .bodyToMono(JsonNode.class)
-                    .block();
-
-            if (issues == null || !issues.isArray()) return;
-
-            Map<String, List<Map<String, Object>>> issuesByRepo = new HashMap<>();
-
-            for (JsonNode issue : issues) {
-                if (issue.has("pull_request")) continue;
-
-                String repoFullName = issue.path("repository").path("full_name").asText("");
-                if (repoFullName.isEmpty() || !activeRepoNames.contains(repoFullName)) continue;
-
-                List<String> labels = new ArrayList<>();
-                JsonNode labelsNode = issue.path("labels");
-                if (labelsNode.isArray()) {
-                    for (JsonNode l : labelsNode) labels.add(l.path("name").asText());
-                }
-
-                Map<String, Object> issueData = Map.of(
-                        "number", issue.path("number").asInt(),
-                        "title", issue.path("title").asText(""),
-                        "labels", labels,
-                        "createdAt", issue.path("created_at").asText(""),
-                        "repoFullName", repoFullName
-                );
-
-                issuesByRepo.computeIfAbsent(repoFullName, k -> new ArrayList<>()).add(issueData);
-            }
-
-            for (Map.Entry<String, List<Map<String, Object>>> entry : issuesByRepo.entrySet()) {
-                repoRepository.findByUserIdAndRepoFullName(userId, entry.getKey())
-                        .ifPresent(repo -> {
-                            repo.setAssignedIssues(entry.getValue());
-                            repoRepository.save(repo);
-                        });
-            }
-        } catch (Exception e) {
-            log.warn("Failed to fetch assigned issues: {}", e.getMessage());
         }
     }
 

@@ -31,7 +31,8 @@ public class OAuth2Config {
                                 .authorizeHttpRequests(authz -> authz
                                                 .requestMatchers("/", "/login", "/oauth2/**", "/actuator/**",
                                                                 "/api/auth/**",
-                                                                "/api/integrations/*/callback")
+                                                                "/api/integrations/*/callback",
+                                                                "/api/webhooks/**")
                                                 .permitAll()
                                                 .requestMatchers("/api/**")
                                                 .authenticated()

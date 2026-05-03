@@ -1,40 +1,72 @@
 package com.pulse.pulse.integrations.application;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pulse.pulse.activity.application.ActivityIngestCommand;
 import com.pulse.pulse.activity.application.ActivityIngestItem;
 import com.pulse.pulse.activity.application.DashboardService;
-import com.pulse.pulse.activity.application.GitHubProjectSyncService;
 import com.pulse.pulse.activity.application.GitHubProjectSyncRequest;
+import com.pulse.pulse.activity.application.GitHubProjectSyncService;
 import com.pulse.pulse.activity.application.RepositorySnapshotView;
 import com.pulse.pulse.integrations.domain.UserIntegration;
+import com.pulse.pulse.integrations.domain.WebhookDelivery;
 import com.pulse.pulse.integrations.infrastructure.persistence.UserIntegrationRepository;
-import com.pulse.pulse.integrations.infrastructure.provider.IntegrationProvider;
+import com.pulse.pulse.integrations.infrastructure.persistence.WebhookDeliveryRepository;
+import com.pulse.pulse.integrations.infrastructure.provider.GitHubIntegrationProvider;
+import com.pulse.pulse.integrations.infrastructure.provider.LinearIntegrationProvider;
+import com.pulse.pulse.integrations.infrastructure.provider.ObsidianIntegrationProvider;
+import com.pulse.pulse.integrations.infrastructure.provider.SlackIntegrationProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.*;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Slf4j
 public class IntegrationService {
 
+    private static final List<String> PROVIDER_ORDER = List.of("github", "obsidian", "slack", "linear");
+
     private final UserIntegrationRepository integrationRepo;
     private final DashboardService dashboardService;
     private final GitHubProjectSyncService gitHubProjectSyncService;
-    private final Map<String, IntegrationProvider> providers;
-    private final ConcurrentHashMap<String, OAuthState> oauthStates = new ConcurrentHashMap<>();
+    private final WebhookDeliveryRepository webhookDeliveryRepository;
+    private final GitHubIntegrationProvider gitHubProvider;
+    private final SlackIntegrationProvider slackProvider;
+    private final LinearIntegrationProvider linearProvider;
+    private final ObsidianIntegrationProvider obsidianProvider;
+    private final ObjectMapper objectMapper;
+    private final ConcurrentHashMap<String, ConnectionState> connectionStates = new ConcurrentHashMap<>();
 
     public IntegrationService(UserIntegrationRepository integrationRepo,
                               DashboardService dashboardService,
                               GitHubProjectSyncService gitHubProjectSyncService,
-                              Map<String, IntegrationProvider> providers) {
+                              WebhookDeliveryRepository webhookDeliveryRepository,
+                              GitHubIntegrationProvider gitHubProvider,
+                              SlackIntegrationProvider slackProvider,
+                              LinearIntegrationProvider linearProvider,
+                              ObsidianIntegrationProvider obsidianProvider,
+                              ObjectMapper objectMapper) {
         this.integrationRepo = integrationRepo;
         this.dashboardService = dashboardService;
         this.gitHubProjectSyncService = gitHubProjectSyncService;
-        this.providers = providers;
+        this.webhookDeliveryRepository = webhookDeliveryRepository;
+        this.gitHubProvider = gitHubProvider;
+        this.slackProvider = slackProvider;
+        this.linearProvider = linearProvider;
+        this.obsidianProvider = obsidianProvider;
+        this.objectMapper = objectMapper;
     }
 
     public List<UserIntegration> getIntegrations(Long userId) {
@@ -49,7 +81,7 @@ public class IntegrationService {
         }
 
         List<IntegrationView> views = new ArrayList<>();
-        for (String providerName : providers.keySet()) {
+        for (String providerName : PROVIDER_ORDER) {
             UserIntegration integration = byProvider.get(providerName);
             if (integration != null && "connected".equals(integration.getStatus())) {
                 views.add(toView(integration, userId));
@@ -58,18 +90,20 @@ public class IntegrationService {
                         userId,
                         providerName,
                         "disconnected",
-                        null,
                         Map.of(),
                         null,
-                        0,
-                        false,
                         null,
+                        "disconnected",
                         null,
+                        defaultAccountLabel(providerName),
                         null,
+                        defaultEventsLabel(providerName),
                         null,
-                        null,
-                        List.of()
-                ));
+                        disconnectedLabel(providerName),
+                defaultScopeSummary(providerName),
+                List.of(),
+                List.of()
+        ));
             }
         }
 
@@ -86,87 +120,38 @@ public class IntegrationService {
         return integrationRepo.findByUserIdAndProvider(userId, provider);
     }
 
-    public String getOAuthUrl(Long userId, String provider, String redirectUri) {
-        IntegrationProvider impl = getProvider(provider);
-        if (!impl.requiresOAuth()) {
-            throw new IllegalArgumentException(provider + " does not use OAuth");
-        }
-
-        String state = UUID.randomUUID().toString();
-        oauthStates.put(state, new OAuthState(userId, provider, LocalDateTime.now().plusMinutes(10)));
-        cleanExpiredStates();
-
-        return impl.buildOAuthUrl(state, redirectUri);
-    }
-
     public String getOAuthUrl(Long userId, String provider) {
-        return getOAuthUrl(userId, provider, getRedirectUri(provider));
+        String state = createState(userId, provider);
+        return switch (provider) {
+            case "github" -> gitHubProvider.buildInstallUrl(state);
+            case "slack" -> slackProvider.buildOAuthUrl(state);
+            case "linear" -> linearProvider.buildOAuthUrl(state);
+            default -> throw new IllegalArgumentException(provider + " does not use an external connect flow");
+        };
     }
 
     @Transactional
-    public UserIntegration handleOAuthCallback(String provider, String code, String state) {
-        OAuthState oauthState = oauthStates.remove(state);
-        if (oauthState == null || oauthState.expiresAt.isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("Invalid or expired OAuth state");
-        }
-
-        if (!oauthState.provider.equals(provider)) {
-            throw new RuntimeException("Provider mismatch in OAuth callback");
-        }
-
-        IntegrationProvider impl = getProvider(provider);
-        String redirectUri = getRedirectUri(provider);
-        String accessToken = impl.exchangeCode(code, redirectUri);
-        Map<String, Object> metadata = impl.fetchMetadata(accessToken);
-
-        UserIntegration integration = integrationRepo
-                .findByUserIdAndProvider(oauthState.userId, provider)
-                .orElse(UserIntegration.builder()
-                        .userId(oauthState.userId)
-                        .provider(provider)
-                        .build());
-
-        integration.setAccessToken(accessToken);
-        integration.setStatus("connected");
-        integration.setMetadata(metadata);
-
-        return integrationRepo.save(integration);
+    public UserIntegration handleOAuthCallback(String provider,
+                                               String code,
+                                               String state,
+                                               Long installationId) {
+        ConnectionState connectionState = consumeState(state, provider);
+        return switch (provider) {
+            case "github" -> connectGitHubInstallation(connectionState.userId(), installationId);
+            case "slack" -> connectSlack(connectionState.userId(), code);
+            case "linear" -> connectLinear(connectionState.userId(), code);
+            default -> throw new IllegalArgumentException("Unknown provider: " + provider);
+        };
     }
 
     @Transactional
-    public UserIntegration connectWithApiKey(Long userId, String provider,
-                                              String apiKey, Map<String, Object> extraMetadata) {
-        IntegrationProvider impl = getProvider(provider);
-        Map<String, Object> metadata = impl.fetchMetadata(apiKey);
-
-        if (extraMetadata != null) {
-            metadata.putAll(extraMetadata);
-        }
-
-        UserIntegration integration = integrationRepo
-                .findByUserIdAndProvider(userId, provider)
-                .orElse(UserIntegration.builder()
-                        .userId(userId)
-                        .provider(provider)
-                        .build());
-
-        integration.setAccessToken(apiKey);
-        integration.setStatus("connected");
-        integration.setMetadata(metadata);
-
-        return integrationRepo.save(integration);
-    }
-
-    @Transactional
-    public UserIntegration connectObsidian(Long userId, String repoFullName) {
+    public UserIntegration connectObsidian(Long userId) {
         UserIntegration github = integrationRepo.findByUserIdAndProvider(userId, "github")
                 .orElseThrow(() -> new RuntimeException("GitHub must be connected first"));
 
         if (!"connected".equals(github.getStatus())) {
             throw new RuntimeException("GitHub integration is not active");
         }
-
-        String normalized = normalizeRepoName(repoFullName);
 
         UserIntegration integration = integrationRepo
                 .findByUserIdAndProvider(userId, "obsidian")
@@ -175,28 +160,27 @@ public class IntegrationService {
                         .provider("obsidian")
                         .build());
 
-        integration.setAccessToken(github.getAccessToken());
         integration.setStatus("connected");
-        integration.setMetadata(Map.of("repoFullName", normalized));
-
+        integration.setAccessToken(null);
+        integration.setRefreshToken(null);
+        integration.setMetadata(Map.of());
+        integration.setWebhookStatus("pending_scope");
+        integration.setLastWebhookError(null);
+        integration.setLastWebhookErrorAt(null);
         return integrationRepo.save(integration);
-    }
-
-    private String normalizeRepoName(String input) {
-        String cleaned = input.trim()
-                .replaceFirst("^https?://github\\.com/", "")
-                .replaceFirst("\\.git$", "")
-                .replaceFirst("/$", "");
-        String[] parts = cleaned.split("/");
-        if (parts.length < 2) {
-            throw new IllegalArgumentException("Invalid repo format. Use owner/repo or a GitHub URL.");
-        }
-        return parts[0] + "/" + parts[1];
     }
 
     @Transactional
     public void disconnect(Long userId, String provider) {
         integrationRepo.deleteByUserIdAndProvider(userId, provider);
+
+        if ("github".equals(provider)) {
+            integrationRepo.deleteByUserIdAndProvider(userId, "obsidian");
+            gitHubProjectSyncService.clearRepositories(userId);
+        }
+        if ("obsidian".equals(provider)) {
+            gitHubProjectSyncService.clearRepositories(userId);
+        }
     }
 
     @Transactional
@@ -209,28 +193,25 @@ public class IntegrationService {
             throw new RuntimeException("Integration is not connected");
         }
 
-        IntegrationProvider impl = getProvider(provider);
         LocalDateTime since = integration.getLastSyncedAt() != null
                 ? integration.getLastSyncedAt()
-                : LocalDateTime.now().minusDays(7);
+                : LocalDateTime.now(ZoneOffset.UTC).minusDays(7);
 
-        List<IntegrationEventPayload> fetched = impl.fetchRecentEvents(integration, since);
+        List<IntegrationEventPayload> fetched = switch (provider) {
+            case "github" -> gitHubProvider.fetchRecentEvents(integration, since);
+            case "obsidian" -> obsidianProvider.fetchRecentEvents(resolveGitHubToken(userId), integration, since);
+            case "slack" -> slackProvider.fetchRecentEvents(integration, since);
+            case "linear" -> linearProvider.fetchRecentEvents(integration, since);
+            default -> throw new IllegalArgumentException("Unknown provider: " + provider);
+        };
 
-        int newEvents = dashboardService.ingestEvents(new ActivityIngestCommand(
-                userId,
-                provider,
-                fetched.stream()
-                        .map(event -> new ActivityIngestItem(
-                                event.eventType(),
-                                event.title(),
-                                event.externalId(),
-                                event.eventTimestamp(),
-                                event.rawPayload()))
-                        .toList()
-        ));
-
-        integration.setLastSyncedAt(LocalDateTime.now());
+        int newEvents = ingestEvents(userId, provider, fetched);
+        integration.setLastSyncedAt(LocalDateTime.now(ZoneOffset.UTC));
         integrationRepo.save(integration);
+
+        if ("github".equals(provider)) {
+            syncGitHubProjects(userId);
+        }
 
         return new SyncResult(newEvents, fetched.size());
     }
@@ -241,7 +222,7 @@ public class IntegrationService {
                 .orElseThrow(() -> new RuntimeException("Integration not found: " + provider));
 
         Map<String, Object> metadata = integration.getMetadata() == null ? new HashMap<>() : new HashMap<>(integration.getMetadata());
-        metadata.put("projectSyncLastRun", LocalDateTime.now().toString());
+        metadata.put("projectSyncLastRun", LocalDateTime.now(ZoneOffset.UTC).toString());
         integration.setMetadata(metadata);
         integrationRepo.save(integration);
     }
@@ -256,7 +237,12 @@ public class IntegrationService {
     public GitHubProjectSyncRequest getGitHubProjectSyncRequest(Long userId) {
         UserIntegration github = integrationRepo.findByUserIdAndProvider(userId, "github")
                 .orElseThrow(() -> new RuntimeException("GitHub not connected"));
-        return toGitHubProjectSyncRequest(github);
+        return new GitHubProjectSyncRequest(
+                github.getUserId(),
+                gitHubProvider.createInstallationAccessToken(github),
+                github.getMetadata(),
+                gitHubProvider.getSelectedRepositoryNames(github.getMetadata())
+        );
     }
 
     public List<GitHubRepositoryView> getGitHubRepositoryViews(Long userId) {
@@ -265,56 +251,373 @@ public class IntegrationService {
                 .toList();
     }
 
+    public List<IntegrationResourceOption> listResources(Long userId, String provider) {
+        UserIntegration integration = integrationRepo.findByUserIdAndProvider(userId, provider)
+                .orElseThrow(() -> new RuntimeException("Integration not found: " + provider));
+
+        return switch (provider) {
+            case "github" -> gitHubProvider.listResources(integration);
+            case "obsidian" -> getObsidianResourceOptions(userId);
+            case "slack" -> slackProvider.listResources(integration);
+            case "linear" -> linearProvider.listResources(integration);
+            default -> throw new IllegalArgumentException("Unknown provider: " + provider);
+        };
+    }
+
+    @Transactional
+    public UserIntegration updateSelectedResources(Long userId, String provider, List<String> selectedIds) {
+        UserIntegration integration = integrationRepo.findByUserIdAndProvider(userId, provider)
+                .orElseThrow(() -> new RuntimeException("Integration not found: " + provider));
+
+        Map<String, Object> metadata = switch (provider) {
+            case "github" -> gitHubProvider.applySelectedResources(integration, selectedIds);
+            case "obsidian" -> obsidianProvider.applySelectedRepository(
+                    integration,
+                    getObsidianResourceMaps(userId),
+                    selectedIds
+            );
+            case "slack" -> slackProvider.applySelectedResources(integration, selectedIds);
+            case "linear" -> linearProvider.applySelectedResources(integration, selectedIds);
+            default -> throw new IllegalArgumentException("Unknown provider: " + provider);
+        };
+
+        integration.setMetadata(metadata);
+        integration.setWebhookStatus(selectedIds.isEmpty() ? "pending_scope" : "active");
+        integration.setLastWebhookError(null);
+        integration.setLastWebhookErrorAt(null);
+        integrationRepo.save(integration);
+
+        if ("github".equals(provider)) {
+            normalizeObsidianScope(userId);
+            syncGitHubProjects(userId);
+        }
+        if ("obsidian".equals(provider)) {
+            gitHubProjectSyncService.clearRepositories(userId);
+        }
+
+        return integration;
+    }
+
+    @Transactional
+    public void handleGitHubWebhook(Map<String, String> headers, byte[] body) {
+        JsonNode payload = gitHubProvider.verifyAndParseWebhook(headers, body);
+        String deliveryId = gitHubProvider.extractDeliveryId(headers);
+
+        processWebhookDelivery("github", deliveryId, payload, headers, () -> {
+            String repoFullName = gitHubProvider.extractRepositoryFullName(payload);
+            List<IntegrationEventPayload> githubEvents = gitHubProvider.mapWebhookEvents(headers, payload);
+
+            for (UserIntegration integration : integrationRepo.findByProviderAndStatus("github", "connected")) {
+                if (matchesRepository(integration.getMetadata(), repoFullName) || matchesInstallation(integration.getMetadata(), payload)) {
+                    ingestEvents(integration.getUserId(), "github", githubEvents);
+                    markWebhookSuccess(integration);
+                    if ("push".equalsIgnoreCase(header(headers, "x-github-event"))) {
+                        syncGitHubProjects(integration.getUserId());
+                    }
+                }
+            }
+
+            List<IntegrationEventPayload> obsidianEvents = obsidianProvider.mapWebhookEvents(payload);
+            if (!obsidianEvents.isEmpty()) {
+                for (UserIntegration integration : integrationRepo.findByProviderAndStatus("obsidian", "connected")) {
+                    if (matchesRepository(integration.getMetadata(), repoFullName)) {
+                        ingestEvents(integration.getUserId(), "obsidian", obsidianEvents);
+                        markWebhookSuccess(integration);
+                    }
+                }
+            }
+        });
+    }
+
+    @Transactional
+    public SlackWebhookResult handleSlackWebhook(Map<String, String> headers, byte[] body) {
+        JsonNode payload = slackProvider.verifyAndParseWebhook(headers, body);
+        if (slackProvider.isUrlVerification(payload)) {
+            return new SlackWebhookResult(true, slackProvider.extractChallenge(payload));
+        }
+
+        String deliveryId = slackProvider.extractDeliveryId(payload);
+        processWebhookDelivery("slack", deliveryId, payload, headers, () -> {
+            String teamId = slackProvider.extractTeamId(payload);
+            String channelId = slackProvider.extractChannelId(payload);
+
+            for (UserIntegration integration : integrationRepo.findByProviderAndStatus("slack", "connected")) {
+                if (!matchesMetadataValue(integration.getMetadata(), "teamId", teamId) ||
+                        !hasSelectedResource(integration.getMetadata(), channelId)) {
+                    continue;
+                }
+
+                ingestEvents(integration.getUserId(), "slack", slackProvider.mapWebhookEvents(integration, payload));
+                markWebhookSuccess(integration);
+            }
+        });
+
+        return new SlackWebhookResult(false, null);
+    }
+
+    @Transactional
+    public void handleLinearWebhook(Map<String, String> headers, byte[] body) {
+        JsonNode payload = linearProvider.verifyAndParseWebhook(headers, body);
+        String deliveryId = linearProvider.extractDeliveryId(headers);
+
+        processWebhookDelivery("linear", deliveryId, payload, headers, () -> {
+            String organizationId = linearProvider.extractOrganizationId(payload);
+            List<String> teamIds = linearProvider.extractTeamIds(payload);
+            List<IntegrationEventPayload> events = linearProvider.mapWebhookEvents(payload);
+
+            for (UserIntegration integration : integrationRepo.findByProviderAndStatus("linear", "connected")) {
+                if (!organizationId.isBlank() && !matchesMetadataValue(integration.getMetadata(), "organizationId", organizationId)) {
+                    continue;
+                }
+                if (!teamIds.isEmpty() && teamIds.stream().noneMatch(teamId -> hasSelectedResource(integration.getMetadata(), teamId))) {
+                    continue;
+                }
+
+                ingestEvents(integration.getUserId(), "linear", events);
+                markWebhookSuccess(integration);
+            }
+        });
+    }
+
+    private UserIntegration connectGitHubInstallation(Long userId, Long installationId) {
+        if (installationId == null) {
+            throw new IllegalArgumentException("GitHub installation id is required");
+        }
+
+        UserIntegration integration = integrationRepo
+                .findByUserIdAndProvider(userId, "github")
+                .orElse(UserIntegration.builder()
+                        .userId(userId)
+                        .provider("github")
+                        .build());
+
+        Map<String, Object> metadata = new HashMap<>(gitHubProvider.fetchInstallationMetadata(installationId));
+        List<Map<String, String>> selectedResources = readSelectedResources(integration.getMetadata());
+        if (!selectedResources.isEmpty()) {
+            metadata.put("selectedResources", selectedResources);
+        }
+
+        integration.setAccessToken(null);
+        integration.setRefreshToken(null);
+        integration.setStatus("connected");
+        integration.setMetadata(metadata);
+        integration.setWebhookStatus(selectedResources.isEmpty() ? "pending_scope" : "active");
+        integration.setLastWebhookError(null);
+        integration.setLastWebhookErrorAt(null);
+        return integrationRepo.save(integration);
+    }
+
+    private UserIntegration connectSlack(Long userId, String code) {
+        SlackIntegrationProvider.ConnectionResult result = slackProvider.exchangeCode(code);
+        return saveOAuthIntegration(userId, "slack", result.accessToken(), result.refreshToken(), result.metadata());
+    }
+
+    private UserIntegration connectLinear(Long userId, String code) {
+        LinearIntegrationProvider.ConnectionResult result = linearProvider.exchangeCode(code);
+        return saveOAuthIntegration(userId, "linear", result.accessToken(), result.refreshToken(), result.metadata());
+    }
+
+    private UserIntegration saveOAuthIntegration(Long userId,
+                                                 String provider,
+                                                 String accessToken,
+                                                 String refreshToken,
+                                                 Map<String, Object> metadata) {
+        UserIntegration integration = integrationRepo
+                .findByUserIdAndProvider(userId, provider)
+                .orElse(UserIntegration.builder()
+                        .userId(userId)
+                        .provider(provider)
+                        .build());
+
+        List<Map<String, String>> selectedResources = readSelectedResources(integration.getMetadata());
+        Map<String, Object> mergedMetadata = metadata == null ? new HashMap<>() : new HashMap<>(metadata);
+        if (!selectedResources.isEmpty()) {
+            mergedMetadata.put("selectedResources", selectedResources);
+        }
+
+        integration.setAccessToken(accessToken);
+        integration.setRefreshToken(refreshToken);
+        integration.setStatus("connected");
+        integration.setMetadata(mergedMetadata);
+        integration.setWebhookStatus(selectedResources.isEmpty() ? "pending_scope" : "active");
+        integration.setLastWebhookError(null);
+        integration.setLastWebhookErrorAt(null);
+        return integrationRepo.save(integration);
+    }
+
+    private List<IntegrationResourceOption> getObsidianResourceOptions(Long userId) {
+        return getObsidianResourceMaps(userId).stream()
+                .map(resource -> new IntegrationResourceOption(resource.get("id"), resource.get("name"), "repository"))
+                .toList();
+    }
+
+    private List<Map<String, String>> getObsidianResourceMaps(Long userId) {
+        UserIntegration github = integrationRepo.findByUserIdAndProvider(userId, "github")
+                .orElseThrow(() -> new RuntimeException("GitHub must be connected first"));
+        return gitHubProvider.getSelectedResourceMaps(github.getMetadata());
+    }
+
+    private void normalizeObsidianScope(Long userId) {
+        integrationRepo.findByUserIdAndProvider(userId, "obsidian").ifPresent(obsidian -> {
+            List<Map<String, String>> available = getObsidianResourceMaps(userId);
+            String selectedRepo = obsidianProvider.getSelectedRepository(obsidian.getMetadata());
+            boolean stillValid = available.stream().anyMatch(resource -> resource.get("id").equals(selectedRepo));
+            if (selectedRepo != null && !stillValid) {
+                obsidian.setMetadata(Map.of());
+                obsidian.setWebhookStatus("pending_scope");
+                integrationRepo.save(obsidian);
+            }
+        });
+    }
+
     private IntegrationView toView(UserIntegration integration, Long userId) {
         Map<String, Object> meta = integration.getMetadata() != null ? integration.getMetadata() : Map.of();
         String providerName = integration.getProvider();
         List<Integer> sparkline = dashboardService.getActivitySparkline(userId, providerName);
 
-        IntegrationProvider provider = providers.get(providerName);
-        String accountLabel = provider != null ? provider.getAccountLabel() : "Account";
-        String accountValue = provider != null ? provider.getAccountValue(meta) : "unknown";
-        String eventsLabel = provider != null ? provider.getEventsLabel() : "Events";
-
         int totalEvents = sparkline.stream().mapToInt(Integer::intValue).sum();
-        String eventsValue = totalEvents + " this week";
-        String lastSyncedLabel = buildLastSyncedLabel(integration.getLastSyncedAt());
-
         return new IntegrationView(
                 integration.getUserId(),
                 providerName,
                 integration.getStatus(),
-                integration.getAccessToken(),
                 meta,
                 integration.getLastSyncedAt(),
-                integration.getConsecutiveFailures(),
-                integration.getAutoSyncEnabled(),
-                accountLabel,
-                accountValue,
-                eventsLabel,
-                eventsValue,
-                lastSyncedLabel,
+                integration.getLastWebhookReceivedAt(),
+                integration.getWebhookStatus(),
+                integration.getLastWebhookError(),
+                accountLabel(providerName),
+                accountValue(providerName, meta),
+                eventsLabel(providerName),
+                totalEvents + " this week",
+                buildLastActivityLabel(integration),
+                buildScopeSummary(providerName, meta),
+                readSelectedResources(meta).stream().map(resource -> resource.get("id")).toList(),
                 sparkline
         );
     }
 
-    private String buildLastSyncedLabel(LocalDateTime lastSyncedAt) {
-        if (lastSyncedAt == null) {
-            return "Never synced";
+    private String buildLastActivityLabel(UserIntegration integration) {
+        if (integration.getLastWebhookReceivedAt() != null) {
+            return "Webhook received " + relativeTime(integration.getLastWebhookReceivedAt());
         }
-
-        long minutes = java.time.temporal.ChronoUnit.MINUTES.between(lastSyncedAt, LocalDateTime.now());
-        if (minutes < 1) return "Just now";
-        if (minutes < 60) return "Last synced " + minutes + " min ago";
-        if (minutes < 1440) return "Last synced " + (minutes / 60) + " hr ago";
-        return "Last synced " + (minutes / 1440) + " days ago";
+        if (integration.getLastSyncedAt() != null) {
+            return "Manual sync " + relativeTime(integration.getLastSyncedAt());
+        }
+        return "Waiting for events";
     }
 
-    private GitHubProjectSyncRequest toGitHubProjectSyncRequest(UserIntegration integration) {
-        return new GitHubProjectSyncRequest(
-                integration.getUserId(),
-                integration.getAccessToken(),
-                integration.getMetadata()
-        );
+    private String relativeTime(LocalDateTime timestamp) {
+        long minutes = ChronoUnit.MINUTES.between(timestamp, LocalDateTime.now(ZoneOffset.UTC));
+        if (minutes < 1) {
+            return "just now";
+        }
+        if (minutes < 60) {
+            return minutes + " min ago";
+        }
+        if (minutes < 1440) {
+            return (minutes / 60) + " hr ago";
+        }
+        return (minutes / 1440) + " days ago";
+    }
+
+    private int ingestEvents(Long userId, String provider, List<IntegrationEventPayload> fetched) {
+        if (fetched.isEmpty()) {
+            return 0;
+        }
+
+        return dashboardService.ingestEvents(new ActivityIngestCommand(
+                userId,
+                provider,
+                fetched.stream()
+                        .map(event -> new ActivityIngestItem(
+                                event.eventType(),
+                                event.title(),
+                                event.externalId(),
+                                event.eventTimestamp(),
+                                event.rawPayload()))
+                        .toList()
+        ));
+    }
+
+    private void processWebhookDelivery(String provider,
+                                        String deliveryId,
+                                        JsonNode payload,
+                                        Map<String, String> headers,
+                                        Runnable processor) {
+        if (webhookDeliveryRepository.findByProviderAndDeliveryId(provider, deliveryId).isPresent()) {
+            return;
+        }
+
+        WebhookDelivery delivery = WebhookDelivery.builder()
+                .provider(provider)
+                .deliveryId(deliveryId)
+                .status("received")
+                .headers(new LinkedHashMap<>(headers))
+                .payload(objectMapper.convertValue(payload, new TypeReference<>() {}))
+                .build();
+        webhookDeliveryRepository.save(delivery);
+
+        try {
+            processor.run();
+            delivery.setStatus("processed");
+            delivery.setProcessedAt(LocalDateTime.now(ZoneOffset.UTC));
+        } catch (Exception e) {
+            delivery.setStatus("failed");
+            delivery.setErrorMessage(e.getMessage());
+            delivery.setProcessedAt(LocalDateTime.now(ZoneOffset.UTC));
+            log.error("Webhook processing failed for provider={} deliveryId={}: {}", provider, deliveryId, e.getMessage(), e);
+            throw e;
+        } finally {
+            webhookDeliveryRepository.save(delivery);
+        }
+    }
+
+    private void markWebhookSuccess(UserIntegration integration) {
+        integration.setWebhookStatus("active");
+        integration.setLastWebhookReceivedAt(LocalDateTime.now(ZoneOffset.UTC));
+        integration.setLastWebhookError(null);
+        integration.setLastWebhookErrorAt(null);
+        integrationRepo.save(integration);
+    }
+
+    private boolean matchesRepository(Map<String, Object> metadata, String repoFullName) {
+        return repoFullName != null && !repoFullName.isBlank() && hasSelectedResource(metadata, repoFullName);
+    }
+
+    private boolean matchesInstallation(Map<String, Object> metadata, JsonNode payload) {
+        JsonNode installation = payload.path("installation");
+        if (installation.isMissingNode()) {
+            return false;
+        }
+        String installationId = installation.path("id").asText("");
+        return matchesMetadataValue(metadata, "installationId", installationId);
+    }
+
+    private boolean matchesMetadataValue(Map<String, Object> metadata, String key, String expected) {
+        if (metadata == null || expected == null || expected.isBlank()) {
+            return false;
+        }
+        Object value = metadata.get(key);
+        return value != null && expected.equals(String.valueOf(value));
+    }
+
+    private boolean hasSelectedResource(Map<String, Object> metadata, String id) {
+        return readSelectedResources(metadata).stream()
+                .anyMatch(resource -> id.equals(resource.get("id")));
+    }
+
+    private List<Map<String, String>> readSelectedResources(Map<String, Object> metadata) {
+        Object raw = metadata != null ? metadata.get("selectedResources") : null;
+        if (raw == null) {
+            return List.of();
+        }
+        return objectMapper.convertValue(raw, new TypeReference<>() {});
+    }
+
+    private String resolveGitHubToken(Long userId) {
+        UserIntegration github = integrationRepo.findByUserIdAndProvider(userId, "github")
+                .orElseThrow(() -> new RuntimeException("GitHub must be connected first"));
+        return gitHubProvider.createInstallationAccessToken(github);
     }
 
     private GitHubRepositoryView toGitHubRepositoryView(RepositorySnapshotView repository) {
@@ -333,29 +636,124 @@ public class IntegrationService {
         );
     }
 
-    private IntegrationProvider getProvider(String provider) {
-        IntegrationProvider impl = providers.get(provider);
-        if (impl == null) {
-            throw new IllegalArgumentException("Unknown provider: " + provider);
-        }
-        return impl;
+    private String accountLabel(String provider) {
+        return switch (provider) {
+            case "github" -> gitHubProvider.getAccountLabel();
+            case "obsidian" -> obsidianProvider.getAccountLabel();
+            case "slack" -> slackProvider.getAccountLabel();
+            case "linear" -> linearProvider.getAccountLabel();
+            default -> defaultAccountLabel(provider);
+        };
     }
 
-    private String getRedirectUri(String providerName) {
-        IntegrationProvider impl = getProvider(providerName);
-        String uri = impl.getRedirectUri();
-        if (uri == null) {
-            throw new IllegalArgumentException("No redirect URI for: " + providerName);
+    private String accountValue(String provider, Map<String, Object> metadata) {
+        return switch (provider) {
+            case "github" -> gitHubProvider.getAccountValue(metadata);
+            case "obsidian" -> obsidianProvider.getAccountValue(metadata);
+            case "slack" -> slackProvider.getAccountValue(metadata);
+            case "linear" -> linearProvider.getAccountValue(metadata);
+            default -> null;
+        };
+    }
+
+    private String eventsLabel(String provider) {
+        return switch (provider) {
+            case "github" -> gitHubProvider.getEventsLabel();
+            case "obsidian" -> obsidianProvider.getEventsLabel();
+            case "slack" -> slackProvider.getEventsLabel();
+            case "linear" -> linearProvider.getEventsLabel();
+            default -> defaultEventsLabel(provider);
+        };
+    }
+
+    private String buildScopeSummary(String provider, Map<String, Object> metadata) {
+        return switch (provider) {
+            case "github" -> gitHubProvider.buildScopeSummary(metadata);
+            case "obsidian" -> obsidianProvider.buildScopeSummary(metadata);
+            case "slack" -> slackProvider.buildScopeSummary(metadata);
+            case "linear" -> linearProvider.buildScopeSummary(metadata);
+            default -> defaultScopeSummary(provider);
+        };
+    }
+
+    private String defaultAccountLabel(String provider) {
+        return switch (provider) {
+            case "slack", "linear" -> "Workspace";
+            case "obsidian" -> "Vault repo";
+            default -> "Account";
+        };
+    }
+
+    private String defaultEventsLabel(String provider) {
+        return switch (provider) {
+            case "github" -> "Repo activity";
+            case "obsidian" -> "Vault activity";
+            case "slack" -> "Channel activity";
+            case "linear" -> "Team activity";
+            default -> "Activity";
+        };
+    }
+
+    private String disconnectedLabel(String provider) {
+        return switch (provider) {
+            case "github" -> "Install GitHub App";
+            case "obsidian" -> "Requires GitHub connection";
+            case "slack" -> "OAuth workspace install";
+            case "linear" -> "OAuth workspace install";
+            default -> "Not connected";
+        };
+    }
+
+    private String defaultScopeSummary(String provider) {
+        return switch (provider) {
+            case "github" -> "Select repositories";
+            case "obsidian" -> "Select a vault repo";
+            case "slack" -> "Select channels";
+            case "linear" -> "Select teams";
+            default -> "Configure scope";
+        };
+    }
+
+    private String createState(Long userId, String provider) {
+        String state = java.util.UUID.randomUUID().toString();
+        connectionStates.put(state, new ConnectionState(userId, provider, LocalDateTime.now(ZoneOffset.UTC).plusMinutes(10)));
+        cleanExpiredStates();
+        return state;
+    }
+
+    private ConnectionState consumeState(String state, String provider) {
+        if (state == null || state.isBlank()) {
+            throw new RuntimeException("Invalid or expired integration state");
         }
-        return uri;
+        ConnectionState connectionState = connectionStates.remove(state);
+        if (connectionState == null || connectionState.expiresAt().isBefore(LocalDateTime.now(ZoneOffset.UTC))) {
+            throw new RuntimeException("Invalid or expired integration state");
+        }
+        if (!connectionState.provider().equals(provider)) {
+            throw new RuntimeException("Provider mismatch in callback");
+        }
+        return connectionState;
     }
 
     private void cleanExpiredStates() {
-        LocalDateTime now = LocalDateTime.now();
-        oauthStates.entrySet().removeIf(e -> e.getValue().expiresAt.isBefore(now));
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        connectionStates.entrySet().removeIf(entry -> entry.getValue().expiresAt().isBefore(now));
     }
 
-    private record OAuthState(Long userId, String provider, LocalDateTime expiresAt) {}
+    private String header(Map<String, String> headers, String name) {
+        return headers.entrySet().stream()
+                .filter(entry -> entry.getKey().equalsIgnoreCase(name))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElse(null);
+    }
 
-    public record SyncResult(int newEvents, int totalFetched) {}
+    private record ConnectionState(Long userId, String provider, LocalDateTime expiresAt) {
+    }
+
+    public record SyncResult(int newEvents, int totalFetched) {
+    }
+
+    public record SlackWebhookResult(boolean challenge, String challengeValue) {
+    }
 }

@@ -4,9 +4,10 @@ import com.pulse.pulse.identity.application.CurrentUserView;
 import com.pulse.pulse.identity.application.UserService;
 import com.pulse.pulse.integrations.api.dto.ConnectApiKeyRequest;
 import com.pulse.pulse.integrations.api.dto.IntegrationDto;
+import com.pulse.pulse.integrations.api.dto.UpdateIntegrationScopeRequest;
 import com.pulse.pulse.integrations.application.GitHubRepositoryView;
+import com.pulse.pulse.integrations.application.IntegrationResourceOption;
 import com.pulse.pulse.integrations.application.IntegrationService;
-import com.pulse.pulse.integrations.application.IntegrationSyncScheduler;
 import com.pulse.pulse.integrations.application.IntegrationView;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -26,24 +27,23 @@ import java.util.Map;
 public class IntegrationController {
 
     private final IntegrationService integrationService;
-    private final IntegrationSyncScheduler syncScheduler;
     private final UserService userService;
 
     @Value("${integrations.frontend-url:http://localhost:3000}")
     private String frontendUrl;
 
     public IntegrationController(IntegrationService integrationService,
-                                 IntegrationSyncScheduler syncScheduler,
                                  UserService userService) {
         this.integrationService = integrationService;
-        this.syncScheduler = syncScheduler;
         this.userService = userService;
     }
 
     @GetMapping
     public ResponseEntity<List<IntegrationDto>> getIntegrations(Authentication authentication) {
         CurrentUserView user = getUser(authentication);
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) {
+            return ResponseEntity.status(401).build();
+        }
 
         List<IntegrationDto> dtos = integrationService.getIntegrationViews(user.id()).stream()
                 .map(this::toDto)
@@ -52,79 +52,111 @@ public class IntegrationController {
     }
 
     @GetMapping("/{provider}/auth-url")
-    public ResponseEntity<Map<String, String>> getAuthUrl(
-            @PathVariable String provider,
-            Authentication authentication) {
+    public ResponseEntity<Map<String, String>> getAuthUrl(@PathVariable String provider,
+                                                          Authentication authentication) {
         CurrentUserView user = getUser(authentication);
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) {
+            return ResponseEntity.status(401).build();
+        }
 
         String url = integrationService.getOAuthUrl(user.id(), provider);
         return ResponseEntity.ok(Map.of("url", url));
     }
 
     @GetMapping("/{provider}/callback")
-    public void handleOAuthCallback(
-            @PathVariable String provider,
-            @RequestParam String code,
-            @RequestParam String state,
-            HttpServletResponse response) throws IOException {
+    public void handleOAuthCallback(@PathVariable String provider,
+                                    @RequestParam(required = false) String code,
+                                    @RequestParam(required = false) String state,
+                                    @RequestParam(name = "installation_id", required = false) Long installationId,
+                                    HttpServletResponse response) throws IOException {
         try {
-            integrationService.handleOAuthCallback(provider, code, state);
+            integrationService.handleOAuthCallback(provider, code, state, installationId);
             response.sendRedirect(frontendUrl + "/integrations?connected=" + provider);
         } catch (Exception e) {
-            log.error("OAuth callback error for {}: {}", provider, e.getMessage());
+            log.error("Callback error for {}: {}", provider, e.getMessage());
             response.sendRedirect(frontendUrl + "/integrations?error=" + provider);
         }
     }
 
     @PostMapping("/{provider}/connect")
-    public ResponseEntity<IntegrationDto> connect(
-            @PathVariable String provider,
-            @RequestBody ConnectApiKeyRequest request,
-            Authentication authentication) {
+    public ResponseEntity<IntegrationDto> connect(@PathVariable String provider,
+                                                  @RequestBody(required = false) ConnectApiKeyRequest request,
+                                                  Authentication authentication) {
         CurrentUserView user = getUser(authentication);
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) {
+            return ResponseEntity.status(401).build();
+        }
 
         try {
-            if ("obsidian".equals(provider)) {
-                String repoFullName = request.metadata() != null
-                        ? (String) request.metadata().get("repoFullName")
-                        : null;
-                if (repoFullName == null || repoFullName.isBlank()) {
-                    return ResponseEntity.badRequest().build();
-                }
-                integrationService.connectObsidian(user.id(), repoFullName);
-            } else {
-                if (request.apiKey() == null || request.apiKey().isBlank()) {
-                    return ResponseEntity.badRequest().build();
-                }
-                integrationService.connectWithApiKey(
-                        user.id(), provider, request.apiKey(), request.metadata());
+            if (!"obsidian".equals(provider)) {
+                return ResponseEntity.badRequest().build();
             }
+
+            integrationService.connectObsidian(user.id());
             return ResponseEntity.ok(toDto(integrationService.getIntegrationView(user.id(), provider)));
         } catch (Exception e) {
             log.error("Connect error for {}: {}", provider, e.getMessage());
-            return ResponseEntity.badRequest().body(null);
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/{provider}/resources")
+    public ResponseEntity<List<IntegrationResourceOption>> getResources(@PathVariable String provider,
+                                                                        Authentication authentication) {
+        CurrentUserView user = getUser(authentication);
+        if (user == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        try {
+            return ResponseEntity.ok(integrationService.listResources(user.id(), provider));
+        } catch (Exception e) {
+            log.error("Resource list error for {}: {}", provider, e.getMessage());
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PutMapping("/{provider}/scope")
+    public ResponseEntity<IntegrationDto> updateScope(@PathVariable String provider,
+                                                      @RequestBody UpdateIntegrationScopeRequest request,
+                                                      Authentication authentication) {
+        CurrentUserView user = getUser(authentication);
+        if (user == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        try {
+            integrationService.updateSelectedResources(
+                    user.id(),
+                    provider,
+                    request.selectedResourceIds() != null ? request.selectedResourceIds() : List.of()
+            );
+            return ResponseEntity.ok(toDto(integrationService.getIntegrationView(user.id(), provider)));
+        } catch (Exception e) {
+            log.error("Scope update error for {}: {}", provider, e.getMessage());
+            return ResponseEntity.badRequest().build();
         }
     }
 
     @DeleteMapping("/{provider}")
-    public ResponseEntity<Void> disconnect(
-            @PathVariable String provider,
-            Authentication authentication) {
+    public ResponseEntity<Void> disconnect(@PathVariable String provider,
+                                           Authentication authentication) {
         CurrentUserView user = getUser(authentication);
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) {
+            return ResponseEntity.status(401).build();
+        }
 
         integrationService.disconnect(user.id(), provider);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{provider}/sync")
-    public ResponseEntity<Map<String, Object>> sync(
-            @PathVariable String provider,
-            Authentication authentication) {
+    public ResponseEntity<Map<String, Object>> sync(@PathVariable String provider,
+                                                    Authentication authentication) {
         CurrentUserView user = getUser(authentication);
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) {
+            return ResponseEntity.status(401).build();
+        }
 
         try {
             IntegrationService.SyncResult result = integrationService.sync(user.id(), provider);
@@ -133,41 +165,18 @@ public class IntegrationController {
                     "totalFetched", result.totalFetched()
             ));
         } catch (Exception e) {
-            log.error("Sync error for {}: {}", provider, e.getMessage());
+            log.error("Manual sync error for {}: {}", provider, e.getMessage());
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", e.getMessage()));
         }
     }
 
-    @GetMapping("/sync/stats")
-    public ResponseEntity<IntegrationSyncScheduler.SyncSchedulerStats> getSyncStats(Authentication authentication) {
-        CurrentUserView user = getUser(authentication);
-        if (user == null) return ResponseEntity.status(401).build();
-        return ResponseEntity.ok(syncScheduler.getStats());
-    }
-
-    @PostMapping("/sync/trigger")
-    public ResponseEntity<Map<String, String>> triggerAutoSync(Authentication authentication) {
-        CurrentUserView user = getUser(authentication);
-        if (user == null) return ResponseEntity.status(401).build();
-        syncScheduler.triggerManualSync();
-        return ResponseEntity.ok(Map.of("status", "triggered"));
-    }
-
-    @PostMapping("/{provider}/reset-backoff")
-    public ResponseEntity<Map<String, String>> resetBackoff(
-            @PathVariable String provider,
-            Authentication authentication) {
-        CurrentUserView user = getUser(authentication);
-        if (user == null) return ResponseEntity.status(401).build();
-        syncScheduler.resetBackoff(user.id(), provider);
-        return ResponseEntity.ok(Map.of("status", "reset"));
-    }
-
     @GetMapping("/github/repositories")
     public ResponseEntity<List<Map<String, Object>>> getGitHubRepositories(Authentication authentication) {
         CurrentUserView user = getUser(authentication);
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) {
+            return ResponseEntity.status(401).build();
+        }
 
         List<Map<String, Object>> result = integrationService.getGitHubRepositoryViews(user.id()).stream()
                 .map(this::toRepositoryMap)
@@ -178,7 +187,9 @@ public class IntegrationController {
     @PostMapping("/github/sync-projects")
     public ResponseEntity<Map<String, Object>> syncGitHubProjects(Authentication authentication) {
         CurrentUserView user = getUser(authentication);
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) {
+            return ResponseEntity.status(401).build();
+        }
 
         try {
             int count = integrationService.syncGitHubProjects(user.id());
@@ -199,10 +210,12 @@ public class IntegrationController {
                 integration.accountValue(),
                 integration.eventsLabel(),
                 integration.eventsValue(),
-                integration.lastSyncedLabel(),
+                integration.lastActivityLabel(),
+                integration.scopeSummary(),
+                integration.selectedResourceIds(),
                 integration.sparkline(),
-                integration.consecutiveFailures() != null ? integration.consecutiveFailures() : 0,
-                integration.autoSyncEnabled() != null && integration.autoSyncEnabled()
+                integration.webhookStatus(),
+                integration.lastWebhookError()
         );
     }
 
@@ -223,7 +236,9 @@ public class IntegrationController {
     }
 
     private CurrentUserView getUser(Authentication authentication) {
-        if (authentication == null) return null;
+        if (authentication == null) {
+            return null;
+        }
         return userService.getCurrentUser(authentication.getName());
     }
 }

@@ -10,8 +10,10 @@ public record IntegrationDto(
         String accountValue,
         String eventsLabel,
         String eventsValue,
-        String lastSyncedAt,
+        String lastActivityLabel,
+        String scopeSummary,
+        List<String> selectedResourceIds,
         List<Integer> activitySparkline,
-        int consecutiveFailures,
-        boolean autoSyncEnabled
+        String webhookStatus,
+        String webhookError
 ) {}
