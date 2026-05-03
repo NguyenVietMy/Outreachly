@@ -33,7 +33,7 @@ jobs:
           java-version: "17"
           cache: maven
 
-      - run: ./mvnw test
+      - run: mvn test
 
   deploy:
     needs: test
@@ -61,7 +61,7 @@ jobs:
           cache: maven
 
       - name: Build JAR
-        run: ./mvnw clean package -DskipTests
+        run: mvn clean package -DskipTests
 
       - name: Build and push Docker image
         id: build
