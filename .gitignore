@@ -155,6 +155,12 @@ Thumbs.db
 .terraform.lock.hcl
 tfplan
 *.tfplan
+*.auto.tfvars
+teardown.ps1
+spinup.ps1
+secrets.json
+*.pem
+check-resources.ps1
 crash.log
 crash.*.log
 override.tf

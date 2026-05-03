@@ -6,6 +6,13 @@ terraform {
     dynamodb_table = "tf-locks"
     profile        = "pulse"
   }
+
+  required_providers {
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 4.0"
+    }
+  }
 }
 
 provider "aws" {
@@ -13,9 +20,14 @@ provider "aws" {
   profile = "pulse"
 }
 
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
+}
+
 locals {
   project      = "pulse"
   env          = "dev"
+  domain       = "pulse-cs.com"
   api_domain   = "api.pulse-cs.com"
   frontend_url = "https://pulse-cs.com"
 }
@@ -24,6 +36,17 @@ variable "image_tag" {
   type        = string
   description = "Docker image tag to deploy"
   default     = "latest"
+}
+
+variable "cloudflare_api_token" {
+  type      = string
+  sensitive = true
+}
+
+# ---------- Cloudflare DNS ----------
+
+data "cloudflare_zone" "this" {
+  name = local.domain
 }
 
 # ---------- ACM certificate (DNS validation via Cloudflare) ----------
@@ -35,6 +58,37 @@ resource "aws_acm_certificate" "api" {
   lifecycle {
     create_before_destroy = true
   }
+}
+
+resource "cloudflare_record" "acm_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.api.domain_validation_options : dvo.domain_name => {
+      name  = dvo.resource_record_name
+      type  = dvo.resource_record_type
+      value = dvo.resource_record_value
+    }
+  }
+
+  zone_id = data.cloudflare_zone.this.id
+  name    = each.value.name
+  type    = each.value.type
+  content = each.value.value
+  ttl     = 60
+  proxied = false
+}
+
+resource "aws_acm_certificate_validation" "api" {
+  certificate_arn         = aws_acm_certificate.api.arn
+  validation_record_fqdns = [for record in cloudflare_record.acm_validation : record.hostname]
+}
+
+resource "cloudflare_record" "api" {
+  zone_id = data.cloudflare_zone.this.id
+  name    = "api"
+  type    = "CNAME"
+  content = module.ecs_api.alb_dns_name
+  ttl     = 60
+  proxied = false
 }
 
 # ---------- Network ----------
@@ -97,7 +151,7 @@ resource "aws_lb_listener" "api_https" {
   port              = 443
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
-  certificate_arn   = aws_acm_certificate.api.arn
+  certificate_arn   = aws_acm_certificate_validation.api.certificate_arn
 
   default_action {
     type             = "forward"
