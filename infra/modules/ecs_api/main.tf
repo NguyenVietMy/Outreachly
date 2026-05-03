@@ -3,6 +3,7 @@ locals {
 }
 
 # ---------- Security Groups ----------
+
 resource "aws_security_group" "alb" {
   name   = "${local.name}-alb-sg"
   vpc_id = var.vpc_id
@@ -48,7 +49,8 @@ resource "aws_security_group" "ecs" {
   }
 }
 
-# ---------- Load Balancer ----------
+# ---------- Load Balancer (public subnets) ----------
+
 resource "aws_lb" "this" {
   name               = "${local.name}-alb"
   load_balancer_type = "application"
@@ -88,7 +90,8 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-# ---------- IAM for ECS ----------
+# ---------- IAM ----------
+
 data "aws_iam_policy_document" "task_assume" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -100,7 +103,6 @@ data "aws_iam_policy_document" "task_assume" {
   }
 }
 
-
 resource "aws_iam_role" "task_exec" {
   name               = "${local.name}-exec-role"
   assume_role_policy = data.aws_iam_policy_document.task_assume.json
@@ -111,7 +113,6 @@ resource "aws_iam_role_policy_attachment" "task_exec_attach" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# Secrets Manager permissions for the ECS task
 resource "aws_iam_role_policy" "secrets_access" {
   name = "${local.name}-secrets-access"
   role = aws_iam_role.task_exec.id
@@ -125,23 +126,14 @@ resource "aws_iam_role_policy" "secrets_access" {
           "secretsmanager:GetSecretValue",
           "secretsmanager:DescribeSecret"
         ]
-        Resource = [
-          var.supabase_session_pooler_secret_arn,
-          var.db_user_secret_arn,
-          var.db_password_secret_arn,
-          var.openai_api_key_secret_arn,
-          var.hunter_acc_1_secret_arn,
-          var.hunter_acc_2_secret_arn,
-          var.google_client_id_secret_arn,
-          var.google_client_secret_secret_arn
-        ]
+        Resource = values(var.secret_arns)
       }
     ]
   })
 }
 
-
 # ---------- Cluster, Task, Service ----------
+
 resource "aws_ecs_cluster" "this" {
   name = "${local.name}-cluster"
 }
@@ -163,48 +155,37 @@ resource "aws_ecs_task_definition" "api" {
 
   container_definitions = jsonencode([
     {
-      name  = "api"
-      image = var.container_image
+      name      = "api"
+      image     = var.container_image
       essential = true
+
       portMappings = [
         {
           containerPort = var.container_port
           protocol      = "tcp"
         }
       ]
-      
-      # OAuth2 configuration via environment variables
-      # Note: In production, consider using AWS Secrets Manager for these values
 
       logConfiguration = {
         logDriver = "awslogs"
         options = {
           awslogs-group         = aws_cloudwatch_log_group.api.name
-          awslogs-region        = data.aws_region.current.name
+          awslogs-region        = data.aws_region.current.id
           awslogs-stream-prefix = "ecs"
         }
       }
+
       environment = [
         { name = "JAVA_OPTS", value = "-XX:+ExitOnOutOfMemoryError" },
-        { name = "GOOGLE_REDIRECT_URI", value = "https://api.outreach-ly.com/login/oauth2/code/google" },
-        { name = "GOOGLE_GMAIL_REDIRECT_URI", value = "https://api.outreach-ly.com/login/oauth2/code/google-gmail" },
-        { name = "FRONTEND_URL", value = "https://www.outreach-ly.com" },
-        { name = "AWS_FROM_EMAIL", value = "noreply@outreach-ly.com" },
-        { name = "AWS_FROM_NAME", value = "Pulse" },
-        { name = "AWS_BOUNCE_EMAIL", value = "bounces@outreach-ly.com" },
-        { name = "AWS_COMPLAINT_EMAIL", value = "complaints@outreach-ly.com" }
+        { name = "GOOGLE_REDIRECT_URI", value = "https://${var.api_domain}/login/oauth2/code/google" },
+        { name = "FRONTEND_URL", value = var.frontend_url },
+        { name = "SLACK_REDIRECT_URI", value = "https://${var.api_domain}/api/integrations/slack/callback" },
+        { name = "LINEAR_REDIRECT_URI", value = "https://${var.api_domain}/api/integrations/linear/callback" },
+        { name = "INTEGRATIONS_FRONTEND_URL", value = var.frontend_url },
+        { name = "CORS_ALLOWED_ORIGINS", value = "${var.frontend_url},https://www.${var.api_domain}" }
       ]
 
-      secrets = [
-        { name = "SUPABASE_SESSION_POOLER", valueFrom = var.supabase_session_pooler_secret_arn },
-        { name = "DB_USER", valueFrom = var.db_user_secret_arn },
-        { name = "DB_PASSWORD", valueFrom = var.db_password_secret_arn },
-        { name = "OPENAI_API_KEY", valueFrom = var.openai_api_key_secret_arn },
-        { name = "HUNTER_ACC_1", valueFrom = var.hunter_acc_1_secret_arn },
-        { name = "HUNTER_ACC_2", valueFrom = var.hunter_acc_2_secret_arn },
-        { name = "GOOGLE_CLIENT_ID", valueFrom = var.google_client_id_secret_arn },
-        { name = "GOOGLE_CLIENT_SECRET", valueFrom = var.google_client_secret_secret_arn }
-      ]
+      secrets = [for name, arn in var.secret_arns : { name = name, valueFrom = arn }]
     }
   ])
 }
@@ -218,10 +199,14 @@ resource "aws_ecs_service" "api" {
 
   health_check_grace_period_seconds = 180
 
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
+
   network_configuration {
-    subnets          = var.public_subnet_ids
+    subnets          = var.private_subnet_ids
     security_groups  = [aws_security_group.ecs.id]
-    assign_public_ip = true
+    assign_public_ip = false
   }
 
   load_balancer {

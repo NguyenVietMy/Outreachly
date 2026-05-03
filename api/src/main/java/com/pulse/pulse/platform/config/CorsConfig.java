@@ -32,8 +32,8 @@ public class CorsConfig {
             origins = Arrays.asList(
                     "http://localhost:3000",
                     "http://localhost:3001",
-                    "https://www.outreach-ly.com",
-                    "https://outreach-ly.com");
+                    "https://pulse-cs.com",
+                    "https://www.pulse-cs.com");
         }
         configuration.setAllowedOriginPatterns(origins);
 

@@ -1,68 +1,35 @@
-variable "project" {
-  type = string
-}
-
-variable "env" {
-  type = string
-}
-
-variable "vpc_id" {
-  type = string
-}
+variable "project" { type = string }
+variable "env" { type = string }
+variable "vpc_id" { type = string }
 
 variable "public_subnet_ids" {
-  type = list(string)
+  type        = list(string)
+  description = "Subnets for the ALB"
 }
 
-variable "container_image" {
-  type = string
+variable "private_subnet_ids" {
+  type        = list(string)
+  description = "Subnets for ECS tasks"
 }
+
+variable "container_image" { type = string }
 
 variable "container_port" {
   type    = number
   default = 8080
 }
 
-
-# ACM / HTTPS
-variable "domain_name" {
-  description = "FQDN for the API (e.g., api.dev.yourdomain.com)"
+variable "api_domain" {
   type        = string
+  description = "FQDN for the API (e.g. api.pulse-cs.com)"
 }
 
-# Secrets Manager
-variable "supabase_session_pooler_secret_arn" {
-  type = string
-}
-
-variable "db_user_secret_arn" {
-  type = string
-}
-
-variable "db_password_secret_arn" {
-  type = string
-}
-
-variable "openai_api_key_secret_arn" {
-  type = string
-}
-
-# Hunter API keys (Secrets Manager)
-variable "hunter_acc_1_secret_arn" {
-  type = string
-}
-
-variable "hunter_acc_2_secret_arn" {
-  type = string
-}
-
-# OAuth2 Secrets (Secrets Manager)
-variable "google_client_id_secret_arn" {
+variable "frontend_url" {
   type        = string
-  description = "ARN of Secrets Manager secret containing Google OAuth2 Client ID"
+  description = "Frontend URL with scheme (e.g. https://pulse-cs.com)"
 }
 
-variable "google_client_secret_secret_arn" {
-  type        = string
-  description = "ARN of Secrets Manager secret containing Google OAuth2 Client Secret"
+variable "secret_arns" {
+  type        = map(string)
+  description = "Map of env var name to Secrets Manager ARN"
 }

@@ -3,5 +3,9 @@ output "vpc_id" {
 }
 
 output "public_subnet_ids" {
-  value = [for k in sort(keys(aws_subnet.public)) : aws_subnet.public[k].id]
+  value = aws_subnet.public[*].id
+}
+
+output "private_subnet_ids" {
+  value = aws_subnet.private[*].id
 }
