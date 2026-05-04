@@ -33,5 +33,6 @@ build/
 .vscode/
 
 
+# Local backend env files
 .env.local.properties
 .env.prod.properties
