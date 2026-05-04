@@ -8,14 +8,12 @@ export default function Header() {
 
   if (loading) {
     return (
-      <header className="bg-background/80 backdrop-blur-md border-b border-border sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Link href="/" className="text-lg font-semibold text-foreground tracking-tight">
-                Pulse
-              </Link>
-            </div>
+      <header className="fixed top-4 left-1/2 -translate-x-1/2 w-[60%] max-w-3xl z-40">
+        <div className="bg-background/80 backdrop-blur-md border border-border rounded-full px-6">
+          <div className="flex justify-between items-center h-14">
+            <Link href="/" className="text-lg font-semibold text-foreground tracking-tight">
+              Pulse
+            </Link>
             <div className="animate-pulse bg-muted h-8 w-24 rounded-full"></div>
           </div>
         </div>
@@ -24,16 +22,14 @@ export default function Header() {
   }
 
   return (
-    <header className="bg-background/80 backdrop-blur-md border-b border-border sticky top-0 z-40">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          <div className="flex items-center">
-            <Link href="/" className="text-lg font-semibold text-foreground tracking-tight">
-              Pulse
-            </Link>
-          </div>
+    <header className="fixed top-4 left-1/2 -translate-x-1/2 w-[60%] max-w-3xl z-40">
+      <div className="bg-background/80 backdrop-blur-md border border-border rounded-full px-6 shadow-card">
+        <div className="flex justify-between items-center h-14">
+          <Link href="/" className="text-lg font-semibold text-foreground tracking-tight">
+            Pulse
+          </Link>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
             {user ? (
               <>
                 <div className="flex items-center space-x-3">
@@ -57,7 +53,7 @@ export default function Header() {
                 </button>
               </>
             ) : (
-              <div className="flex items-center space-x-3">
+              <>
                 <Link
                   href="/auth"
                   className="text-sm font-medium text-muted-foreground hover:text-foreground px-4 py-2 rounded-full hover:bg-secondary"
@@ -70,7 +66,7 @@ export default function Header() {
                 >
                   Get Started
                 </Link>
-              </div>
+              </>
             )}
           </div>
         </div>

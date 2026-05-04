@@ -7,12 +7,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Mail,
-  CheckCircle,
-  UserPlus,
-  Send,
-  BarChart3,
-  Shield,
+  Target,
+  FileText,
+  Flag,
+  Zap,
+  Sparkles,
+  BookOpen,
 } from "lucide-react";
 
 interface FeatureCardProps {
@@ -44,40 +44,40 @@ const FeatureCard = ({
 const FeatureGrid = () => {
   const features = [
     {
-      icon: <UserPlus className="h-6 w-6 text-brand-deep" />,
-      title: "Lead Enrichment",
+      icon: <Target className="h-6 w-6 text-brand-deep" />,
+      title: "SWE Readiness",
       description:
-        "Automatically enhance your lead data with verified contact information, social profiles, and company details.",
+        "AI-powered assessments across algorithms, system design, and behavioral skills to gauge your interview readiness.",
     },
     {
-      icon: <CheckCircle className="h-6 w-6 text-brand-deep" />,
-      title: "Email Verification",
+      icon: <FileText className="h-6 w-6 text-brand-deep" />,
+      title: "Resume Scoring",
       description:
-        "Ensure your emails reach real inboxes with our advanced verification system that reduces bounce rates to under 1%.",
+        "Upload your resume and get instant AI feedback on impact, structure, and how it stacks up for top companies.",
     },
     {
-      icon: <Mail className="h-6 w-6 text-brand-deep" />,
-      title: "AI Personalization",
+      icon: <Flag className="h-6 w-6 text-brand-deep" />,
+      title: "Goal Tracking",
       description:
-        "Create highly personalized outreach messages that resonate with your prospects using our AI-powered content engine.",
+        "Set career milestones with deadlines and track your progress week over week to stay on course.",
     },
     {
-      icon: <Send className="h-6 w-6 text-brand-deep" />,
-      title: "Workspace Automation",
+      icon: <Zap className="h-6 w-6 text-brand-deep" />,
+      title: "Integration Hub",
       description:
-        "Run lead workflows, enrich records, and keep your workspace organized with lightweight automation.",
+        "Connect GitHub, Obsidian, Slack, and Linear to automatically track your engineering activity.",
     },
     {
-      icon: <BarChart3 className="h-6 w-6 text-brand-deep" />,
-      title: "Performance Analytics",
+      icon: <Sparkles className="h-6 w-6 text-brand-deep" />,
+      title: "AI Digest",
       description:
-        "Track open rates, replies, and conversions with detailed analytics to optimize your outreach strategy.",
+        "Personalized weekly insights on your activity trends, strengths, and areas to focus on next.",
     },
     {
-      icon: <Shield className="h-6 w-6 text-brand-deep" />,
-      title: "Deliverability Controls",
+      icon: <BookOpen className="h-6 w-6 text-brand-deep" />,
+      title: "Study Tasks",
       description:
-        "Maximize inbox placement with smart sending controls, domain warmup, and reputation management tools.",
+        "AI-generated study plans and tasks tailored to your skill gaps, so you always know what to work on.",
     },
   ];
 
@@ -86,11 +86,11 @@ const FeatureGrid = () => {
       <div className="container mx-auto max-w-7xl">
         <div className="text-center mb-12">
           <h2 className="text-[40px] font-semibold tracking-[-0.02em] leading-[1.10] mb-2">
-            Powerful Features
+            Everything You Need
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Everything you need to build a cleaner outbound workflow from lead
-            import through enrichment and personalization.
+            From readiness assessments to AI-generated study plans — tools built
+            to help you get internship-ready.
           </p>
         </div>
 

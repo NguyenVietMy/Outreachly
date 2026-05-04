@@ -3,20 +3,16 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "./ui/button";
-import { ArrowRight, BarChart3, Mail, Shield } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 interface HeroSectionProps {
   headline?: string;
-  subtext?: string;
   primaryCTA?: string;
-  secondaryCTA?: string;
 }
 
 const HeroSection = ({
-  headline = "Smarter lead enrichment. Cold outreach that actually gets replies.",
-  subtext = "Leverage AI-powered personalization, enhanced deliverability, and lightning-fast campaign management to boost your sales outreach performance.",
-  primaryCTA = "Get Started Free",
-  secondaryCTA = "Book Demo",
+  headline = "Land your SWE internship.",
+  primaryCTA = "Get Started",
 }: HeroSectionProps) => {
   const router = useRouter();
   return (
@@ -29,20 +25,11 @@ const HeroSection = ({
 
       <div className="container mx-auto px-4 relative z-10">
         <div className="max-w-3xl mx-auto text-center">
-          <div className="inline-flex items-center px-4 py-1.5 mb-6 rounded-full bg-brand-light dark:bg-brand-deep/20 text-brand-deep dark:text-brand-accent border border-brand-accent/30 text-sm font-medium">
-            <span className="mr-2">✨</span>
-            <span>AI-Powered Outreach Platform</span>
-          </div>
-
-          <h1 className="text-4xl md:text-5xl lg:text-[64px] font-semibold leading-[1.15] tracking-[-0.02em] text-foreground mb-6">
+          <h1 className="text-4xl md:text-5xl lg:text-[64px] font-semibold leading-[1.15] tracking-[-0.02em] text-foreground mb-8">
             {headline}
           </h1>
 
-          <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            {subtext}
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
+          <div className="flex items-center justify-center mb-12">
             <Button
               size="lg"
               variant="brand"
@@ -52,13 +39,6 @@ const HeroSection = ({
               {primaryCTA}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="h-12 px-8 text-base font-medium"
-            >
-              {secondaryCTA}
-            </Button>
           </div>
         </div>
 
@@ -67,7 +47,7 @@ const HeroSection = ({
           <div className="aspect-[16/9] rounded-xl overflow-hidden border border-border/50 shadow-2xl">
             <img
               src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&q=80"
-              alt="Pulse AI Dashboard"
+              alt="Pulse Dashboard"
               className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent"></div>
@@ -77,14 +57,14 @@ const HeroSection = ({
           <div className="absolute -top-6 -right-6 bg-card border border-border/50 rounded-lg p-4 shadow-card hidden md:block">
             <div className="flex items-center gap-2">
               <div className="h-3 w-3 rounded-full bg-brand-accent"></div>
-              <span className="text-sm font-medium">98% Delivery Rate</span>
+              <span className="text-sm font-medium">Readiness: 82%</span>
             </div>
           </div>
 
           <div className="absolute -bottom-6 -left-6 bg-card border border-border/50 rounded-lg p-4 shadow-card hidden md:block">
             <div className="flex items-center gap-2">
               <div className="h-3 w-3 rounded-full bg-brand-accent"></div>
-              <span className="text-sm font-medium">3.2x Reply Rate</span>
+              <span className="text-sm font-medium">5 Goals on Track</span>
             </div>
           </div>
         </div>
