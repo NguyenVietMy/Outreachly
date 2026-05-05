@@ -11,6 +11,9 @@ import com.pulse.pulse.personal.infrastructure.persistence.DailySuggestionReposi
 import com.pulse.pulse.personal.infrastructure.persistence.UserGoalRepository;
 import com.pulse.pulse.personal.infrastructure.persistence.UserProfileRepository;
 import com.pulse.pulse.platform.ai.OpenAiService;
+import com.pulse.pulse.platform.observability.PulseObservability;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.observation.Observation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,50 +37,95 @@ public class DailySuggestionService {
     private final DashboardService dashboardService;
     private final OpenAiService openAiService;
     private final ObjectMapper objectMapper;
+    private final PulseObservability observability;
 
     private static final long CACHE_HOURS = 12;
     private static final long REGENERATE_COOLDOWN_HOURS = 1;
 
     public DailySuggestionService(DailySuggestionRepository suggestionRepo,
-                                   UserProfileRepository profileRepo,
-                                   UserGoalRepository goalRepo,
-                                   DashboardService dashboardService,
-                                   OpenAiService openAiService,
-                                   ObjectMapper objectMapper) {
+                                  UserProfileRepository profileRepo,
+                                  UserGoalRepository goalRepo,
+                                  DashboardService dashboardService,
+                                  OpenAiService openAiService,
+                                  ObjectMapper objectMapper,
+                                  PulseObservability observability) {
         this.suggestionRepo = suggestionRepo;
         this.profileRepo = profileRepo;
         this.goalRepo = goalRepo;
         this.dashboardService = dashboardService;
         this.openAiService = openAiService;
         this.objectMapper = objectMapper;
+        this.observability = observability;
     }
 
     public DailySuggestionView getSuggestionsForToday(Long userId) {
-        LocalDate today = LocalDate.now();
-        Optional<DailySuggestion> cached = suggestionRepo.findByUserIdAndSuggestionDate(userId, today);
+        Observation observation = observability.start("pulse.suggestions.generate");
+        observability.low(observation, "operation", "today");
+        observability.high(observation, "user.id", userId);
 
-        if (cached.isPresent()) {
-            DailySuggestion existing = cached.get();
-            if (existing.getGeneratedAt().plusHours(CACHE_HOURS).isAfter(LocalDateTime.now())) {
-                return toView(existing);
+        try {
+            LocalDate today = LocalDate.now();
+            Optional<DailySuggestion> cached = suggestionRepo.findByUserIdAndSuggestionDate(userId, today);
+
+            if (cached.isPresent()) {
+                DailySuggestion existing = cached.get();
+                if (existing.getGeneratedAt().plusHours(CACHE_HOURS).isAfter(LocalDateTime.now())) {
+                    observability.low(observation, "cache", "cache_hit");
+                    observability.low(observation, "result", "cache_hit");
+                    observability.counter("pulse.suggestions.requests",
+                                    "operation", "today",
+                                    "result", "cache_hit")
+                            .increment();
+                    return toView(existing);
+                }
             }
-        }
 
-        return generateSuggestions(userId, today);
+            observability.low(observation, "cache", "miss");
+            DailySuggestionView result = generateSuggestions(userId, today, "today");
+            observability.low(observation, "result", "generated");
+            return result;
+        } catch (RuntimeException e) {
+            observation.error(e);
+            observability.low(observation, "result", "error");
+            throw e;
+        } finally {
+            observation.stop();
+        }
     }
 
     public DailySuggestionView regenerateSuggestions(Long userId) {
-        LocalDate today = LocalDate.now();
-        Optional<DailySuggestion> existing = suggestionRepo.findByUserIdAndSuggestionDate(userId, today);
+        Observation observation = observability.start("pulse.suggestions.generate");
+        observability.low(observation, "operation", "regenerate");
+        observability.high(observation, "user.id", userId);
 
-        if (existing.isPresent()) {
-            DailySuggestion current = existing.get();
-            if (current.getGeneratedAt().plusHours(REGENERATE_COOLDOWN_HOURS).isAfter(LocalDateTime.now())) {
-                return null;
+        try {
+            LocalDate today = LocalDate.now();
+            Optional<DailySuggestion> existing = suggestionRepo.findByUserIdAndSuggestionDate(userId, today);
+
+            if (existing.isPresent()) {
+                DailySuggestion current = existing.get();
+                if (current.getGeneratedAt().plusHours(REGENERATE_COOLDOWN_HOURS).isAfter(LocalDateTime.now())) {
+                    observability.low(observation, "cache", "cooldown");
+                    observability.low(observation, "result", "cooldown");
+                    observability.counter("pulse.suggestions.requests",
+                                    "operation", "regenerate",
+                                    "result", "cooldown")
+                            .increment();
+                    return null;
+                }
             }
-        }
 
-        return generateSuggestions(userId, today);
+            observability.low(observation, "cache", "regenerate");
+            DailySuggestionView result = generateSuggestions(userId, today, "regenerate");
+            observability.low(observation, "result", "generated");
+            return result;
+        } catch (RuntimeException e) {
+            observation.error(e);
+            observability.low(observation, "result", "error");
+            throw e;
+        } finally {
+            observation.stop();
+        }
     }
 
     public LocalDateTime getNextAllowedRegenerateTime(Long userId) {
@@ -88,41 +136,53 @@ public class DailySuggestionService {
     }
 
     @Transactional
-    private DailySuggestionView generateSuggestions(Long userId, LocalDate date) {
+    private DailySuggestionView generateSuggestions(Long userId, LocalDate date, String operation) {
+        Timer.Sample sample = observability.timerSample();
+        String result = "error";
         String context = buildContextPrompt(userId);
         String contextHash = sha256(context);
 
-        String response = openAiService.generateDailySuggestions(context).block();
-        if (response == null) {
-            throw new RuntimeException("Failed to generate daily suggestions");
-        }
-
-        List<Map<String, Object>> tasks;
         try {
-            tasks = objectMapper.readValue(response, new TypeReference<>() {});
-        } catch (Exception e) {
-            log.error("Failed to parse daily suggestions response: {}", response, e);
-            throw new RuntimeException("Failed to parse daily suggestions");
-        }
+            String response = openAiService.generateDailySuggestions(context).block();
+            if (response == null) {
+                throw new RuntimeException("Failed to generate daily suggestions");
+            }
 
-        Optional<DailySuggestion> existing = suggestionRepo.findByUserIdAndSuggestionDate(userId, date);
-        DailySuggestion suggestion;
-        if (existing.isPresent()) {
-            suggestion = existing.get();
-            suggestion.setTasks(tasks);
-            suggestion.setContextHash(contextHash);
-            suggestion.setGeneratedAt(LocalDateTime.now());
-        } else {
-            suggestion = DailySuggestion.builder()
-                    .userId(userId)
-                    .suggestionDate(date)
-                    .tasks(tasks)
-                    .contextHash(contextHash)
-                    .generatedAt(LocalDateTime.now())
-                    .build();
-        }
+            List<Map<String, Object>> tasks;
+            try {
+                tasks = objectMapper.readValue(response, new TypeReference<>() {
+                });
+            } catch (Exception e) {
+                log.error("Failed to parse daily suggestions response: {}", response, e);
+                throw new RuntimeException("Failed to parse daily suggestions", e);
+            }
 
-        return toView(suggestionRepo.save(suggestion));
+            Optional<DailySuggestion> existing = suggestionRepo.findByUserIdAndSuggestionDate(userId, date);
+            DailySuggestion suggestion;
+            if (existing.isPresent()) {
+                suggestion = existing.get();
+                suggestion.setTasks(tasks);
+                suggestion.setContextHash(contextHash);
+                suggestion.setGeneratedAt(LocalDateTime.now());
+            } else {
+                suggestion = DailySuggestion.builder()
+                        .userId(userId)
+                        .suggestionDate(date)
+                        .tasks(tasks)
+                        .contextHash(contextHash)
+                        .generatedAt(LocalDateTime.now())
+                        .build();
+            }
+
+            result = "generated";
+            return toView(suggestionRepo.save(suggestion));
+        } finally {
+            observability.counter("pulse.suggestions.requests",
+                            "operation", operation,
+                            "result", result)
+                    .increment();
+            observability.stopTimer(sample, "pulse.suggestions.generate.duration", "result", result);
+        }
     }
 
     private String buildContextPrompt(Long userId) {
@@ -162,7 +222,9 @@ public class DailySuggestionService {
 
     private void buildGoalsBlock(StringBuilder sb, Long userId) {
         List<UserGoal> goals = goalRepo.findByUserIdAndStatus(userId, "active");
-        if (goals.isEmpty()) return;
+        if (goals.isEmpty()) {
+            return;
+        }
 
         sb.append("=== ACTIVE GOALS ===\n");
         for (UserGoal goal : goals) {
@@ -180,12 +242,16 @@ public class DailySuggestionService {
     private void buildProjectsBlock(StringBuilder sb, Long userId) {
         LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
         List<RepositorySnapshotView> repos = dashboardService.getActiveGitHubRepositories(userId, sevenDaysAgo);
-        if (repos.isEmpty()) return;
+        if (repos.isEmpty()) {
+            return;
+        }
 
         sb.append("=== ACTIVE GITHUB PROJECTS ===\n");
         int count = 0;
         for (RepositorySnapshotView repo : repos) {
-            if (count >= 5) break;
+            if (count >= 5) {
+                break;
+            }
             sb.append("--- ").append(repo.repoFullName()).append(" ---\n");
             if (repo.description() != null) {
                 sb.append("Description: ").append(repo.description()).append("\n");
@@ -216,10 +282,14 @@ public class DailySuggestionService {
                 sb.append("Recent commits:\n");
                 int commitCount = 0;
                 for (Map<String, Object> commit : commits) {
-                    if (commitCount >= 5) break;
+                    if (commitCount >= 5) {
+                        break;
+                    }
                     sb.append("  - \"").append(commit.getOrDefault("message", "")).append("\"");
                     Object date = commit.get("date");
-                    if (date != null) sb.append(" (").append(date).append(")");
+                    if (date != null) {
+                        sb.append(" (").append(date).append(")");
+                    }
                     sb.append("\n");
                     commitCount++;
                 }
@@ -230,7 +300,9 @@ public class DailySuggestionService {
                 sb.append("Open PRs:\n");
                 for (Map<String, Object> pr : prs) {
                     sb.append("  - \"").append(pr.getOrDefault("title", "")).append("\"");
-                    if (Boolean.TRUE.equals(pr.get("draft"))) sb.append(" [draft]");
+                    if (Boolean.TRUE.equals(pr.get("draft"))) {
+                        sb.append(" [draft]");
+                    }
                     sb.append(" (created: ").append(pr.getOrDefault("createdAt", "")).append(")");
                     sb.append("\n");
                 }
@@ -253,7 +325,9 @@ public class DailySuggestionService {
 
             if (repo.readmeContent() != null && !repo.readmeContent().isEmpty()) {
                 String excerpt = repo.readmeContent();
-                if (excerpt.length() > 500) excerpt = excerpt.substring(0, 500) + "...";
+                if (excerpt.length() > 500) {
+                    excerpt = excerpt.substring(0, 500) + "...";
+                }
                 sb.append("README excerpt: ").append(excerpt).append("\n");
             }
 
@@ -266,12 +340,16 @@ public class DailySuggestionService {
         LocalDateTime fortyEightHoursAgo = LocalDateTime.now().minusHours(48);
         List<ActivityEventView> events = dashboardService.getRecentEventsSince(userId, fortyEightHoursAgo);
 
-        if (events.isEmpty()) return;
+        if (events.isEmpty()) {
+            return;
+        }
 
         sb.append("=== RECENT ACTIVITY (48 HOURS) ===\n");
         int count = 0;
         for (ActivityEventView event : events) {
-            if (count >= 20) break;
+            if (count >= 20) {
+                break;
+            }
             sb.append("- [").append(event.provider()).append("] ").append(event.title())
                     .append(" (").append(event.eventTimestamp().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)).append(")\n");
             count++;
@@ -291,7 +369,9 @@ public class DailySuggestionService {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
             StringBuilder hex = new StringBuilder();
-            for (byte b : hash) hex.append(String.format("%02x", b));
+            for (byte b : hash) {
+                hex.append(String.format("%02x", b));
+            }
             return hex.toString();
         } catch (Exception e) {
             return "";

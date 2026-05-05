@@ -16,6 +16,8 @@ import com.pulse.pulse.personal.infrastructure.persistence.UserGoalRepository;
 import com.pulse.pulse.personal.infrastructure.persistence.UserProfileRepository;
 import com.pulse.pulse.personal.infrastructure.resume.ResumeService;
 import com.pulse.pulse.platform.ai.OpenAiService;
+import com.pulse.pulse.platform.observability.PulseObservability;
+import io.micrometer.observation.Observation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -42,6 +44,7 @@ public class PersonalService {
     private final LeetCodeService leetCodeService;
     private final ResumeService resumeService;
     private final ObjectMapper objectMapper;
+    private final PulseObservability observability;
 
     public UserProfileView getOrCreateProfile(Long userId) {
         return toView(getOrCreateProfileEntity(userId));
@@ -162,76 +165,104 @@ public class PersonalService {
 
     @Transactional
     public UserProfileView connectLeetCode(Long userId, String username) {
-        Map<String, Object> stats = leetCodeService.fetchStats(username);
-        UserProfile profile = getOrCreateProfileEntity(userId);
-        profile.setLeetcodeUsername(username);
-        profile.setLeetcodeStats(stats);
-        profile.setLeetcodeFetchedAt(OffsetDateTime.now());
-        updateAxisScore(profile, "dsa", ((Number) stats.get("dsaScore")).intValue());
-        UserProfile saved = profileRepo.save(profile);
+        return observability.observe("pulse.leetcode.fetch", observation -> {
+            observability.low(observation, "operation", "connect");
+            observability.high(observation, "user.id", userId);
+            observability.high(observation, "username", username);
+        }, () -> {
+            Map<String, Object> stats = leetCodeService.fetchStats(username);
+            UserProfile profile = getOrCreateProfileEntity(userId);
+            profile.setLeetcodeUsername(username);
+            profile.setLeetcodeStats(stats);
+            profile.setLeetcodeFetchedAt(OffsetDateTime.now());
+            updateAxisScore(profile, "dsa", ((Number) stats.get("dsaScore")).intValue());
+            UserProfile saved = profileRepo.save(profile);
 
-        String eventContext = String.format(
-                "Connected LeetCode account: %s. Total %s (Easy: %s, Medium: %s, Hard: %s). DSA score: %s/100.",
-                username, stats.get("total"), stats.get("easy"),
-                stats.get("medium"), stats.get("hard"), stats.get("dsaScore"));
-        generateEventTasks(userId, "dsa", "leetcode_refresh", eventContext);
-        updateMemory(saved, eventContext);
-        return toView(saved);
+            String eventContext = String.format(
+                    "Connected LeetCode account: %s. Total %s (Easy: %s, Medium: %s, Hard: %s). DSA score: %s/100.",
+                    username, stats.get("total"), stats.get("easy"),
+                    stats.get("medium"), stats.get("hard"), stats.get("dsaScore"));
+            generateEventTasks(userId, "dsa", "leetcode_refresh", eventContext);
+            updateMemory(saved, eventContext);
+            return toView(saved);
+        });
     }
 
     @Transactional
     public UserProfileView refreshLeetCode(Long userId) {
-        UserProfile profile = getOrCreateProfileEntity(userId);
-        if (profile.getLeetcodeUsername() == null) {
-            throw new RuntimeException("LeetCode not connected");
-        }
-        Map<String, Object> stats = leetCodeService.fetchStats(profile.getLeetcodeUsername());
-        profile.setLeetcodeStats(stats);
-        profile.setLeetcodeFetchedAt(OffsetDateTime.now());
-        updateAxisScore(profile, "dsa", ((Number) stats.get("dsaScore")).intValue());
-        UserProfile saved = profileRepo.save(profile);
+        return observability.observe("pulse.leetcode.fetch", observation -> {
+            observability.low(observation, "operation", "refresh");
+            observability.high(observation, "user.id", userId);
+        }, () -> {
+            UserProfile profile = getOrCreateProfileEntity(userId);
+            if (profile.getLeetcodeUsername() == null) {
+                throw new RuntimeException("LeetCode not connected");
+            }
+            Map<String, Object> stats = leetCodeService.fetchStats(profile.getLeetcodeUsername());
+            profile.setLeetcodeStats(stats);
+            profile.setLeetcodeFetchedAt(OffsetDateTime.now());
+            updateAxisScore(profile, "dsa", ((Number) stats.get("dsaScore")).intValue());
+            UserProfile saved = profileRepo.save(profile);
 
-        String eventContext = String.format(
-                "LeetCode stats updated for %s: Total %s (Easy: %s, Medium: %s, Hard: %s). DSA score: %s/100.",
-                profile.getLeetcodeUsername(), stats.get("total"), stats.get("easy"),
-                stats.get("medium"), stats.get("hard"), stats.get("dsaScore"));
-        generateEventTasks(userId, "dsa", "leetcode_refresh", eventContext);
-        updateMemory(saved, eventContext);
-        return toView(saved);
+            String eventContext = String.format(
+                    "LeetCode stats updated for %s: Total %s (Easy: %s, Medium: %s, Hard: %s). DSA score: %s/100.",
+                    profile.getLeetcodeUsername(), stats.get("total"), stats.get("easy"),
+                    stats.get("medium"), stats.get("hard"), stats.get("dsaScore"));
+            generateEventTasks(userId, "dsa", "leetcode_refresh", eventContext);
+            updateMemory(saved, eventContext);
+            return toView(saved);
+        });
     }
 
     // --- Resume ---
 
     @Transactional
     public UserProfileView uploadResume(Long userId, MultipartFile file) {
-        String text = resumeService.extractText(file);
-        UserProfile profile = getOrCreateProfileEntity(userId);
-        profile.setResumeText(text);
-        profile.setResumeFilename(file.getOriginalFilename());
-        profile.setResumeUploadedAt(OffsetDateTime.now());
-        profileRepo.save(profile);
+        return observability.observe("pulse.resume.extract", observation -> {
+            observability.low(observation, "operation", "upload");
+            observability.high(observation, "user.id", userId);
+            observability.high(observation, "file.size_bytes", file.getSize());
+        }, () -> {
+            String text = resumeService.extractText(file);
+            UserProfile profile = getOrCreateProfileEntity(userId);
+            profile.setResumeText(text);
+            profile.setResumeFilename(file.getOriginalFilename());
+            profile.setResumeUploadedAt(OffsetDateTime.now());
+            profileRepo.save(profile);
 
-        try {
-            return toView(applyResumeScore(profile));
-        } catch (Exception e) {
-            log.warn("Resume scoring failed on upload, score will be 0 until re-scored", e);
-            return toView(profile);
-        }
+            try {
+                return toView(applyResumeScore(profile));
+            } catch (Exception e) {
+                log.warn("Resume scoring failed on upload, score will be 0 until re-scored", e);
+                return toView(profile);
+            }
+        });
     }
 
     @Transactional
     public UserProfileView scoreResume(Long userId) {
-        UserProfile profile = getOrCreateProfileEntity(userId);
-        if (profile.getResumeText() == null || profile.getResumeText().isBlank()) {
-            throw new RuntimeException("No resume uploaded");
-        }
-        return toView(applyResumeScore(profile));
+        return observability.observe("pulse.resume.score", observation -> {
+            observability.low(observation, "operation", "score");
+            observability.high(observation, "user.id", userId);
+        }, () -> {
+            UserProfile profile = getOrCreateProfileEntity(userId);
+            if (profile.getResumeText() == null || profile.getResumeText().isBlank()) {
+                throw new RuntimeException("No resume uploaded");
+            }
+            return toView(applyResumeScore(profile));
+        });
     }
 
     private UserProfile applyResumeScore(UserProfile profile) {
-        String raw = openAiService.scoreResume(profile.getResumeText()).block();
+        Observation observation = observability.start("pulse.resume.score");
+        String result = "error";
+
+        observability.low(observation, "operation", "score");
+        observability.high(observation, "user.id", profile.getUserId());
         try {
-            Map<String, Object> breakdown = objectMapper.readValue(raw, new TypeReference<>() {});
+            String raw = openAiService.scoreResume(profile.getResumeText()).block();
+            Map<String, Object> breakdown = objectMapper.readValue(raw, new TypeReference<>() {
+            });
             profile.setResumeScoreBreakdown(breakdown);
 
             Number totalScore = (Number) breakdown.get("total_score");
@@ -249,10 +280,18 @@ public class PersonalService {
                     "Resume scored: %d/100 (%s). %s", score, decision, summary);
             generateEventTasks(profile.getUserId(), "resume", "resume_upload", eventContext);
             updateMemory(saved, eventContext);
+            result = "success";
             return saved;
         } catch (Exception e) {
-            log.error("Failed to parse resume scoring response: {}", raw, e);
+            observation.error(e);
+            log.error("Failed to score resume", e);
             throw new RuntimeException("Failed to parse resume score", e);
+        } finally {
+            observability.low(observation, "result", result);
+            observability.counter("pulse.resume.operations",
+                    "operation", "score",
+                    "result", result).increment();
+            observation.stop();
         }
     }
 
@@ -289,38 +328,44 @@ public class PersonalService {
 
     @Transactional
     public UserProfileView submitQuestionnaire(Long userId, String axis, Map<String, Object> payload) {
-        UserProfile profile = getOrCreateProfileEntity(userId);
+        return observability.observe("pulse.personal.section_tasks.generate", observation -> {
+            observability.low(observation, "operation", "submit_questionnaire");
+            observability.low(observation, "source", axis);
+            observability.high(observation, "user.id", userId);
+        }, () -> {
+            UserProfile profile = getOrCreateProfileEntity(userId);
 
-        if (isNewFormatSection(payload)) {
-            Map<String, Object> merged = mergeSection(axis, profile, payload);
-            int score = computeNewFormatScore(merged);
+            if (isNewFormatSection(payload)) {
+                Map<String, Object> merged = mergeSection(axis, profile, payload);
+                int score = computeNewFormatScore(merged);
 
-            if ("systemDesign".equals(axis)) {
-                profile.setSystemDesignAnswers(merged);
-                updateAxisScore(profile, "systemDesign", score);
-            } else if ("coreCs".equals(axis)) {
-                profile.setCoreCsAnswers(merged);
-                updateAxisScore(profile, "coreCs", score);
+                if ("systemDesign".equals(axis)) {
+                    profile.setSystemDesignAnswers(merged);
+                    updateAxisScore(profile, "systemDesign", score);
+                } else if ("coreCs".equals(axis)) {
+                    profile.setCoreCsAnswers(merged);
+                    updateAxisScore(profile, "coreCs", score);
+                }
+
+                UserProfile saved = profileRepo.save(profile);
+                generateSectionTasks(userId, axis, payload);
+                updateMemory(saved, String.format("Completed %s assessment section: %s. New %s score: %d/100.",
+                        axis, payload.get("sectionId"), axis, score));
+                return toView(saved);
+            } else {
+                int score = computeLegacyScore(payload);
+
+                if ("systemDesign".equals(axis)) {
+                    profile.setSystemDesignAnswers(payload);
+                    updateAxisScore(profile, "systemDesign", score);
+                } else if ("coreCs".equals(axis)) {
+                    profile.setCoreCsAnswers(payload);
+                    updateAxisScore(profile, "coreCs", score);
+                }
             }
 
-            UserProfile saved = profileRepo.save(profile);
-            generateSectionTasks(userId, axis, payload);
-            updateMemory(saved, String.format("Completed %s assessment section: %s. New %s score: %d/100.",
-                    axis, payload.get("sectionId"), axis, score));
-            return toView(saved);
-        } else {
-            int score = computeLegacyScore(payload);
-
-            if ("systemDesign".equals(axis)) {
-                profile.setSystemDesignAnswers(payload);
-                updateAxisScore(profile, "systemDesign", score);
-            } else if ("coreCs".equals(axis)) {
-                profile.setCoreCsAnswers(payload);
-                updateAxisScore(profile, "coreCs", score);
-            }
-        }
-
-        return toView(profileRepo.save(profile));
+            return toView(profileRepo.save(profile));
+        });
     }
 
     private boolean isNewFormatSection(Map<String, Object> payload) {
@@ -493,81 +538,103 @@ public class PersonalService {
 
     @SuppressWarnings("unchecked")
     void generateSectionTasks(Long userId, String axis, Map<String, Object> sectionPayload) {
-        try {
-            String sectionId = (String) sectionPayload.get("sectionId");
-            List<?> subskills = (List<?>) sectionPayload.get("subskills");
-            if (subskills == null) return;
+        observability.observe("pulse.personal.section_tasks.generate", observation -> {
+            observability.low(observation, "operation", "section_tasks");
+            observability.low(observation, "source", axis);
+            observability.high(observation, "user.id", userId);
+            observability.high(observation, "section.id", sectionPayload.get("sectionId"));
+        }, () -> {
+            try {
+                String sectionId = (String) sectionPayload.get("sectionId");
+                List<?> subskills = (List<?>) sectionPayload.get("subskills");
+                if (subskills == null) {
+                    return;
+                }
 
-            StringBuilder context = new StringBuilder();
-            context.append("Axis: ").append(axis).append("\n");
-            context.append("Section: ").append(sectionId).append("\n");
-            context.append("Subskill results:\n");
-            for (Object ss : subskills) {
-                Map<String, Object> subskill = (Map<String, Object>) ss;
-                context.append(String.format("- %s: tier %s/4\n",
-                        subskill.get("subskillId"), subskill.get("tier")));
+                StringBuilder context = new StringBuilder();
+                context.append("Axis: ").append(axis).append("\n");
+                context.append("Section: ").append(sectionId).append("\n");
+                context.append("Subskill results:\n");
+                for (Object ss : subskills) {
+                    Map<String, Object> subskill = (Map<String, Object>) ss;
+                    context.append(String.format("- %s: tier %s/4\n",
+                            subskill.get("subskillId"), subskill.get("tier")));
+                }
+
+                String raw = openAiService.generateSectionTasks(context.toString()).block();
+                List<Map<String, Object>> tasks = objectMapper.readValue(raw, new TypeReference<>() {
+                });
+
+                aiTaskRepo.deleteByUserIdAndAxisAndSectionId(userId, axis, sectionId);
+
+                int idx = 0;
+                for (Map<String, Object> t : tasks) {
+                    aiTaskRepo.save(AiTask.builder()
+                            .userId(userId)
+                            .axis(axis)
+                            .sectionId(sectionId)
+                            .title((String) t.get("title"))
+                            .description((String) t.get("description"))
+                            .source("assessment")
+                            .priority(((Number) t.getOrDefault("priority", 1)).intValue())
+                            .orderIndex(idx++)
+                            .build());
+                }
+            } catch (Exception e) {
+                log.error("Failed to generate section tasks for {}/{}", axis,
+                        sectionPayload.get("sectionId"), e);
             }
-
-            String raw = openAiService.generateSectionTasks(context.toString()).block();
-            List<Map<String, Object>> tasks = objectMapper.readValue(raw, new TypeReference<>() {});
-
-            aiTaskRepo.deleteByUserIdAndAxisAndSectionId(userId, axis, sectionId);
-
-            int idx = 0;
-            for (Map<String, Object> t : tasks) {
-                aiTaskRepo.save(AiTask.builder()
-                        .userId(userId)
-                        .axis(axis)
-                        .sectionId(sectionId)
-                        .title((String) t.get("title"))
-                        .description((String) t.get("description"))
-                        .source("assessment")
-                        .priority(((Number) t.getOrDefault("priority", 1)).intValue())
-                        .orderIndex(idx++)
-                        .build());
-            }
-        } catch (Exception e) {
-            log.error("Failed to generate section tasks for {}/{}", axis,
-                    sectionPayload.get("sectionId"), e);
-        }
+        });
     }
 
     void generateEventTasks(Long userId, String axis, String source, String eventContext) {
-        try {
-            String raw = openAiService.generateEventTasks(eventContext).block();
-            List<Map<String, Object>> tasks = objectMapper.readValue(raw, new TypeReference<>() {});
+        observability.observe("pulse.personal.event_tasks.generate", observation -> {
+            observability.low(observation, "operation", "event_tasks");
+            observability.low(observation, "source", source);
+            observability.high(observation, "user.id", userId);
+        }, () -> {
+            try {
+                String raw = openAiService.generateEventTasks(eventContext).block();
+                List<Map<String, Object>> tasks = objectMapper.readValue(raw, new TypeReference<>() {
+                });
 
-            aiTaskRepo.deleteByUserIdAndSource(userId, source);
+                aiTaskRepo.deleteByUserIdAndSource(userId, source);
 
-            int idx = 0;
-            for (Map<String, Object> t : tasks) {
-                aiTaskRepo.save(AiTask.builder()
-                        .userId(userId)
-                        .axis(axis)
-                        .title((String) t.get("title"))
-                        .description((String) t.get("description"))
-                        .source(source)
-                        .priority(((Number) t.getOrDefault("priority", 1)).intValue())
-                        .orderIndex(idx++)
-                        .build());
+                int idx = 0;
+                for (Map<String, Object> t : tasks) {
+                    aiTaskRepo.save(AiTask.builder()
+                            .userId(userId)
+                            .axis(axis)
+                            .title((String) t.get("title"))
+                            .description((String) t.get("description"))
+                            .source(source)
+                            .priority(((Number) t.getOrDefault("priority", 1)).intValue())
+                            .orderIndex(idx++)
+                            .build());
+                }
+            } catch (Exception e) {
+                log.error("Failed to generate event tasks for {}", source, e);
             }
-        } catch (Exception e) {
-            log.error("Failed to generate event tasks for {}", source, e);
-        }
+        });
     }
 
     void updateMemory(UserProfile profile, String eventDescription) {
-        try {
-            String fullContext = buildFullContext(profile, eventDescription);
-            String updated = openAiService.updateMemory(
-                    profile.getProfileMarkdown(), fullContext).block();
-            if (updated != null && !updated.isBlank()) {
-                profile.setProfileMarkdown(updated);
-                profileRepo.save(profile);
+        observability.observe("pulse.personal.memory.update", observation -> {
+            observability.low(observation, "operation", "memory_update");
+            observability.high(observation, "user.id", profile.getUserId());
+        }, () -> {
+            try {
+                String fullContext = buildFullContext(profile, eventDescription);
+                String updated = openAiService.updateMemory(
+                        profile.getProfileMarkdown(), fullContext).block();
+                if (updated != null && !updated.isBlank()) {
+                    profile.setProfileMarkdown(updated);
+                    profileRepo.save(profile);
+                }
+            } catch (Exception e) {
+                log.error("Failed to update memory", e);
             }
-        } catch (Exception e) {
-            log.error("Failed to update memory", e);
-        }
+        });
     }
 
     private String buildFullContext(UserProfile profile, String eventDescription) {
@@ -680,66 +747,71 @@ public class PersonalService {
     // --- AI Insights ---
 
     public String generateInsights(Long userId) {
-        UserProfile profile = getOrCreateProfileEntity(userId);
-        List<UserGoal> goals = goalRepo.findByUserIdAndStatus(userId, "active");
-        LocalDateTime since = LocalDateTime.now().minusDays(7);
-        List<ActivityEventView> recentEvents = dashboardService.getRecentEventsSince(userId, since);
+        return observability.observe("pulse.personal.insights.generate", observation -> {
+            observability.low(observation, "operation", "insights");
+            observability.high(observation, "user.id", userId);
+        }, () -> {
+            UserProfile profile = getOrCreateProfileEntity(userId);
+            List<UserGoal> goals = goalRepo.findByUserIdAndStatus(userId, "active");
+            LocalDateTime since = LocalDateTime.now().minusDays(7);
+            List<ActivityEventView> recentEvents = dashboardService.getRecentEventsSince(userId, since);
 
-        StringBuilder context = new StringBuilder();
+            StringBuilder context = new StringBuilder();
 
-        if (!profile.getProfileMarkdown().isBlank()) {
-            context.append("=== STUDENT PROFILE ===\n");
-            context.append(profile.getProfileMarkdown()).append("\n\n");
-        }
+            if (!profile.getProfileMarkdown().isBlank()) {
+                context.append("=== STUDENT PROFILE ===\n");
+                context.append(profile.getProfileMarkdown()).append("\n\n");
+            }
 
-        if (profile.getLeetcodeStats() != null && !profile.getLeetcodeStats().isEmpty()) {
-            context.append("=== LEETCODE STATS ===\n");
-            Map<String, Object> lc = profile.getLeetcodeStats();
-            context.append(String.format("Total solved: %s (Easy: %s, Medium: %s, Hard: %s)\n",
-                    lc.get("total"), lc.get("easy"), lc.get("medium"), lc.get("hard")));
-            context.append(String.format("DSA Score: %s/100\n\n", lc.get("dsaScore")));
-        }
+            if (profile.getLeetcodeStats() != null && !profile.getLeetcodeStats().isEmpty()) {
+                context.append("=== LEETCODE STATS ===\n");
+                Map<String, Object> lc = profile.getLeetcodeStats();
+                context.append(String.format("Total solved: %s (Easy: %s, Medium: %s, Hard: %s)\n",
+                        lc.get("total"), lc.get("easy"), lc.get("medium"), lc.get("hard")));
+                context.append(String.format("DSA Score: %s/100\n\n", lc.get("dsaScore")));
+            }
 
-        Map<String, Object> scores = profile.getAxisScores();
-        if (scores != null && !scores.isEmpty()) {
-            context.append("=== AXIS SCORES ===\n");
-            context.append(String.format("DSA: %s, System Design: %s, Core CS: %s, Projects: %s, Resume: %s\n\n",
-                    scores.get("dsa"), scores.get("systemDesign"), scores.get("coreCs"),
-                    scores.get("projects"), scores.get("resume")));
-        }
+            Map<String, Object> scores = profile.getAxisScores();
+            if (scores != null && !scores.isEmpty()) {
+                context.append("=== AXIS SCORES ===\n");
+                context.append(String.format("DSA: %s, System Design: %s, Core CS: %s, Projects: %s, Resume: %s\n\n",
+                        scores.get("dsa"), scores.get("systemDesign"), scores.get("coreCs"),
+                        scores.get("projects"), scores.get("resume")));
+            }
 
-        if (!goals.isEmpty()) {
-            context.append("=== ACTIVE GOALS ===\n");
-            for (UserGoal goal : goals) {
-                context.append(String.format("- %s: %d/%s %s",
-                        goal.getTitle(), goal.getCurrentValue(),
-                        goal.getTargetValue() != null ? goal.getTargetValue().toString() : "?",
-                        goal.getUnit()));
-                if (goal.getDeadline() != null) {
-                    context.append(" (deadline: ").append(goal.getDeadline()).append(")");
+            if (!goals.isEmpty()) {
+                context.append("=== ACTIVE GOALS ===\n");
+                for (UserGoal goal : goals) {
+                    context.append(String.format("- %s: %d/%s %s",
+                            goal.getTitle(), goal.getCurrentValue(),
+                            goal.getTargetValue() != null ? goal.getTargetValue().toString() : "?",
+                            goal.getUnit()));
+                    if (goal.getDeadline() != null) {
+                        context.append(" (deadline: ").append(goal.getDeadline()).append(")");
+                    }
+                    context.append("\n");
                 }
                 context.append("\n");
             }
-            context.append("\n");
-        }
 
-        if (!recentEvents.isEmpty()) {
-            context.append("=== RECENT ACTIVITY (last 7 days) ===\n");
-            for (ActivityEventView e : recentEvents) {
-                context.append(String.format("- [%s] %s\n", e.provider(), e.title()));
+            if (!recentEvents.isEmpty()) {
+                context.append("=== RECENT ACTIVITY (last 7 days) ===\n");
+                for (ActivityEventView e : recentEvents) {
+                    context.append(String.format("- [%s] %s\n", e.provider(), e.title()));
+                }
             }
-        }
 
-        if (context.isEmpty()) {
-            return "Complete your profile and set some goals to get personalized insights.";
-        }
+            if (context.isEmpty()) {
+                return "Complete your profile and set some goals to get personalized insights.";
+            }
 
-        try {
-            return openAiService.generatePersonalInsights(context.toString()).block();
-        } catch (Exception e) {
-            log.error("Failed to generate personal insights", e);
-            return "Could not generate insights at this time.";
-        }
+            try {
+                return openAiService.generatePersonalInsights(context.toString()).block();
+            } catch (Exception e) {
+                log.error("Failed to generate personal insights", e);
+                return "Could not generate insights at this time.";
+            }
+        });
     }
 
     private UserProfileView toView(UserProfile profile) {

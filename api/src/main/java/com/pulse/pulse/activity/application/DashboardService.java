@@ -3,6 +3,8 @@ package com.pulse.pulse.activity.application;
 import com.pulse.pulse.activity.domain.IntegrationEvent;
 import com.pulse.pulse.activity.infrastructure.persistence.GitHubRepositoryRepository;
 import com.pulse.pulse.activity.infrastructure.persistence.IntegrationEventRepository;
+import com.pulse.pulse.platform.observability.PulseObservability;
+import io.micrometer.observation.Observation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -24,6 +26,7 @@ public class DashboardService {
     private final IntegrationEventRepository eventRepo;
     private final GitHubRepositoryRepository gitHubRepositoryRepository;
     private final OpenAiService openAiService;
+    private final PulseObservability observability;
 
     public Map<String, Long> getMetrics(Long userId) {
         LocalDateTime startOfDay = LocalDateTime.now().truncatedTo(ChronoUnit.DAYS);
@@ -184,27 +187,40 @@ public class DashboardService {
     }
 
     public String generateDigest(Long userId) {
-        LocalDateTime since = LocalDateTime.now().minusHours(24);
-        List<IntegrationEvent> events = eventRepo
-                .findByUserIdAndEventTimestampAfterOrderByEventTimestampDesc(userId, since);
-
-        if (events.isEmpty()) {
-            return "No activity recorded in the last 24 hours. Connect some integrations to start tracking your productivity.";
-        }
-
-        StringBuilder context = new StringBuilder();
-        context.append("Here is the CS student's activity from the last 24 hours:\n\n");
-        for (IntegrationEvent e : events) {
-            context.append(String.format("- [%s] %s (%s)\n",
-                    e.getProvider(), e.getTitle(),
-                    e.getEventTimestamp().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"))));
-        }
+        Observation observation = observability.start("pulse.dashboard.digest.generate");
+        observability.low(observation, "operation", "digest");
+        observability.high(observation, "user.id", userId);
 
         try {
-            return openAiService.generateDigest(context.toString()).block();
+            LocalDateTime since = LocalDateTime.now().minusHours(24);
+            List<IntegrationEvent> events = eventRepo
+                    .findByUserIdAndEventTimestampAfterOrderByEventTimestampDesc(userId, since);
+
+            observability.high(observation, "event_count", events.size());
+            if (events.isEmpty()) {
+                observability.low(observation, "cache", "empty");
+                observability.low(observation, "result", "success");
+                return "No activity recorded in the last 24 hours. Connect some integrations to start tracking your productivity.";
+            }
+
+            StringBuilder context = new StringBuilder();
+            context.append("Here is the CS student's activity from the last 24 hours:\n\n");
+            for (IntegrationEvent e : events) {
+                context.append(String.format("- [%s] %s (%s)\n",
+                        e.getProvider(), e.getTitle(),
+                        e.getEventTimestamp().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"))));
+            }
+
+            String digest = openAiService.generateDigest(context.toString()).block();
+            observability.low(observation, "result", "success");
+            return digest;
         } catch (Exception e) {
+            observation.error(e);
+            observability.low(observation, "result", "error");
             log.error("Failed to generate AI digest", e);
-            return "Could not generate digest at this time. You had " + events.size() + " activities in the last 24 hours.";
+            return "Could not generate digest at this time.";
+        } finally {
+            observation.stop();
         }
     }
 

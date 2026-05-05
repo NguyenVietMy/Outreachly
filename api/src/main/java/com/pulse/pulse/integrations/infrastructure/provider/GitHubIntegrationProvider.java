@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pulse.pulse.integrations.application.IntegrationEventPayload;
 import com.pulse.pulse.integrations.application.IntegrationResourceOption;
 import com.pulse.pulse.integrations.domain.UserIntegration;
+import com.pulse.pulse.platform.observability.PulseObservability;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -44,6 +45,7 @@ public class GitHubIntegrationProvider {
 
     private final WebClient gitHubWebClient;
     private final ObjectMapper objectMapper;
+    private final PulseObservability observability;
 
     @Value("${github.app-id:}")
     private String appId;
@@ -58,9 +60,11 @@ public class GitHubIntegrationProvider {
     private String webhookSecret;
 
     public GitHubIntegrationProvider(@Qualifier("gitHubWebClient") WebClient gitHubWebClient,
-                                     ObjectMapper objectMapper) {
+                                     ObjectMapper objectMapper,
+                                     PulseObservability observability) {
         this.gitHubWebClient = gitHubWebClient;
         this.objectMapper = objectMapper;
+        this.observability = observability;
     }
 
     public String buildInstallUrl(String state) {
@@ -73,23 +77,28 @@ public class GitHubIntegrationProvider {
     }
 
     public Map<String, Object> fetchInstallationMetadata(long installationId) {
-        JsonNode installation = gitHubWebClient.get()
-                .uri("/app/installations/{installationId}", installationId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + createAppJwt())
-                .retrieve()
-                .bodyToMono(JsonNode.class)
-                .block();
+        return observability.observe("pulse.github.installation.metadata", observation -> {
+            observability.low(observation, "operation", "fetch_installation_metadata");
+            observability.high(observation, "installation.id", installationId);
+        }, () -> {
+            JsonNode installation = gitHubWebClient.get()
+                    .uri("/app/installations/{installationId}", installationId)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + createAppJwt())
+                    .retrieve()
+                    .bodyToMono(JsonNode.class)
+                    .block();
 
-        if (installation == null) {
-            throw new IllegalStateException("Failed to load GitHub installation details");
-        }
+            if (installation == null) {
+                throw new IllegalStateException("Failed to load GitHub installation details");
+            }
 
-        Map<String, Object> metadata = new HashMap<>();
-        metadata.put("installationId", installationId);
-        metadata.put("accountLogin", installation.path("account").path("login").asText(""));
-        metadata.put("accountType", installation.path("account").path("type").asText(""));
-        metadata.put("repositorySelection", installation.path("repository_selection").asText(""));
-        return metadata;
+            Map<String, Object> metadata = new HashMap<>();
+            metadata.put("installationId", installationId);
+            metadata.put("accountLogin", installation.path("account").path("login").asText(""));
+            metadata.put("accountType", installation.path("account").path("type").asText(""));
+            metadata.put("repositorySelection", installation.path("repository_selection").asText(""));
+            return metadata;
+        });
     }
 
     public String createInstallationAccessToken(UserIntegration integration) {
@@ -103,45 +112,55 @@ public class GitHubIntegrationProvider {
     }
 
     public String createInstallationAccessToken(long installationId) {
-        JsonNode response = gitHubWebClient.post()
-                .uri("/app/installations/{installationId}/access_tokens", installationId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + createAppJwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(Map.of())
-                .retrieve()
-                .bodyToMono(JsonNode.class)
-                .block();
+        return observability.observe("pulse.github.installation.token", observation -> {
+            observability.low(observation, "operation", "create_installation_token");
+            observability.high(observation, "installation.id", installationId);
+        }, () -> {
+            JsonNode response = gitHubWebClient.post()
+                    .uri("/app/installations/{installationId}/access_tokens", installationId)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + createAppJwt())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(Map.of())
+                    .retrieve()
+                    .bodyToMono(JsonNode.class)
+                    .block();
 
-        if (response == null || response.path("token").asText("").isBlank()) {
-            throw new IllegalStateException("Failed to create GitHub installation token");
-        }
+            if (response == null || response.path("token").asText("").isBlank()) {
+                throw new IllegalStateException("Failed to create GitHub installation token");
+            }
 
-        return response.path("token").asText();
+            return response.path("token").asText();
+        });
     }
 
     public List<IntegrationResourceOption> listResources(UserIntegration integration) {
-        String token = createInstallationAccessToken(integration);
-        JsonNode response = gitHubWebClient.get()
-                .uri("/installation/repositories?per_page=100")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .retrieve()
-                .bodyToMono(JsonNode.class)
-                .block();
+        return observability.observe("pulse.github.resources.list", observation -> {
+            observability.low(observation, "operation", "list_resources");
+            observability.high(observation, "installation.id",
+                    integration.getMetadata() != null ? integration.getMetadata().get("installationId") : null);
+        }, () -> {
+            String token = createInstallationAccessToken(integration);
+            JsonNode response = gitHubWebClient.get()
+                    .uri("/installation/repositories?per_page=100")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .retrieve()
+                    .bodyToMono(JsonNode.class)
+                    .block();
 
-        if (response == null || !response.path("repositories").isArray()) {
-            return List.of();
-        }
-
-        List<IntegrationResourceOption> resources = new ArrayList<>();
-        for (JsonNode repo : response.path("repositories")) {
-            String fullName = repo.path("full_name").asText("");
-            if (!fullName.isBlank()) {
-                resources.add(new IntegrationResourceOption(fullName, fullName, "repository"));
+            if (response == null || !response.path("repositories").isArray()) {
+                return List.of();
             }
-        }
 
-        resources.sort((left, right) -> left.label().compareToIgnoreCase(right.label()));
-        return resources;
+            List<IntegrationResourceOption> resources = new ArrayList<>();
+            for (JsonNode repo : response.path("repositories")) {
+                String fullName = repo.path("full_name").asText("");
+                if (!fullName.isBlank()) {
+                    resources.add(new IntegrationResourceOption(fullName, fullName, "repository"));
+                }
+            }
+            resources.sort((left, right) -> left.label().compareToIgnoreCase(right.label()));
+            return resources;
+        });
     }
 
     public Map<String, Object> applySelectedResources(UserIntegration integration, List<String> selectedIds) {
@@ -243,23 +262,29 @@ public class GitHubIntegrationProvider {
     }
 
     public List<IntegrationEventPayload> fetchRecentEvents(UserIntegration integration, LocalDateTime since) {
-        List<String> repositories = getSelectedRepositoryNames(integration.getMetadata());
-        if (repositories.isEmpty()) {
-            return List.of();
-        }
-
-        String token = createInstallationAccessToken(integration);
-        List<IntegrationEventPayload> events = new ArrayList<>();
-        for (String repoFullName : repositories) {
-            String[] parts = repoFullName.split("/");
-            if (parts.length != 2) {
-                continue;
+        return observability.observe("pulse.github.events.fetch", observation -> {
+            observability.low(observation, "operation", "fetch_recent_events");
+            observability.high(observation, "installation.id",
+                    integration.getMetadata() != null ? integration.getMetadata().get("installationId") : null);
+        }, () -> {
+            List<String> repositories = getSelectedRepositoryNames(integration.getMetadata());
+            if (repositories.isEmpty()) {
+                return List.of();
             }
 
-            fetchRecentCommits(token, parts[0], parts[1], since).forEach(events::add);
-            fetchRecentIssues(token, parts[0], parts[1], since).forEach(events::add);
-        }
-        return events;
+            String token = createInstallationAccessToken(integration);
+            List<IntegrationEventPayload> events = new ArrayList<>();
+            for (String repoFullName : repositories) {
+                String[] parts = repoFullName.split("/");
+                if (parts.length != 2) {
+                    continue;
+                }
+
+                fetchRecentCommits(token, parts[0], parts[1], since).forEach(events::add);
+                fetchRecentIssues(token, parts[0], parts[1], since).forEach(events::add);
+            }
+            return events;
+        });
     }
 
     public String getAccountLabel() {

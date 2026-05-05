@@ -31,6 +31,7 @@ locals {
   api_domain                      = "api.pulse-cs.com"
   frontend_url                    = "https://pulse-cs.com"
   observability_otlp_endpoint     = "https://otlp-gateway-prod-us-east-2.grafana.net/otlp/v1/traces"
+  observability_otlp_metrics_url  = "https://otlp-gateway-prod-us-east-2.grafana.net/otlp/v1/metrics"
   observability_service_name      = "pulse-api"
   observability_service_namespace = "pulse"
 }
@@ -150,6 +151,8 @@ module "ecs_api" {
   extra_environment = {
     OBSERVABILITY_TRACING_ENABLED              = "true"
     OBSERVABILITY_OTLP_ENDPOINT                = local.observability_otlp_endpoint
+    OBSERVABILITY_METRICS_ENABLED              = "true"
+    OBSERVABILITY_OTLP_METRICS_URL             = local.observability_otlp_metrics_url
     OBSERVABILITY_TRACING_SAMPLING_PROBABILITY = "1.0"
     OBSERVABILITY_SERVICE_NAME                 = local.observability_service_name
     OBSERVABILITY_SERVICE_NAMESPACE            = local.observability_service_namespace

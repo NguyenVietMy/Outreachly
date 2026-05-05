@@ -17,6 +17,9 @@ import com.pulse.pulse.integrations.infrastructure.provider.GitHubIntegrationPro
 import com.pulse.pulse.integrations.infrastructure.provider.LinearIntegrationProvider;
 import com.pulse.pulse.integrations.infrastructure.provider.ObsidianIntegrationProvider;
 import com.pulse.pulse.integrations.infrastructure.provider.SlackIntegrationProvider;
+import com.pulse.pulse.platform.observability.PulseObservability;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.observation.Observation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,6 +50,7 @@ public class IntegrationService {
     private final LinearIntegrationProvider linearProvider;
     private final ObsidianIntegrationProvider obsidianProvider;
     private final ObjectMapper objectMapper;
+    private final PulseObservability observability;
     private final ConcurrentHashMap<String, ConnectionState> connectionStates = new ConcurrentHashMap<>();
 
     public IntegrationService(UserIntegrationRepository integrationRepo,
@@ -57,7 +61,8 @@ public class IntegrationService {
                               SlackIntegrationProvider slackProvider,
                               LinearIntegrationProvider linearProvider,
                               ObsidianIntegrationProvider obsidianProvider,
-                              ObjectMapper objectMapper) {
+                              ObjectMapper objectMapper,
+                              PulseObservability observability) {
         this.integrationRepo = integrationRepo;
         this.dashboardService = dashboardService;
         this.gitHubProjectSyncService = gitHubProjectSyncService;
@@ -67,6 +72,7 @@ public class IntegrationService {
         this.linearProvider = linearProvider;
         this.obsidianProvider = obsidianProvider;
         this.objectMapper = objectMapper;
+        this.observability = observability;
     }
 
     public List<UserIntegration> getIntegrations(Long userId) {
@@ -135,13 +141,18 @@ public class IntegrationService {
                                                String code,
                                                String state,
                                                Long installationId) {
-        ConnectionState connectionState = consumeState(state, provider);
-        return switch (provider) {
-            case "github" -> connectGitHubInstallation(connectionState.userId(), installationId);
-            case "slack" -> connectSlack(connectionState.userId(), code);
-            case "linear" -> connectLinear(connectionState.userId(), code);
-            default -> throw new IllegalArgumentException("Unknown provider: " + provider);
-        };
+        return observability.observe("pulse.integration.oauth.callback", observation -> {
+            observability.low(observation, "provider", provider);
+            observability.high(observation, "installation.id", installationId);
+        }, () -> {
+            ConnectionState connectionState = consumeState(state, provider);
+            return switch (provider) {
+                case "github" -> connectGitHubInstallation(connectionState.userId(), installationId);
+                case "slack" -> connectSlack(connectionState.userId(), code);
+                case "linear" -> connectLinear(connectionState.userId(), code);
+                default -> throw new IllegalArgumentException("Unknown provider: " + provider);
+            };
+        });
     }
 
     @Transactional
@@ -185,35 +196,52 @@ public class IntegrationService {
 
     @Transactional
     public SyncResult sync(Long userId, String provider) {
-        UserIntegration integration = integrationRepo
-                .findByUserIdAndProvider(userId, provider)
-                .orElseThrow(() -> new RuntimeException("Integration not found: " + provider));
+        Timer.Sample sample = observability.timerSample();
+        String result = "error";
+        try {
+            SyncResult syncResult = observability.observe("pulse.integration.sync", observation -> {
+                observability.low(observation, "provider", provider);
+                observability.low(observation, "mode", "manual");
+                observability.high(observation, "user.id", userId);
+            }, () -> {
+                UserIntegration integration = integrationRepo
+                        .findByUserIdAndProvider(userId, provider)
+                        .orElseThrow(() -> new RuntimeException("Integration not found: " + provider));
 
-        if (!"connected".equals(integration.getStatus())) {
-            throw new RuntimeException("Integration is not connected");
+                if (!"connected".equals(integration.getStatus())) {
+                    throw new RuntimeException("Integration is not connected");
+                }
+
+                LocalDateTime since = integration.getLastSyncedAt() != null
+                        ? integration.getLastSyncedAt()
+                        : LocalDateTime.now(ZoneOffset.UTC).minusDays(7);
+
+                List<IntegrationEventPayload> fetched = switch (provider) {
+                    case "github" -> gitHubProvider.fetchRecentEvents(integration, since);
+                    case "obsidian" -> obsidianProvider.fetchRecentEvents(resolveGitHubToken(userId), integration, since);
+                    case "slack" -> slackProvider.fetchRecentEvents(integration, since);
+                    case "linear" -> linearProvider.fetchRecentEvents(integration, since);
+                    default -> throw new IllegalArgumentException("Unknown provider: " + provider);
+                };
+
+                int newEvents = ingestEvents(userId, provider, fetched);
+                integration.setLastSyncedAt(LocalDateTime.now(ZoneOffset.UTC));
+                integrationRepo.save(integration);
+
+                if ("github".equals(provider)) {
+                    syncGitHubProjects(userId);
+                }
+
+                return new SyncResult(newEvents, fetched.size());
+            });
+            result = "success";
+            return syncResult;
+        } finally {
+            observability.stopTimer(sample, "pulse.integration.sync.duration",
+                    "provider", provider,
+                    "mode", "manual",
+                    "result", result);
         }
-
-        LocalDateTime since = integration.getLastSyncedAt() != null
-                ? integration.getLastSyncedAt()
-                : LocalDateTime.now(ZoneOffset.UTC).minusDays(7);
-
-        List<IntegrationEventPayload> fetched = switch (provider) {
-            case "github" -> gitHubProvider.fetchRecentEvents(integration, since);
-            case "obsidian" -> obsidianProvider.fetchRecentEvents(resolveGitHubToken(userId), integration, since);
-            case "slack" -> slackProvider.fetchRecentEvents(integration, since);
-            case "linear" -> linearProvider.fetchRecentEvents(integration, since);
-            default -> throw new IllegalArgumentException("Unknown provider: " + provider);
-        };
-
-        int newEvents = ingestEvents(userId, provider, fetched);
-        integration.setLastSyncedAt(LocalDateTime.now(ZoneOffset.UTC));
-        integrationRepo.save(integration);
-
-        if ("github".equals(provider)) {
-            syncGitHubProjects(userId);
-        }
-
-        return new SyncResult(newEvents, fetched.size());
     }
 
     @Transactional
@@ -228,10 +256,16 @@ public class IntegrationService {
     }
 
     public int syncGitHubProjects(Long userId) {
-        GitHubProjectSyncRequest request = getGitHubProjectSyncRequest(userId);
-        int count = gitHubProjectSyncService.syncProjects(request);
-        markProjectSyncRun(userId, "github");
-        return count;
+        return observability.observe("pulse.integration.sync", observation -> {
+            observability.low(observation, "provider", "github");
+            observability.low(observation, "mode", "project_sync");
+            observability.high(observation, "user.id", userId);
+        }, () -> {
+            GitHubProjectSyncRequest request = getGitHubProjectSyncRequest(userId);
+            int count = gitHubProjectSyncService.syncProjects(request);
+            markProjectSyncRun(userId, "github");
+            return count;
+        });
     }
 
     public GitHubProjectSyncRequest getGitHubProjectSyncRequest(Long userId) {
@@ -266,116 +300,155 @@ public class IntegrationService {
 
     @Transactional
     public UserIntegration updateSelectedResources(Long userId, String provider, List<String> selectedIds) {
-        UserIntegration integration = integrationRepo.findByUserIdAndProvider(userId, provider)
-                .orElseThrow(() -> new RuntimeException("Integration not found: " + provider));
+        return observability.observe("pulse.integration.sync", observation -> {
+            observability.low(observation, "provider", provider);
+            observability.low(observation, "mode", "scope_update");
+            observability.high(observation, "user.id", userId);
+            observability.high(observation, "selected_repo_count", selectedIds != null ? selectedIds.size() : 0);
+        }, () -> {
+            UserIntegration integration = integrationRepo.findByUserIdAndProvider(userId, provider)
+                    .orElseThrow(() -> new RuntimeException("Integration not found: " + provider));
 
-        Map<String, Object> metadata = switch (provider) {
-            case "github" -> gitHubProvider.applySelectedResources(integration, selectedIds);
-            case "obsidian" -> obsidianProvider.applySelectedRepository(
-                    integration,
-                    getObsidianResourceMaps(userId),
-                    selectedIds
-            );
-            case "slack" -> slackProvider.applySelectedResources(integration, selectedIds);
-            case "linear" -> linearProvider.applySelectedResources(integration, selectedIds);
-            default -> throw new IllegalArgumentException("Unknown provider: " + provider);
-        };
+            Map<String, Object> metadata = switch (provider) {
+                case "github" -> gitHubProvider.applySelectedResources(integration, selectedIds);
+                case "obsidian" -> obsidianProvider.applySelectedRepository(
+                        integration,
+                        getObsidianResourceMaps(userId),
+                        selectedIds
+                );
+                case "slack" -> slackProvider.applySelectedResources(integration, selectedIds);
+                case "linear" -> linearProvider.applySelectedResources(integration, selectedIds);
+                default -> throw new IllegalArgumentException("Unknown provider: " + provider);
+            };
 
-        integration.setMetadata(metadata);
-        integration.setWebhookStatus(selectedIds.isEmpty() ? "pending_scope" : "active");
-        integration.setLastWebhookError(null);
-        integration.setLastWebhookErrorAt(null);
-        integrationRepo.save(integration);
+            integration.setMetadata(metadata);
+            integration.setWebhookStatus(selectedIds.isEmpty() ? "pending_scope" : "active");
+            integration.setLastWebhookError(null);
+            integration.setLastWebhookErrorAt(null);
+            integrationRepo.save(integration);
 
-        if ("github".equals(provider)) {
-            normalizeObsidianScope(userId);
-            syncGitHubProjects(userId);
-        }
-        if ("obsidian".equals(provider)) {
-            gitHubProjectSyncService.clearRepositories(userId);
-        }
+            if ("github".equals(provider)) {
+                normalizeObsidianScope(userId);
+                syncGitHubProjects(userId);
+            }
+            if ("obsidian".equals(provider)) {
+                gitHubProjectSyncService.clearRepositories(userId);
+            }
 
-        return integration;
+            return integration;
+        });
     }
 
     @Transactional
     public void handleGitHubWebhook(Map<String, String> headers, byte[] body) {
-        JsonNode payload = gitHubProvider.verifyAndParseWebhook(headers, body);
-        String deliveryId = gitHubProvider.extractDeliveryId(headers);
+        Observation observation = observability.start("pulse.webhook.receive");
+        observability.low(observation, "provider", "github");
+        observability.low(observation, "event_type", header(headers, "x-github-event"));
+        try {
+            JsonNode payload = observability.observe("pulse.webhook.process", child -> {
+                observability.low(child, "provider", "github");
+                observability.low(child, "operation", "verify_signature");
+            }, () -> gitHubProvider.verifyAndParseWebhook(headers, body));
+            String deliveryId = gitHubProvider.extractDeliveryId(headers);
+            observability.high(observation, "delivery.id", deliveryId);
 
-        processWebhookDelivery("github", deliveryId, payload, headers, () -> {
-            String repoFullName = gitHubProvider.extractRepositoryFullName(payload);
-            List<IntegrationEventPayload> githubEvents = gitHubProvider.mapWebhookEvents(headers, payload);
+            processWebhookDelivery("github", deliveryId, payload, headers, () -> {
+                String repoFullName = gitHubProvider.extractRepositoryFullName(payload);
 
-            for (UserIntegration integration : integrationRepo.findByProviderAndStatus("github", "connected")) {
-                if (matchesRepository(integration.getMetadata(), repoFullName) || matchesInstallation(integration.getMetadata(), payload)) {
-                    ingestEvents(integration.getUserId(), "github", githubEvents);
-                    markWebhookSuccess(integration);
-                    if ("push".equalsIgnoreCase(header(headers, "x-github-event"))) {
-                        syncGitHubProjects(integration.getUserId());
-                    }
-                }
-            }
+                List<IntegrationEventPayload> githubEvents = observability.observe("pulse.webhook.process", child -> {
+                    observability.low(child, "provider", "github");
+                    observability.low(child, "operation", "map_events");
+                }, () -> gitHubProvider.mapWebhookEvents(headers, payload));
 
-            List<IntegrationEventPayload> obsidianEvents = obsidianProvider.mapWebhookEvents(payload);
-            if (!obsidianEvents.isEmpty()) {
-                for (UserIntegration integration : integrationRepo.findByProviderAndStatus("obsidian", "connected")) {
-                    if (matchesRepository(integration.getMetadata(), repoFullName)) {
-                        ingestEvents(integration.getUserId(), "obsidian", obsidianEvents);
+                for (UserIntegration integration : integrationRepo.findByProviderAndStatus("github", "connected")) {
+                    if (matchesRepository(integration.getMetadata(), repoFullName) || matchesInstallation(integration.getMetadata(), payload)) {
+                        ingestEvents(integration.getUserId(), "github", githubEvents);
                         markWebhookSuccess(integration);
+                        if ("push".equalsIgnoreCase(header(headers, "x-github-event"))) {
+                            observability.observe("pulse.webhook.process", child -> {
+                                observability.low(child, "provider", "github");
+                                observability.low(child, "operation", "project_sync_trigger");
+                                observability.high(child, "user.id", integration.getUserId());
+                            }, () -> syncGitHubProjects(integration.getUserId()));
+                        }
                     }
                 }
-            }
-        });
+
+                List<IntegrationEventPayload> obsidianEvents = obsidianProvider.mapWebhookEvents(payload);
+                if (!obsidianEvents.isEmpty()) {
+                    for (UserIntegration integration : integrationRepo.findByProviderAndStatus("obsidian", "connected")) {
+                        if (matchesRepository(integration.getMetadata(), repoFullName)) {
+                            ingestEvents(integration.getUserId(), "obsidian", obsidianEvents);
+                            markWebhookSuccess(integration);
+                        }
+                    }
+                }
+            });
+            observability.low(observation, "result", "processed");
+        } catch (RuntimeException e) {
+            observation.error(e);
+            observability.low(observation, "result", "rejected");
+            throw e;
+        } finally {
+            observation.stop();
+        }
     }
 
     @Transactional
     public SlackWebhookResult handleSlackWebhook(Map<String, String> headers, byte[] body) {
-        JsonNode payload = slackProvider.verifyAndParseWebhook(headers, body);
-        if (slackProvider.isUrlVerification(payload)) {
-            return new SlackWebhookResult(true, slackProvider.extractChallenge(payload));
-        }
-
-        String deliveryId = slackProvider.extractDeliveryId(payload);
-        processWebhookDelivery("slack", deliveryId, payload, headers, () -> {
-            String teamId = slackProvider.extractTeamId(payload);
-            String channelId = slackProvider.extractChannelId(payload);
-
-            for (UserIntegration integration : integrationRepo.findByProviderAndStatus("slack", "connected")) {
-                if (!matchesMetadataValue(integration.getMetadata(), "teamId", teamId) ||
-                        !hasSelectedResource(integration.getMetadata(), channelId)) {
-                    continue;
-                }
-
-                ingestEvents(integration.getUserId(), "slack", slackProvider.mapWebhookEvents(integration, payload));
-                markWebhookSuccess(integration);
+        return observability.observe("pulse.webhook.receive", observation -> {
+            observability.low(observation, "provider", "slack");
+        }, () -> {
+            JsonNode payload = slackProvider.verifyAndParseWebhook(headers, body);
+            if (slackProvider.isUrlVerification(payload)) {
+                return new SlackWebhookResult(true, slackProvider.extractChallenge(payload));
             }
-        });
 
-        return new SlackWebhookResult(false, null);
+            String deliveryId = slackProvider.extractDeliveryId(payload);
+            processWebhookDelivery("slack", deliveryId, payload, headers, () -> {
+                String teamId = slackProvider.extractTeamId(payload);
+                String channelId = slackProvider.extractChannelId(payload);
+
+                for (UserIntegration integration : integrationRepo.findByProviderAndStatus("slack", "connected")) {
+                    if (!matchesMetadataValue(integration.getMetadata(), "teamId", teamId) ||
+                            !hasSelectedResource(integration.getMetadata(), channelId)) {
+                        continue;
+                    }
+
+                    ingestEvents(integration.getUserId(), "slack", slackProvider.mapWebhookEvents(integration, payload));
+                    markWebhookSuccess(integration);
+                }
+            });
+
+            return new SlackWebhookResult(false, null);
+        });
     }
 
     @Transactional
     public void handleLinearWebhook(Map<String, String> headers, byte[] body) {
-        JsonNode payload = linearProvider.verifyAndParseWebhook(headers, body);
-        String deliveryId = linearProvider.extractDeliveryId(headers);
+        observability.observe("pulse.webhook.receive", observation -> {
+            observability.low(observation, "provider", "linear");
+        }, () -> {
+            JsonNode payload = linearProvider.verifyAndParseWebhook(headers, body);
+            String deliveryId = linearProvider.extractDeliveryId(headers);
 
-        processWebhookDelivery("linear", deliveryId, payload, headers, () -> {
-            String organizationId = linearProvider.extractOrganizationId(payload);
-            List<String> teamIds = linearProvider.extractTeamIds(payload);
-            List<IntegrationEventPayload> events = linearProvider.mapWebhookEvents(payload);
+            processWebhookDelivery("linear", deliveryId, payload, headers, () -> {
+                String organizationId = linearProvider.extractOrganizationId(payload);
+                List<String> teamIds = linearProvider.extractTeamIds(payload);
+                List<IntegrationEventPayload> events = linearProvider.mapWebhookEvents(payload);
 
-            for (UserIntegration integration : integrationRepo.findByProviderAndStatus("linear", "connected")) {
-                if (!organizationId.isBlank() && !matchesMetadataValue(integration.getMetadata(), "organizationId", organizationId)) {
-                    continue;
+                for (UserIntegration integration : integrationRepo.findByProviderAndStatus("linear", "connected")) {
+                    if (!organizationId.isBlank() && !matchesMetadataValue(integration.getMetadata(), "organizationId", organizationId)) {
+                        continue;
+                    }
+                    if (!teamIds.isEmpty() && teamIds.stream().noneMatch(teamId -> hasSelectedResource(integration.getMetadata(), teamId))) {
+                        continue;
+                    }
+
+                    ingestEvents(integration.getUserId(), "linear", events);
+                    markWebhookSuccess(integration);
                 }
-                if (!teamIds.isEmpty() && teamIds.stream().noneMatch(teamId -> hasSelectedResource(integration.getMetadata(), teamId))) {
-                    continue;
-                }
-
-                ingestEvents(integration.getUserId(), "linear", events);
-                markWebhookSuccess(integration);
-            }
+            });
         });
     }
 
@@ -544,7 +617,17 @@ public class IntegrationService {
                                         JsonNode payload,
                                         Map<String, String> headers,
                                         Runnable processor) {
+        Observation observation = observability.start("pulse.webhook.process");
+        String result = "processed";
+        observability.low(observation, "provider", provider);
+        observability.high(observation, "delivery.id", deliveryId);
         if (webhookDeliveryRepository.findByProviderAndDeliveryId(provider, deliveryId).isPresent()) {
+            result = "duplicate";
+            observability.low(observation, "result", result);
+            observability.counter("pulse.webhook.deliveries",
+                    "provider", provider,
+                    "result", result).increment();
+            observation.stop();
             return;
         }
 
@@ -562,13 +645,20 @@ public class IntegrationService {
             delivery.setStatus("processed");
             delivery.setProcessedAt(LocalDateTime.now(ZoneOffset.UTC));
         } catch (Exception e) {
+            result = "failed";
             delivery.setStatus("failed");
             delivery.setErrorMessage(e.getMessage());
             delivery.setProcessedAt(LocalDateTime.now(ZoneOffset.UTC));
+            observation.error(e);
             log.error("Webhook processing failed for provider={} deliveryId={}: {}", provider, deliveryId, e.getMessage(), e);
             throw e;
         } finally {
             webhookDeliveryRepository.save(delivery);
+            observability.low(observation, "result", result);
+            observability.counter("pulse.webhook.deliveries",
+                    "provider", provider,
+                    "result", result).increment();
+            observation.stop();
         }
     }
 

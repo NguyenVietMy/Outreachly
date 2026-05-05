@@ -1,6 +1,8 @@
 package com.pulse.pulse.personal.infrastructure.leetcode;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.pulse.pulse.platform.observability.PulseObservability;
+import io.micrometer.observation.Observation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -14,14 +16,20 @@ import java.util.Map;
 public class LeetCodeService {
 
     private final WebClient webClient;
+    private final PulseObservability observability;
 
-    public LeetCodeService(WebClient.Builder webClientBuilder) {
+    public LeetCodeService(WebClient.Builder webClientBuilder, PulseObservability observability) {
         this.webClient = webClientBuilder
                 .baseUrl("https://leetcode.com")
                 .build();
+        this.observability = observability;
     }
 
     public Map<String, Object> fetchStats(String username) {
+        Observation observation = observability.start("pulse.leetcode.fetch");
+        observability.low(observation, "operation", "fetch");
+        observability.high(observation, "username", username);
+
         String query = """
                 query getUserProfile($username: String!) {
                   matchedUser(username: $username) {
@@ -64,7 +72,10 @@ public class LeetCodeService {
             stats.put("username", user.path("username").asText());
             stats.put("ranking", user.path("profile").path("ranking").asInt(0));
 
-            int easy = 0, medium = 0, hard = 0, total = 0;
+            int easy = 0;
+            int medium = 0;
+            int hard = 0;
+            int total = 0;
             for (JsonNode sub : submissions) {
                 String diff = sub.path("difficulty").asText();
                 int count = sub.path("count").asInt(0);
@@ -84,12 +95,19 @@ public class LeetCodeService {
             int dsaScore = computeDsaScore(easy, medium, hard);
             stats.put("dsaScore", dsaScore);
 
+            observability.low(observation, "result", "success");
             return stats;
         } catch (RuntimeException e) {
+            observability.low(observation, "result", "error");
+            observation.error(e);
             throw e;
         } catch (Exception e) {
+            observability.low(observation, "result", "error");
+            observation.error(e);
             log.error("Failed to fetch LeetCode stats for {}", username, e);
             throw new RuntimeException("Failed to fetch LeetCode stats", e);
+        } finally {
+            observation.stop();
         }
     }
 

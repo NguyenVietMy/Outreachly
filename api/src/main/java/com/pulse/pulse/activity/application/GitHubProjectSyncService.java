@@ -3,6 +3,9 @@ package com.pulse.pulse.activity.application;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.pulse.pulse.activity.domain.GitHubRepository;
 import com.pulse.pulse.activity.infrastructure.persistence.GitHubRepositoryRepository;
+import com.pulse.pulse.platform.observability.PulseObservability;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.observation.Observation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
@@ -27,6 +30,7 @@ public class GitHubProjectSyncService {
 
     private final WebClient gitHubWebClient;
     private final GitHubRepositoryRepository repoRepository;
+    private final PulseObservability observability;
 
     private static final int MAX_ACTIVE_REPOS = 5;
     private static final int MAX_COMMITS_PER_REPO = 20;
@@ -37,9 +41,11 @@ public class GitHubProjectSyncService {
     private static final long PROJECT_SYNC_COOLDOWN_HOURS = 6;
 
     public GitHubProjectSyncService(@Qualifier("gitHubWebClient") WebClient gitHubWebClient,
-                                    GitHubRepositoryRepository repoRepository) {
+                                    GitHubRepositoryRepository repoRepository,
+                                    PulseObservability observability) {
         this.gitHubWebClient = gitHubWebClient;
         this.repoRepository = repoRepository;
+        this.observability = observability;
     }
 
     public boolean shouldSync(GitHubProjectSyncRequest request) {
@@ -57,7 +63,26 @@ public class GitHubProjectSyncService {
 
     @Transactional
     public int syncProjects(GitHubProjectSyncRequest request) {
-        return syncSelectedRepositories(request.userId(), request.accessToken(), request.selectedRepositories());
+        Timer.Sample sample = observability.timerSample();
+        String result = "error";
+        Observation observation = observability.start("pulse.github.project_sync");
+        observability.low(observation, "operation", "sync_projects");
+        observability.high(observation, "user.id", request.userId());
+        observability.high(observation, "selected_repo_count",
+                request.selectedRepositories() != null ? request.selectedRepositories().size() : 0);
+
+        try {
+            int synced = syncSelectedRepositories(request.userId(), request.accessToken(), request.selectedRepositories());
+            result = "success";
+            return synced;
+        } catch (RuntimeException e) {
+            observation.error(e);
+            throw e;
+        } finally {
+            observability.low(observation, "result", result);
+            observability.stopTimer(sample, "pulse.github.project_sync.duration", "result", result);
+            observation.stop();
+        }
     }
 
     @Transactional
@@ -67,68 +92,80 @@ public class GitHubProjectSyncService {
 
     @Transactional
     public int syncSelectedRepositories(Long userId, String token, List<String> selectedRepositories) {
-        if (selectedRepositories == null || selectedRepositories.isEmpty()) {
-            repoRepository.deleteByUserId(userId);
-            return 0;
-        }
-
-        LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
-        List<String> trackedRepos = new ArrayList<>();
-        int synced = 0;
-
-        for (String fullName : selectedRepositories) {
-            String[] parts = fullName.split("/");
-            if (parts.length != 2) {
-                continue;
+        return observability.observe("pulse.github.project_sync", observation -> {
+            observability.low(observation, "operation", "sync_selected_repositories");
+            observability.high(observation, "user.id", userId);
+            observability.high(observation, "selected_repo_count",
+                    selectedRepositories != null ? selectedRepositories.size() : 0);
+        }, () -> {
+            if (selectedRepositories == null || selectedRepositories.isEmpty()) {
+                repoRepository.deleteByUserId(userId);
+                return 0;
             }
 
-            JsonNode repoNode = fetchRepository(token, parts[0], parts[1]);
-            if (repoNode == null) {
-                continue;
+            LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
+            List<String> trackedRepos = new ArrayList<>();
+            int synced = 0;
+
+            for (String fullName : selectedRepositories) {
+                String[] parts = fullName.split("/");
+                if (parts.length != 2) {
+                    continue;
+                }
+
+                JsonNode repoNode = fetchRepository(token, parts[0], parts[1]);
+                if (repoNode == null) {
+                    continue;
+                }
+
+                trackedRepos.add(fullName);
+                GitHubRepository repo = repoRepository.findByUserIdAndRepoFullName(userId, fullName)
+                        .orElse(GitHubRepository.builder()
+                                .userId(userId)
+                                .repoFullName(fullName)
+                                .build());
+
+                populateRepositorySummary(repo, repoNode);
+
+                LocalDateTime pushedAt = repo.getPushedAt();
+                boolean isRecentlyActive = pushedAt != null && pushedAt.isAfter(sevenDaysAgo);
+                if (isRecentlyActive && synced < MAX_ACTIVE_REPOS) {
+                    syncRepoDetails(repo, token, parts[0], parts[1]);
+                    synced++;
+                }
+
+                repo.setLastSyncedAt(LocalDateTime.now());
+                repoRepository.save(repo);
             }
 
-            trackedRepos.add(fullName);
-            GitHubRepository repo = repoRepository.findByUserIdAndRepoFullName(userId, fullName)
-                    .orElse(GitHubRepository.builder()
-                            .userId(userId)
-                            .repoFullName(fullName)
-                            .build());
-
-            populateRepositorySummary(repo, repoNode);
-
-            LocalDateTime pushedAt = repo.getPushedAt();
-            boolean isRecentlyActive = pushedAt != null && pushedAt.isAfter(sevenDaysAgo);
-            if (isRecentlyActive && synced < MAX_ACTIVE_REPOS) {
-                syncRepoDetails(repo, token, parts[0], parts[1]);
-                synced++;
+            if (trackedRepos.isEmpty()) {
+                repoRepository.deleteByUserId(userId);
+                return 0;
             }
 
-            repo.setLastSyncedAt(LocalDateTime.now());
-            repoRepository.save(repo);
-        }
-
-        if (trackedRepos.isEmpty()) {
-            repoRepository.deleteByUserId(userId);
-            return 0;
-        }
-
-        repoRepository.deleteStaleRepos(userId, trackedRepos);
-        log.info("Project sync for userId={}: {} repos tracked, {} with full details", userId, trackedRepos.size(), synced);
-        return trackedRepos.size();
+            repoRepository.deleteStaleRepos(userId, trackedRepos);
+            log.info("Project sync for userId={}: {} repos tracked, {} with full details", userId, trackedRepos.size(), synced);
+            return trackedRepos.size();
+        });
     }
 
     private JsonNode fetchRepository(String token, String owner, String repoName) {
-        try {
-            return gitHubWebClient.get()
-                    .uri("/repos/{owner}/{repo}", owner, repoName)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                    .retrieve()
-                    .bodyToMono(JsonNode.class)
-                    .block();
-        } catch (Exception e) {
-            log.warn("Failed to fetch repo {}/{}: {}", owner, repoName, e.getMessage());
-            return null;
-        }
+        return observability.observe("pulse.github.project_sync", observation -> {
+            observability.low(observation, "operation", "fetch_repo_summary");
+            observability.high(observation, "repo.full_name", owner + "/" + repoName);
+        }, () -> {
+            try {
+                return gitHubWebClient.get()
+                        .uri("/repos/{owner}/{repo}", owner, repoName)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .retrieve()
+                        .bodyToMono(JsonNode.class)
+                        .block();
+            } catch (Exception e) {
+                log.warn("Failed to fetch repo {}/{}: {}", owner, repoName, e.getMessage());
+                return null;
+            }
+        });
     }
 
     private void populateRepositorySummary(GitHubRepository repo, JsonNode repoNode) {
@@ -160,46 +197,50 @@ public class GitHubProjectSyncService {
     }
 
     private void fetchCommits(GitHubRepository repo, String token, String owner, String repoName) {
-        try {
-            JsonNode commits = gitHubWebClient.get()
-                    .uri("/repos/{owner}/{repo}/commits?per_page={limit}", owner, repoName, MAX_COMMITS_PER_REPO)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                    .retrieve()
-                    .bodyToMono(JsonNode.class)
-                    .block();
+        observability.observe("pulse.github.project_sync", observation -> {
+            observability.low(observation, "operation", "fetch_commits");
+            observability.high(observation, "repo.full_name", owner + "/" + repoName);
+        }, () -> {
+            try {
+                JsonNode commits = gitHubWebClient.get()
+                        .uri("/repos/{owner}/{repo}/commits?per_page={limit}", owner, repoName, MAX_COMMITS_PER_REPO)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .retrieve()
+                        .bodyToMono(JsonNode.class)
+                        .block();
 
-            if (commits == null || !commits.isArray()) {
-                return;
-            }
-
-            List<Map<String, Object>> commitList = new ArrayList<>();
-            boolean firstCommit = true;
-
-            for (JsonNode commit : commits) {
-                String sha = commit.path("sha").asText();
-                String message = commit.path("commit").path("message").asText("");
-                String date = commit.path("commit").path("author").path("date").asText("");
-
-                Map<String, Object> commitData = new LinkedHashMap<>();
-                commitData.put("sha", sha.substring(0, Math.min(7, sha.length())));
-                commitData.put("message", message.length() > 200 ? message.substring(0, 200) : message);
-                commitData.put("date", date);
-
-                if (firstCommit) {
-                    List<Map<String, Object>> filesChanged = fetchCommitFiles(token, owner, repoName, sha);
-                    if (!filesChanged.isEmpty()) {
-                        commitData.put("filesChanged", filesChanged);
-                    }
-                    firstCommit = false;
+                if (commits == null || !commits.isArray()) {
+                    return;
                 }
 
-                commitList.add(commitData);
-            }
+                List<Map<String, Object>> commitList = new ArrayList<>();
+                boolean firstCommit = true;
 
-            repo.setRecentCommits(commitList);
-        } catch (Exception e) {
-            log.warn("Failed to fetch commits for {}/{}: {}", owner, repoName, e.getMessage());
-        }
+                for (JsonNode commit : commits) {
+                    String sha = commit.path("sha").asText();
+                    String message = commit.path("commit").path("message").asText("");
+                    String date = commit.path("commit").path("author").path("date").asText("");
+
+                    Map<String, Object> commitData = new LinkedHashMap<>();
+                    commitData.put("sha", sha.substring(0, Math.min(7, sha.length())));
+                    commitData.put("message", message.length() > 200 ? message.substring(0, 200) : message);
+                    commitData.put("date", date);
+
+                    if (firstCommit) {
+                        List<Map<String, Object>> filesChanged = fetchCommitFiles(token, owner, repoName, sha);
+                        if (!filesChanged.isEmpty()) {
+                            commitData.put("filesChanged", filesChanged);
+                        }
+                        firstCommit = false;
+                    }
+
+                    commitList.add(commitData);
+                }
+                repo.setRecentCommits(commitList);
+            } catch (Exception e) {
+                log.warn("Failed to fetch commits for {}/{}: {}", owner, repoName, e.getMessage());
+            }
+        });
     }
 
     private List<Map<String, Object>> fetchCommitFiles(String token, String owner, String repoName, String sha) {
@@ -241,34 +282,39 @@ public class GitHubProjectSyncService {
     }
 
     private void fetchOpenPrs(GitHubRepository repo, String token, String owner, String repoName) {
-        try {
-            JsonNode prs = gitHubWebClient.get()
-                    .uri("/repos/{owner}/{repo}/pulls?state=open&per_page=10", owner, repoName)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                    .retrieve()
-                    .bodyToMono(JsonNode.class)
-                    .block();
+        observability.observe("pulse.github.project_sync", observation -> {
+            observability.low(observation, "operation", "fetch_open_prs");
+            observability.high(observation, "repo.full_name", owner + "/" + repoName);
+        }, () -> {
+            try {
+                JsonNode prs = gitHubWebClient.get()
+                        .uri("/repos/{owner}/{repo}/pulls?state=open&per_page=10", owner, repoName)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .retrieve()
+                        .bodyToMono(JsonNode.class)
+                        .block();
 
-            if (prs == null || !prs.isArray()) {
-                return;
-            }
+                if (prs == null || !prs.isArray()) {
+                    return;
+                }
 
-            List<Map<String, Object>> prList = new ArrayList<>();
-            for (JsonNode pr : prs) {
-                String body = pr.path("body").asText("");
-                prList.add(Map.of(
-                        "number", pr.path("number").asInt(),
-                        "title", pr.path("title").asText(""),
-                        "body", body.length() > 500 ? body.substring(0, 500) : body,
-                        "draft", pr.path("draft").asBoolean(false),
-                        "createdAt", pr.path("created_at").asText(""),
-                        "reviewComments", pr.path("review_comments").asInt(0)
-                ));
+                List<Map<String, Object>> prList = new ArrayList<>();
+                for (JsonNode pr : prs) {
+                    String body = pr.path("body").asText("");
+                    prList.add(Map.of(
+                            "number", pr.path("number").asInt(),
+                            "title", pr.path("title").asText(""),
+                            "body", body.length() > 500 ? body.substring(0, 500) : body,
+                            "draft", pr.path("draft").asBoolean(false),
+                            "createdAt", pr.path("created_at").asText(""),
+                            "reviewComments", pr.path("review_comments").asInt(0)
+                    ));
+                }
+                repo.setOpenPrs(prList);
+            } catch (Exception e) {
+                log.warn("Failed to fetch PRs for {}/{}: {}", owner, repoName, e.getMessage());
             }
-            repo.setOpenPrs(prList);
-        } catch (Exception e) {
-            log.warn("Failed to fetch PRs for {}/{}: {}", owner, repoName, e.getMessage());
-        }
+        });
     }
 
     private void fetchReadmeIfStale(GitHubRepository repo, String token, String owner, String repoName) {
@@ -277,34 +323,39 @@ public class GitHubProjectSyncService {
             return;
         }
 
-        try {
-            JsonNode readme = gitHubWebClient.get()
-                    .uri("/repos/{owner}/{repo}/readme", owner, repoName)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                    .retrieve()
-                    .bodyToMono(JsonNode.class)
-                    .block();
+        observability.observe("pulse.github.project_sync", observation -> {
+            observability.low(observation, "operation", "fetch_readme");
+            observability.high(observation, "repo.full_name", owner + "/" + repoName);
+        }, () -> {
+            try {
+                JsonNode readme = gitHubWebClient.get()
+                        .uri("/repos/{owner}/{repo}/readme", owner, repoName)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .retrieve()
+                        .bodyToMono(JsonNode.class)
+                        .block();
 
-            if (readme == null) {
-                return;
+                if (readme == null) {
+                    return;
+                }
+
+                String content = readme.path("content").asText("");
+                String encoding = readme.path("encoding").asText("");
+
+                if ("base64".equals(encoding) && !content.isEmpty()) {
+                    String decoded = new String(Base64.getMimeDecoder().decode(content), StandardCharsets.UTF_8);
+                    repo.setReadmeContent(decoded.length() > README_MAX_LENGTH
+                            ? decoded.substring(0, README_MAX_LENGTH)
+                            : decoded);
+                }
+                repo.setReadmeFetchedAt(LocalDateTime.now());
+            } catch (WebClientResponseException.NotFound e) {
+                repo.setReadmeContent(null);
+                repo.setReadmeFetchedAt(LocalDateTime.now());
+            } catch (Exception e) {
+                log.warn("Failed to fetch README for {}/{}: {}", owner, repoName, e.getMessage());
             }
-
-            String content = readme.path("content").asText("");
-            String encoding = readme.path("encoding").asText("");
-
-            if ("base64".equals(encoding) && !content.isEmpty()) {
-                String decoded = new String(Base64.getMimeDecoder().decode(content), StandardCharsets.UTF_8);
-                repo.setReadmeContent(decoded.length() > README_MAX_LENGTH
-                        ? decoded.substring(0, README_MAX_LENGTH)
-                        : decoded);
-            }
-            repo.setReadmeFetchedAt(LocalDateTime.now());
-        } catch (WebClientResponseException.NotFound e) {
-            repo.setReadmeContent(null);
-            repo.setReadmeFetchedAt(LocalDateTime.now());
-        } catch (Exception e) {
-            log.warn("Failed to fetch README for {}/{}: {}", owner, repoName, e.getMessage());
-        }
+        });
     }
 
     private void fetchLanguagesIfStale(GitHubRepository repo, String token, String owner, String repoName) {
@@ -314,24 +365,29 @@ public class GitHubProjectSyncService {
             return;
         }
 
-        try {
-            JsonNode langs = gitHubWebClient.get()
-                    .uri("/repos/{owner}/{repo}/languages", owner, repoName)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                    .retrieve()
-                    .bodyToMono(JsonNode.class)
-                    .block();
+        observability.observe("pulse.github.project_sync", observation -> {
+            observability.low(observation, "operation", "fetch_languages");
+            observability.high(observation, "repo.full_name", owner + "/" + repoName);
+        }, () -> {
+            try {
+                JsonNode langs = gitHubWebClient.get()
+                        .uri("/repos/{owner}/{repo}/languages", owner, repoName)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .retrieve()
+                        .bodyToMono(JsonNode.class)
+                        .block();
 
-            if (langs == null) {
-                return;
+                if (langs == null) {
+                    return;
+                }
+
+                Map<String, Object> langMap = new LinkedHashMap<>();
+                langs.fields().forEachRemaining(entry -> langMap.put(entry.getKey(), entry.getValue().asLong()));
+                repo.setLanguages(langMap);
+            } catch (Exception e) {
+                log.warn("Failed to fetch languages for {}/{}: {}", owner, repoName, e.getMessage());
             }
-
-            Map<String, Object> langMap = new LinkedHashMap<>();
-            langs.fields().forEachRemaining(entry -> langMap.put(entry.getKey(), entry.getValue().asLong()));
-            repo.setLanguages(langMap);
-        } catch (Exception e) {
-            log.warn("Failed to fetch languages for {}/{}: {}", owner, repoName, e.getMessage());
-        }
+        });
     }
 
     private LocalDateTime parseGitHubTimestamp(String timestamp) {
