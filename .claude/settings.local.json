@@ -40,7 +40,22 @@
       "Bash(git -C \"C:/Users/VietM/OneDrive/Documents/VietMySpace/Outreachly\" log --oneline --diff-filter=A -- \"**/.env*\" \"**/*.env*\" \"**/.env.local.properties\" \"**/.env.prod.properties\")",
       "Bash(git -C \"C:/Users/VietM/OneDrive/Documents/VietMySpace/Outreachly\" log --all --oneline --name-only -- \"api/.env.local.properties\" \"api/.env.prod.properties\")",
       "Bash(git -C \"C:/Users/VietM/OneDrive/Documents/VietMySpace/Outreachly\" status --short)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(.\\\\mvnw.cmd compile *)",
+      "PowerShell(New-Item *)",
+      "PowerShell(Remove-Item *)",
+      "PowerShell(git *)",
+      "PowerShell(aws ecr batch-delete-image *)",
+      "PowerShell(aws ecs list-clusters *)",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "mcp__plugin_playwright_playwright__browser_take_screenshot",
+      "mcp__plugin_playwright_playwright__browser_resize",
+      "mcp__plugin_playwright_playwright__browser_snapshot",
+      "mcp__plugin_playwright_playwright__browser_wait_for",
+      "mcp__plugin_playwright_playwright__browser_run_code_unsafe",
+      "mcp__plugin_playwright_playwright__browser_console_messages",
+      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:3000\" -UseBasicParsing -TimeoutSec 5 | Select-Object StatusCode, StatusDescription)",
+      "mcp__plugin_playwright_playwright__browser_network_requests"
     ]
   }
 }

@@ -33,3 +33,15 @@ variable "secret_arns" {
   type        = map(string)
   description = "Map of env var name to Secrets Manager ARN"
 }
+
+variable "extra_environment" {
+  type        = map(string)
+  description = "Additional plain-text environment variables for the ECS task"
+  default     = {}
+}
+
+variable "alarm_actions" {
+  type        = list(string)
+  description = "Optional CloudWatch alarm action ARNs"
+  default     = []
+}

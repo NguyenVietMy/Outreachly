@@ -136,6 +136,11 @@ resource "aws_iam_role_policy" "secrets_access" {
 
 resource "aws_ecs_cluster" "this" {
   name = "${local.name}-cluster"
+
+  setting {
+    name  = "containerInsights"
+    value = "enhanced"
+  }
 }
 
 resource "aws_cloudwatch_log_group" "api" {
@@ -175,7 +180,7 @@ resource "aws_ecs_task_definition" "api" {
         }
       }
 
-      environment = [
+      environment = concat([
         { name = "JAVA_OPTS", value = "-XX:+ExitOnOutOfMemoryError" },
         { name = "GOOGLE_REDIRECT_URI", value = "https://${var.api_domain}/login/oauth2/code/google" },
         { name = "FRONTEND_URL", value = var.frontend_url },
@@ -183,7 +188,10 @@ resource "aws_ecs_task_definition" "api" {
         { name = "LINEAR_REDIRECT_URI", value = "https://${var.api_domain}/api/integrations/linear/callback" },
         { name = "INTEGRATIONS_FRONTEND_URL", value = var.frontend_url },
         { name = "CORS_ALLOWED_ORIGINS", value = "${var.frontend_url},https://www.${var.api_domain}" }
-      ]
+        ], [for name, value in var.extra_environment : {
+          name  = name
+          value = value
+      }])
 
       secrets = [for name, arn in var.secret_arns : { name = name, valueFrom = arn }]
     }
@@ -216,4 +224,84 @@ resource "aws_ecs_service" "api" {
   }
 
   depends_on = [aws_lb_listener.http]
+}
+
+resource "aws_cloudwatch_metric_alarm" "ecs_high_cpu" {
+  alarm_name          = "${local.name}-high-cpu"
+  alarm_description   = "High ECS service CPU utilization for ${local.name}"
+  namespace           = "AWS/ECS"
+  metric_name         = "CPUUtilization"
+  statistic           = "Average"
+  period              = 300
+  evaluation_periods  = 2
+  threshold           = 80
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = var.alarm_actions
+  ok_actions          = var.alarm_actions
+
+  dimensions = {
+    ClusterName = aws_ecs_cluster.this.name
+    ServiceName = aws_ecs_service.api.name
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "ecs_high_memory" {
+  alarm_name          = "${local.name}-high-memory"
+  alarm_description   = "High ECS service memory utilization for ${local.name}"
+  namespace           = "AWS/ECS"
+  metric_name         = "MemoryUtilization"
+  statistic           = "Average"
+  period              = 300
+  evaluation_periods  = 2
+  threshold           = 80
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = var.alarm_actions
+  ok_actions          = var.alarm_actions
+
+  dimensions = {
+    ClusterName = aws_ecs_cluster.this.name
+    ServiceName = aws_ecs_service.api.name
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "alb_target_5xx" {
+  alarm_name          = "${local.name}-target-5xx"
+  alarm_description   = "Target 5xx responses for ${local.name} ALB target group"
+  namespace           = "AWS/ApplicationELB"
+  metric_name         = "HTTPCode_Target_5XX_Count"
+  statistic           = "Sum"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = 5
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = var.alarm_actions
+  ok_actions          = var.alarm_actions
+
+  dimensions = {
+    LoadBalancer = aws_lb.this.arn_suffix
+    TargetGroup  = aws_lb_target_group.api.arn_suffix
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "alb_unhealthy_hosts" {
+  alarm_name          = "${local.name}-unhealthy-hosts"
+  alarm_description   = "Unhealthy targets for ${local.name} ALB target group"
+  namespace           = "AWS/ApplicationELB"
+  metric_name         = "UnHealthyHostCount"
+  statistic           = "Average"
+  period              = 60
+  evaluation_periods  = 3
+  threshold           = 1
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = var.alarm_actions
+  ok_actions          = var.alarm_actions
+
+  dimensions = {
+    LoadBalancer = aws_lb.this.arn_suffix
+    TargetGroup  = aws_lb_target_group.api.arn_suffix
+  }
 }

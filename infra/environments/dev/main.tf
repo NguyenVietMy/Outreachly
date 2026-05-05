@@ -25,11 +25,14 @@ provider "cloudflare" {
 }
 
 locals {
-  project      = "pulse"
-  env          = "dev"
-  domain       = "pulse-cs.com"
-  api_domain   = "api.pulse-cs.com"
-  frontend_url = "https://pulse-cs.com"
+  project                         = "pulse"
+  env                             = "dev"
+  domain                          = "pulse-cs.com"
+  api_domain                      = "api.pulse-cs.com"
+  frontend_url                    = "https://pulse-cs.com"
+  observability_otlp_endpoint     = "https://otlp-gateway-prod-us-east-2.grafana.net/otlp/v1/traces"
+  observability_service_name      = "pulse-api"
+  observability_service_namespace = "pulse"
 }
 
 variable "image_tag" {
@@ -125,22 +128,32 @@ module "ecs_api" {
   frontend_url       = local.frontend_url
 
   secret_arns = {
-    SUPABASE_SESSION_POOLER = aws_secretsmanager_secret.supabase_session_pooler.arn
-    DB_USER                 = aws_secretsmanager_secret.db_user.arn
-    DB_PASSWORD             = aws_secretsmanager_secret.db_password.arn
-    OPENAI_API_KEY          = aws_secretsmanager_secret.openai_api_key.arn
-    GOOGLE_CLIENT_ID        = aws_secretsmanager_secret.google_client_id.arn
-    GOOGLE_CLIENT_SECRET    = aws_secretsmanager_secret.google_client_secret.arn
-    GITHUB_APP_ID           = aws_secretsmanager_secret.github_app_id.arn
-    GITHUB_APP_PRIVATE_KEY  = aws_secretsmanager_secret.github_app_private_key.arn
-    GITHUB_APP_INSTALL_URL  = aws_secretsmanager_secret.github_app_install_url.arn
-    GITHUB_WEBHOOK_SECRET   = aws_secretsmanager_secret.github_webhook_secret.arn
-    SLACK_CLIENT_ID         = aws_secretsmanager_secret.slack_client_id.arn
-    SLACK_CLIENT_SECRET     = aws_secretsmanager_secret.slack_client_secret.arn
-    SLACK_SIGNING_SECRET    = aws_secretsmanager_secret.slack_signing_secret.arn
-    LINEAR_CLIENT_ID        = aws_secretsmanager_secret.linear_client_id.arn
-    LINEAR_CLIENT_SECRET    = aws_secretsmanager_secret.linear_client_secret.arn
-    LINEAR_WEBHOOK_SECRET   = aws_secretsmanager_secret.linear_webhook_secret.arn
+    SUPABASE_SESSION_POOLER          = aws_secretsmanager_secret.supabase_session_pooler.arn
+    DB_USER                          = aws_secretsmanager_secret.db_user.arn
+    DB_PASSWORD                      = aws_secretsmanager_secret.db_password.arn
+    OPENAI_API_KEY                   = aws_secretsmanager_secret.openai_api_key.arn
+    GOOGLE_CLIENT_ID                 = aws_secretsmanager_secret.google_client_id.arn
+    GOOGLE_CLIENT_SECRET             = aws_secretsmanager_secret.google_client_secret.arn
+    GITHUB_APP_ID                    = aws_secretsmanager_secret.github_app_id.arn
+    GITHUB_APP_PRIVATE_KEY           = aws_secretsmanager_secret.github_app_private_key.arn
+    GITHUB_APP_INSTALL_URL           = aws_secretsmanager_secret.github_app_install_url.arn
+    GITHUB_WEBHOOK_SECRET            = aws_secretsmanager_secret.github_webhook_secret.arn
+    SLACK_CLIENT_ID                  = aws_secretsmanager_secret.slack_client_id.arn
+    SLACK_CLIENT_SECRET              = aws_secretsmanager_secret.slack_client_secret.arn
+    SLACK_SIGNING_SECRET             = aws_secretsmanager_secret.slack_signing_secret.arn
+    LINEAR_CLIENT_ID                 = aws_secretsmanager_secret.linear_client_id.arn
+    LINEAR_CLIENT_SECRET             = aws_secretsmanager_secret.linear_client_secret.arn
+    LINEAR_WEBHOOK_SECRET            = aws_secretsmanager_secret.linear_webhook_secret.arn
+    OBSERVABILITY_OTLP_AUTHORIZATION = aws_secretsmanager_secret.observability_otlp_authorization.arn
+  }
+
+  extra_environment = {
+    OBSERVABILITY_TRACING_ENABLED              = "true"
+    OBSERVABILITY_OTLP_ENDPOINT                = local.observability_otlp_endpoint
+    OBSERVABILITY_TRACING_SAMPLING_PROBABILITY = "1.0"
+    OBSERVABILITY_SERVICE_NAME                 = local.observability_service_name
+    OBSERVABILITY_SERVICE_NAMESPACE            = local.observability_service_namespace
+    OBSERVABILITY_ENVIRONMENT                  = local.env
   }
 }
 
@@ -232,8 +245,8 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         Resource = "*"
       },
       {
-        Effect = "Allow"
-        Action = "iam:PassRole"
+        Effect   = "Allow"
+        Action   = "iam:PassRole"
         Resource = module.ecs_api.task_exec_role_arn
       }
     ]
@@ -319,5 +332,10 @@ resource "aws_secretsmanager_secret" "linear_client_secret" {
 
 resource "aws_secretsmanager_secret" "linear_webhook_secret" {
   name                    = "pulse/dev/LINEAR_WEBHOOK_SECRET"
+  recovery_window_in_days = 0
+}
+
+resource "aws_secretsmanager_secret" "observability_otlp_authorization" {
+  name                    = "pulse/dev/OBSERVABILITY_OTLP_AUTHORIZATION"
   recovery_window_in_days = 0
 }

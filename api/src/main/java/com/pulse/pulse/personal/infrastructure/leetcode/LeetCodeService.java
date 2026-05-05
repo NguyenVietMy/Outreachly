@@ -15,8 +15,8 @@ public class LeetCodeService {
 
     private final WebClient webClient;
 
-    public LeetCodeService() {
-        this.webClient = WebClient.builder()
+    public LeetCodeService(WebClient.Builder webClientBuilder) {
+        this.webClient = webClientBuilder
                 .baseUrl("https://leetcode.com")
                 .build();
     }
