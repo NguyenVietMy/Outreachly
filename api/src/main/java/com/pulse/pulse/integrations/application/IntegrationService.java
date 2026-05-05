@@ -345,44 +345,46 @@ public class IntegrationService {
         observability.low(observation, "provider", "github");
         observability.low(observation, "event_type", header(headers, "x-github-event"));
         try {
-            JsonNode payload = observability.observe("pulse.webhook.process", child -> {
-                observability.low(child, "provider", "github");
-                observability.low(child, "operation", "verify_signature");
-            }, () -> gitHubProvider.verifyAndParseWebhook(headers, body));
-            String deliveryId = gitHubProvider.extractDeliveryId(headers);
-            observability.high(observation, "delivery.id", deliveryId);
-
-            processWebhookDelivery("github", deliveryId, payload, headers, () -> {
-                String repoFullName = gitHubProvider.extractRepositoryFullName(payload);
-
-                List<IntegrationEventPayload> githubEvents = observability.observe("pulse.webhook.process", child -> {
+            observability.scoped(observation, () -> {
+                JsonNode payload = observability.observe("pulse.webhook.process", child -> {
                     observability.low(child, "provider", "github");
-                    observability.low(child, "operation", "map_events");
-                }, () -> gitHubProvider.mapWebhookEvents(headers, payload));
+                    observability.low(child, "operation", "verify_signature");
+                }, () -> gitHubProvider.verifyAndParseWebhook(headers, body));
+                String deliveryId = gitHubProvider.extractDeliveryId(headers);
+                observability.high(observation, "delivery.id", deliveryId);
 
-                for (UserIntegration integration : integrationRepo.findByProviderAndStatus("github", "connected")) {
-                    if (matchesRepository(integration.getMetadata(), repoFullName) || matchesInstallation(integration.getMetadata(), payload)) {
-                        ingestEvents(integration.getUserId(), "github", githubEvents);
-                        markWebhookSuccess(integration);
-                        if ("push".equalsIgnoreCase(header(headers, "x-github-event"))) {
-                            observability.observe("pulse.webhook.process", child -> {
-                                observability.low(child, "provider", "github");
-                                observability.low(child, "operation", "project_sync_trigger");
-                                observability.high(child, "user.id", integration.getUserId());
-                            }, () -> syncGitHubProjects(integration.getUserId()));
-                        }
-                    }
-                }
+                processWebhookDelivery("github", deliveryId, payload, headers, () -> {
+                    String repoFullName = gitHubProvider.extractRepositoryFullName(payload);
 
-                List<IntegrationEventPayload> obsidianEvents = obsidianProvider.mapWebhookEvents(payload);
-                if (!obsidianEvents.isEmpty()) {
-                    for (UserIntegration integration : integrationRepo.findByProviderAndStatus("obsidian", "connected")) {
-                        if (matchesRepository(integration.getMetadata(), repoFullName)) {
-                            ingestEvents(integration.getUserId(), "obsidian", obsidianEvents);
+                    List<IntegrationEventPayload> githubEvents = observability.observe("pulse.webhook.process", child -> {
+                        observability.low(child, "provider", "github");
+                        observability.low(child, "operation", "map_events");
+                    }, () -> gitHubProvider.mapWebhookEvents(headers, payload));
+
+                    for (UserIntegration integration : integrationRepo.findByProviderAndStatus("github", "connected")) {
+                        if (matchesRepository(integration.getMetadata(), repoFullName) || matchesInstallation(integration.getMetadata(), payload)) {
+                            ingestEvents(integration.getUserId(), "github", githubEvents);
                             markWebhookSuccess(integration);
+                            if ("push".equalsIgnoreCase(header(headers, "x-github-event"))) {
+                                observability.observe("pulse.webhook.process", child -> {
+                                    observability.low(child, "provider", "github");
+                                    observability.low(child, "operation", "project_sync_trigger");
+                                    observability.high(child, "user.id", integration.getUserId());
+                                }, () -> syncGitHubProjects(integration.getUserId()));
+                            }
                         }
                     }
-                }
+
+                    List<IntegrationEventPayload> obsidianEvents = obsidianProvider.mapWebhookEvents(payload);
+                    if (!obsidianEvents.isEmpty()) {
+                        for (UserIntegration integration : integrationRepo.findByProviderAndStatus("obsidian", "connected")) {
+                            if (matchesRepository(integration.getMetadata(), repoFullName)) {
+                                ingestEvents(integration.getUserId(), "obsidian", obsidianEvents);
+                                markWebhookSuccess(integration);
+                            }
+                        }
+                    }
+                });
             });
             observability.low(observation, "result", "processed");
         } catch (RuntimeException e) {
@@ -641,7 +643,7 @@ public class IntegrationService {
         webhookDeliveryRepository.save(delivery);
 
         try {
-            processor.run();
+            observability.scoped(observation, processor);
             delivery.setStatus("processed");
             delivery.setProcessedAt(LocalDateTime.now(ZoneOffset.UTC));
         } catch (Exception e) {

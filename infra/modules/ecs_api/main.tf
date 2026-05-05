@@ -66,12 +66,12 @@ resource "aws_lb_target_group" "api" {
   target_type = "ip"
 
   health_check {
-    path                = "/health"
+    path                = "/actuator/health"
     healthy_threshold   = 2
     unhealthy_threshold = 10
     timeout             = 30
     interval            = 60
-    matcher             = "200-399"
+    matcher             = "200"
   }
 }
 

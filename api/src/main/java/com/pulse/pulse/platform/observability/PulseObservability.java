@@ -26,6 +26,19 @@ public class PulseObservability {
         return Observation.createNotStarted(name, observationRegistry).start();
     }
 
+    public <T> T scoped(Observation observation, Supplier<T> supplier) {
+        try (Observation.Scope ignored = observation.openScope()) {
+            return supplier.get();
+        }
+    }
+
+    public void scoped(Observation observation, Runnable runnable) {
+        scoped(observation, () -> {
+            runnable.run();
+            return null;
+        });
+    }
+
     public <T> T observe(String name, Consumer<Observation> customizer, Supplier<T> supplier) {
         Observation observation = Observation.createNotStarted(name, observationRegistry);
         if (customizer != null) {

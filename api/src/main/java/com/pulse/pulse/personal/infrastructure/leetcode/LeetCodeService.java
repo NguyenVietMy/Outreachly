@@ -51,62 +51,64 @@ public class LeetCodeService {
                 "query", query,
                 "variables", Map.of("username", username));
 
+        String result = "error";
         try {
-            JsonNode response = webClient.post()
-                    .uri("/graphql")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(body)
-                    .retrieve()
-                    .bodyToMono(JsonNode.class)
-                    .block();
+            Map<String, Object> stats = observability.scoped(observation, () -> {
+                JsonNode response = webClient.post()
+                        .uri("/graphql")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(body)
+                        .retrieve()
+                        .bodyToMono(JsonNode.class)
+                        .block();
 
-            if (response == null || response.path("data").path("matchedUser").isNull()
-                    || response.path("data").path("matchedUser").isMissingNode()) {
-                throw new RuntimeException("LeetCode user not found: " + username);
-            }
-
-            JsonNode user = response.path("data").path("matchedUser");
-            JsonNode submissions = user.path("submitStatsGlobal").path("acSubmissionNum");
-
-            Map<String, Object> stats = new HashMap<>();
-            stats.put("username", user.path("username").asText());
-            stats.put("ranking", user.path("profile").path("ranking").asInt(0));
-
-            int easy = 0;
-            int medium = 0;
-            int hard = 0;
-            int total = 0;
-            for (JsonNode sub : submissions) {
-                String diff = sub.path("difficulty").asText();
-                int count = sub.path("count").asInt(0);
-                switch (diff) {
-                    case "Easy" -> easy = count;
-                    case "Medium" -> medium = count;
-                    case "Hard" -> hard = count;
-                    case "All" -> total = count;
+                if (response == null || response.path("data").path("matchedUser").isNull()
+                        || response.path("data").path("matchedUser").isMissingNode()) {
+                    throw new RuntimeException("LeetCode user not found: " + username);
                 }
-            }
 
-            stats.put("easy", easy);
-            stats.put("medium", medium);
-            stats.put("hard", hard);
-            stats.put("total", total);
+                JsonNode user = response.path("data").path("matchedUser");
+                JsonNode submissions = user.path("submitStatsGlobal").path("acSubmissionNum");
 
-            int dsaScore = computeDsaScore(easy, medium, hard);
-            stats.put("dsaScore", dsaScore);
+                Map<String, Object> fetchedStats = new HashMap<>();
+                fetchedStats.put("username", user.path("username").asText());
+                fetchedStats.put("ranking", user.path("profile").path("ranking").asInt(0));
 
-            observability.low(observation, "result", "success");
+                int easy = 0;
+                int medium = 0;
+                int hard = 0;
+                int total = 0;
+                for (JsonNode sub : submissions) {
+                    String diff = sub.path("difficulty").asText();
+                    int count = sub.path("count").asInt(0);
+                    switch (diff) {
+                        case "Easy" -> easy = count;
+                        case "Medium" -> medium = count;
+                        case "Hard" -> hard = count;
+                        case "All" -> total = count;
+                    }
+                }
+
+                fetchedStats.put("easy", easy);
+                fetchedStats.put("medium", medium);
+                fetchedStats.put("hard", hard);
+                fetchedStats.put("total", total);
+
+                int dsaScore = computeDsaScore(easy, medium, hard);
+                fetchedStats.put("dsaScore", dsaScore);
+                return fetchedStats;
+            });
+            result = "success";
             return stats;
         } catch (RuntimeException e) {
-            observability.low(observation, "result", "error");
             observation.error(e);
             throw e;
         } catch (Exception e) {
-            observability.low(observation, "result", "error");
             observation.error(e);
             log.error("Failed to fetch LeetCode stats for {}", username, e);
             throw new RuntimeException("Failed to fetch LeetCode stats", e);
         } finally {
+            observability.low(observation, "result", result);
             observation.stop();
         }
     }

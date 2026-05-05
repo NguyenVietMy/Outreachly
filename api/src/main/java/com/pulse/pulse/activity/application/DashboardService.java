@@ -192,28 +192,30 @@ public class DashboardService {
         observability.high(observation, "user.id", userId);
 
         try {
-            LocalDateTime since = LocalDateTime.now().minusHours(24);
-            List<IntegrationEvent> events = eventRepo
-                    .findByUserIdAndEventTimestampAfterOrderByEventTimestampDesc(userId, since);
+            return observability.scoped(observation, () -> {
+                LocalDateTime since = LocalDateTime.now().minusHours(24);
+                List<IntegrationEvent> events = eventRepo
+                        .findByUserIdAndEventTimestampAfterOrderByEventTimestampDesc(userId, since);
 
-            observability.high(observation, "event_count", events.size());
-            if (events.isEmpty()) {
-                observability.low(observation, "cache", "empty");
+                observability.high(observation, "event_count", events.size());
+                if (events.isEmpty()) {
+                    observability.low(observation, "cache", "empty");
+                    observability.low(observation, "result", "success");
+                    return "No activity recorded in the last 24 hours. Connect some integrations to start tracking your productivity.";
+                }
+
+                StringBuilder context = new StringBuilder();
+                context.append("Here is the CS student's activity from the last 24 hours:\n\n");
+                for (IntegrationEvent e : events) {
+                    context.append(String.format("- [%s] %s (%s)\n",
+                            e.getProvider(), e.getTitle(),
+                            e.getEventTimestamp().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"))));
+                }
+
+                String digest = openAiService.generateDigest(context.toString()).block();
                 observability.low(observation, "result", "success");
-                return "No activity recorded in the last 24 hours. Connect some integrations to start tracking your productivity.";
-            }
-
-            StringBuilder context = new StringBuilder();
-            context.append("Here is the CS student's activity from the last 24 hours:\n\n");
-            for (IntegrationEvent e : events) {
-                context.append(String.format("- [%s] %s (%s)\n",
-                        e.getProvider(), e.getTitle(),
-                        e.getEventTimestamp().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"))));
-            }
-
-            String digest = openAiService.generateDigest(context.toString()).block();
-            observability.low(observation, "result", "success");
-            return digest;
+                return digest;
+            });
         } catch (Exception e) {
             observation.error(e);
             observability.low(observation, "result", "error");

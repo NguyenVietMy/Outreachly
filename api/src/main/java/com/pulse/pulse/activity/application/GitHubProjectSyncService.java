@@ -72,7 +72,8 @@ public class GitHubProjectSyncService {
                 request.selectedRepositories() != null ? request.selectedRepositories().size() : 0);
 
         try {
-            int synced = syncSelectedRepositories(request.userId(), request.accessToken(), request.selectedRepositories());
+            int synced = observability.scoped(observation, () ->
+                    syncSelectedRepositories(request.userId(), request.accessToken(), request.selectedRepositories()));
             result = "success";
             return synced;
         } catch (RuntimeException e) {

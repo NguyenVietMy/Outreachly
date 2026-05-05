@@ -222,34 +222,38 @@ public class OpenAiService {
             observability.low(observation, "model", model);
             observability.high(observation, "prompt.char_count", promptCharCount);
 
-            return webClient.post()
-                    .uri("/chat/completions")
-                    .bodyValue(requestBody)
-                    .retrieve()
-                    .bodyToMono(JsonNode.class)
-                    .map(this::extractMessageContent)
-                    .doOnNext(content -> {
-                        result.set("success");
-                        observability.high(observation, "response.char_count", content.length());
-                    })
-                    .doOnError(error -> {
-                        result.set("error");
-                        observation.error(error);
-                        log.error("{}: ", errorLogMessage, error);
-                    })
-                    .doFinally(signal -> {
-                        observability.low(observation, "result", result.get());
-                        observability.counter("pulse.openai.calls",
+            return Mono.using(
+                    observation::openScope,
+                    scope -> webClient.post()
+                            .uri("/chat/completions")
+                            .bodyValue(requestBody)
+                            .retrieve()
+                            .bodyToMono(JsonNode.class)
+                            .map(this::extractMessageContent)
+                            .doOnNext(content -> {
+                                result.set("success");
+                                observability.high(observation, "response.char_count", content.length());
+                            })
+                            .doOnError(error -> {
+                                result.set("error");
+                                observation.error(error);
+                                log.error("{}: ", errorLogMessage, error);
+                            })
+                            .doFinally(signal -> {
+                                observability.low(observation, "result", result.get());
+                                observability.counter("pulse.openai.calls",
+                                                "operation", operation,
+                                                "model", model,
+                                                "result", result.get())
+                                        .increment();
+                                observability.stopTimer(sample, "pulse.openai.call.duration",
                                         "operation", operation,
                                         "model", model,
-                                        "result", result.get())
-                                .increment();
-                        observability.stopTimer(sample, "pulse.openai.call.duration",
-                                "operation", operation,
-                                "model", model,
-                                "result", result.get());
-                        observation.stop();
-                    });
+                                        "result", result.get());
+                                observation.stop();
+                            }),
+                    Observation.Scope::close
+            );
         });
     }
 

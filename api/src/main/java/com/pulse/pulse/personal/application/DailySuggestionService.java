@@ -64,26 +64,28 @@ public class DailySuggestionService {
         observability.high(observation, "user.id", userId);
 
         try {
-            LocalDate today = LocalDate.now();
-            Optional<DailySuggestion> cached = suggestionRepo.findByUserIdAndSuggestionDate(userId, today);
+            return observability.scoped(observation, () -> {
+                LocalDate today = LocalDate.now();
+                Optional<DailySuggestion> cached = suggestionRepo.findByUserIdAndSuggestionDate(userId, today);
 
-            if (cached.isPresent()) {
-                DailySuggestion existing = cached.get();
-                if (existing.getGeneratedAt().plusHours(CACHE_HOURS).isAfter(LocalDateTime.now())) {
-                    observability.low(observation, "cache", "cache_hit");
-                    observability.low(observation, "result", "cache_hit");
-                    observability.counter("pulse.suggestions.requests",
-                                    "operation", "today",
-                                    "result", "cache_hit")
-                            .increment();
-                    return toView(existing);
+                if (cached.isPresent()) {
+                    DailySuggestion existing = cached.get();
+                    if (existing.getGeneratedAt().plusHours(CACHE_HOURS).isAfter(LocalDateTime.now())) {
+                        observability.low(observation, "cache", "cache_hit");
+                        observability.low(observation, "result", "cache_hit");
+                        observability.counter("pulse.suggestions.requests",
+                                        "operation", "today",
+                                        "result", "cache_hit")
+                                .increment();
+                        return toView(existing);
+                    }
                 }
-            }
 
-            observability.low(observation, "cache", "miss");
-            DailySuggestionView result = generateSuggestions(userId, today, "today");
-            observability.low(observation, "result", "generated");
-            return result;
+                observability.low(observation, "cache", "miss");
+                DailySuggestionView result = generateSuggestions(userId, today, "today");
+                observability.low(observation, "result", "generated");
+                return result;
+            });
         } catch (RuntimeException e) {
             observation.error(e);
             observability.low(observation, "result", "error");
@@ -99,26 +101,28 @@ public class DailySuggestionService {
         observability.high(observation, "user.id", userId);
 
         try {
-            LocalDate today = LocalDate.now();
-            Optional<DailySuggestion> existing = suggestionRepo.findByUserIdAndSuggestionDate(userId, today);
+            return observability.scoped(observation, () -> {
+                LocalDate today = LocalDate.now();
+                Optional<DailySuggestion> existing = suggestionRepo.findByUserIdAndSuggestionDate(userId, today);
 
-            if (existing.isPresent()) {
-                DailySuggestion current = existing.get();
-                if (current.getGeneratedAt().plusHours(REGENERATE_COOLDOWN_HOURS).isAfter(LocalDateTime.now())) {
-                    observability.low(observation, "cache", "cooldown");
-                    observability.low(observation, "result", "cooldown");
-                    observability.counter("pulse.suggestions.requests",
-                                    "operation", "regenerate",
-                                    "result", "cooldown")
-                            .increment();
-                    return null;
+                if (existing.isPresent()) {
+                    DailySuggestion current = existing.get();
+                    if (current.getGeneratedAt().plusHours(REGENERATE_COOLDOWN_HOURS).isAfter(LocalDateTime.now())) {
+                        observability.low(observation, "cache", "cooldown");
+                        observability.low(observation, "result", "cooldown");
+                        observability.counter("pulse.suggestions.requests",
+                                        "operation", "regenerate",
+                                        "result", "cooldown")
+                                .increment();
+                        return null;
+                    }
                 }
-            }
 
-            observability.low(observation, "cache", "regenerate");
-            DailySuggestionView result = generateSuggestions(userId, today, "regenerate");
-            observability.low(observation, "result", "generated");
-            return result;
+                observability.low(observation, "cache", "regenerate");
+                DailySuggestionView result = generateSuggestions(userId, today, "regenerate");
+                observability.low(observation, "result", "generated");
+                return result;
+            });
         } catch (RuntimeException e) {
             observation.error(e);
             observability.low(observation, "result", "error");

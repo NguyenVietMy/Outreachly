@@ -260,32 +260,40 @@ public class PersonalService {
         observability.low(observation, "operation", "score");
         observability.high(observation, "user.id", profile.getUserId());
         try {
-            String raw = openAiService.scoreResume(profile.getResumeText()).block();
-            Map<String, Object> breakdown = objectMapper.readValue(raw, new TypeReference<>() {
+            UserProfile saved = observability.scoped(observation, () -> {
+                String raw = openAiService.scoreResume(profile.getResumeText()).block();
+                Map<String, Object> breakdown;
+                try {
+                    breakdown = objectMapper.readValue(raw, new TypeReference<>() {
+                    });
+                } catch (Exception e) {
+                    throw new RuntimeException("Failed to parse resume score", e);
+                }
+                profile.setResumeScoreBreakdown(breakdown);
+
+                Number totalScore = (Number) breakdown.get("total_score");
+                int score = totalScore != null ? totalScore.intValue() : 0;
+                updateAxisScore(profile, "resume", score);
+
+                int projectScore = extractProjectScore(breakdown);
+                updateAxisScore(profile, "projects", projectScore);
+
+                UserProfile persisted = profileRepo.save(profile);
+
+                String decision = (String) breakdown.getOrDefault("decision", "UNKNOWN");
+                String summary = (String) breakdown.getOrDefault("summary", "");
+                String eventContext = String.format(
+                        "Resume scored: %d/100 (%s). %s", score, decision, summary);
+                generateEventTasks(profile.getUserId(), "resume", "resume_upload", eventContext);
+                updateMemory(persisted, eventContext);
+                return persisted;
             });
-            profile.setResumeScoreBreakdown(breakdown);
-
-            Number totalScore = (Number) breakdown.get("total_score");
-            int score = totalScore != null ? totalScore.intValue() : 0;
-            updateAxisScore(profile, "resume", score);
-
-            int projectScore = extractProjectScore(breakdown);
-            updateAxisScore(profile, "projects", projectScore);
-
-            UserProfile saved = profileRepo.save(profile);
-
-            String decision = (String) breakdown.getOrDefault("decision", "UNKNOWN");
-            String summary = (String) breakdown.getOrDefault("summary", "");
-            String eventContext = String.format(
-                    "Resume scored: %d/100 (%s). %s", score, decision, summary);
-            generateEventTasks(profile.getUserId(), "resume", "resume_upload", eventContext);
-            updateMemory(saved, eventContext);
             result = "success";
             return saved;
         } catch (Exception e) {
             observation.error(e);
             log.error("Failed to score resume", e);
-            throw new RuntimeException("Failed to parse resume score", e);
+            throw new RuntimeException("Failed to score resume", e);
         } finally {
             observability.low(observation, "result", result);
             observability.counter("pulse.resume.operations",
