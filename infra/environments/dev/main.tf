@@ -32,6 +32,7 @@ locals {
   frontend_url                    = "https://pulse-cs.com"
   observability_otlp_endpoint     = "https://otlp-gateway-prod-us-east-2.grafana.net/otlp/v1/traces"
   observability_otlp_metrics_url  = "https://otlp-gateway-prod-us-east-2.grafana.net/otlp/v1/metrics"
+  observability_otlp_logs_url     = "https://otlp-gateway-prod-us-east-2.grafana.net/otlp/v1/logs"
   observability_service_name      = "pulse-api"
   observability_service_namespace = "pulse"
 }
@@ -114,6 +115,18 @@ module "ecr" {
   env     = local.env
 }
 
+# ---------- Alarms: SNS ----------
+
+resource "aws_sns_topic" "alarms" {
+  name = "${local.project}-${local.env}-alarms"
+}
+
+resource "aws_sns_topic_subscription" "alarms_email" {
+  topic_arn = aws_sns_topic.alarms.arn
+  protocol  = "email"
+  endpoint  = "mynv2712@gmail.com"
+}
+
 # ---------- ECS API ----------
 
 module "ecs_api" {
@@ -127,6 +140,7 @@ module "ecs_api" {
   container_port     = 8080
   api_domain         = local.api_domain
   frontend_url       = local.frontend_url
+  alarm_actions      = [aws_sns_topic.alarms.arn]
 
   secret_arns = {
     SUPABASE_SESSION_POOLER          = aws_secretsmanager_secret.supabase_session_pooler.arn
@@ -154,6 +168,8 @@ module "ecs_api" {
     OBSERVABILITY_METRICS_ENABLED              = "true"
     OBSERVABILITY_OTLP_METRICS_URL             = local.observability_otlp_metrics_url
     OBSERVABILITY_TRACING_SAMPLING_PROBABILITY = "1.0"
+    OBSERVABILITY_LOGS_ENABLED                 = "true"
+    OBSERVABILITY_OTLP_LOGS_URL                = local.observability_otlp_logs_url
     OBSERVABILITY_SERVICE_NAME                 = local.observability_service_name
     OBSERVABILITY_SERVICE_NAMESPACE            = local.observability_service_namespace
     OBSERVABILITY_ENVIRONMENT                  = local.env
