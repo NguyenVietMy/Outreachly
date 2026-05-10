@@ -101,7 +101,7 @@ public class IntegrationController {
                 return ResponseEntity.ok(toDto(integrationService.getIntegrationView(user.id(), provider)));
             }
 
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.notFound().build();
         } catch (Exception e) {
             log.error("Connect error for {}: {}", provider, e.getMessage());
             return ResponseEntity.badRequest().build();
