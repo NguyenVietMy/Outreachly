@@ -300,8 +300,12 @@ public class GitHubIntegrationProvider {
                     continue;
                 }
 
-                fetchRecentCommits(token, parts[0], parts[1], since).forEach(events::add);
-                fetchRecentIssues(token, parts[0], parts[1], since).forEach(events::add);
+                try {
+                    fetchRecentCommits(token, parts[0], parts[1], since).forEach(events::add);
+                    fetchRecentIssues(token, parts[0], parts[1], since).forEach(events::add);
+                } catch (Exception e) {
+                    log.warn("Skipping repo {}: {}", repoFullName, e.getMessage());
+                }
             }
             return events;
         });
