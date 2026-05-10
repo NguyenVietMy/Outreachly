@@ -67,7 +67,7 @@ export function useIntegrations() {
     window.location.href = data.url;
   };
 
-  const connect = async (provider: string) => {
+  const connect = async (provider: string): Promise<boolean> => {
     const res = await fetch(
       `${API_BASE_URL}/api/integrations/${provider}/connect`,
       {
@@ -77,11 +77,15 @@ export function useIntegrations() {
         body: JSON.stringify({}),
       }
     );
+    if (res.status === 404) {
+      return false;
+    }
     if (!res.ok) {
       const text = await res.text();
       throw new Error(text || "Failed to connect");
     }
     await fetchIntegrations();
+    return true;
   };
 
   const getResources = async (provider: string) => {

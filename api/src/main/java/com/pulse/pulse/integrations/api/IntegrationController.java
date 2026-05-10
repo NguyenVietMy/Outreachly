@@ -88,12 +88,20 @@ public class IntegrationController {
         }
 
         try {
-            if (!"obsidian".equals(provider)) {
-                return ResponseEntity.badRequest().build();
+            if ("github".equals(provider)) {
+                var integration = integrationService.autoDetectGitHub(user.id());
+                if (integration == null) {
+                    return ResponseEntity.notFound().build();
+                }
+                return ResponseEntity.ok(toDto(integrationService.getIntegrationView(user.id(), provider)));
             }
 
-            integrationService.connectObsidian(user.id());
-            return ResponseEntity.ok(toDto(integrationService.getIntegrationView(user.id(), provider)));
+            if ("obsidian".equals(provider)) {
+                integrationService.connectObsidian(user.id());
+                return ResponseEntity.ok(toDto(integrationService.getIntegrationView(user.id(), provider)));
+            }
+
+            return ResponseEntity.badRequest().build();
         } catch (Exception e) {
             log.error("Connect error for {}: {}", provider, e.getMessage());
             return ResponseEntity.badRequest().build();

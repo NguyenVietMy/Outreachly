@@ -155,6 +155,11 @@ function IntegrationsContent() {
 
     try {
       if (config.connectType === "oauth") {
+        const connected = await connect(provider);
+        if (connected) {
+          toast({ title: `${config.name} connected` });
+          return;
+        }
         await connectOAuth(provider);
         return;
       }

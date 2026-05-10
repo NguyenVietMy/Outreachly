@@ -454,6 +454,15 @@ public class IntegrationService {
         });
     }
 
+    @Transactional
+    public UserIntegration autoDetectGitHub(Long userId) {
+        Long installationId = gitHubProvider.findExistingInstallationId();
+        if (installationId == null) {
+            return null;
+        }
+        return connectGitHubInstallation(userId, installationId);
+    }
+
     private UserIntegration connectGitHubInstallation(Long userId, Long installationId) {
         if (installationId == null) {
             throw new IllegalArgumentException("GitHub installation id is required");

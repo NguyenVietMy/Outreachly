@@ -200,6 +200,26 @@ public class GitHubIntegrationProvider {
         return objectMapper.convertValue(raw, new TypeReference<>() {});
     }
 
+    public Long findExistingInstallationId() {
+        try {
+            JsonNode response = gitHubWebClient.get()
+                    .uri("/app/installations")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + createAppJwt())
+                    .retrieve()
+                    .bodyToMono(JsonNode.class)
+                    .block();
+
+            if (response == null || !response.isArray() || response.isEmpty()) {
+                return null;
+            }
+
+            return response.get(0).path("id").asLong();
+        } catch (Exception e) {
+            log.warn("Failed to check existing GitHub installations: {}", e.getMessage());
+            return null;
+        }
+    }
+
     public String buildScopeSummary(Map<String, Object> metadata) {
         List<Map<String, String>> selected = getSelectedResourceMaps(metadata);
         if (selected.isEmpty()) {
