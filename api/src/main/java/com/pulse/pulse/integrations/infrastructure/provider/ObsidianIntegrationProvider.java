@@ -73,8 +73,11 @@ public class ObsidianIntegrationProvider {
         }
 
         JsonNode commits = gitHubWebClient.get()
-                .uri("/repos/{owner}/{repo}/commits?per_page=100&since={since}",
-                        parts[0], parts[1], since.toInstant(ZoneOffset.UTC).toString())
+                .uri(uriBuilder -> uriBuilder
+                        .path("/repos/{owner}/{repo}/commits")
+                        .queryParam("since", since.toInstant(ZoneOffset.UTC).toString())
+                        .queryParam("per_page", 100)
+                        .build(parts[0], parts[1]))
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .retrieve()
                 .bodyToMono(JsonNode.class)

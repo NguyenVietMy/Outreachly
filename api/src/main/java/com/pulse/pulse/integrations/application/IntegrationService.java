@@ -323,6 +323,7 @@ public class IntegrationService {
 
             integration.setMetadata(metadata);
             integration.setWebhookStatus(selectedIds.isEmpty() ? "pending_scope" : "active");
+            integration.setLastSyncedAt(null);
             integration.setLastWebhookError(null);
             integration.setLastWebhookErrorAt(null);
             integrationRepo.save(integration);
