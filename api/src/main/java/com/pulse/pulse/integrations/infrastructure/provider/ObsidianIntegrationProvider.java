@@ -165,6 +165,79 @@ public class ObsidianIntegrationProvider {
         return selected != null ? selected : "Select a vault repo";
     }
 
+    public String fetchRecentVaultDiffs(String token, Map<String, Object> metadata) {
+        String repoFullName = getSelectedRepository(metadata);
+        if (repoFullName == null || token == null || token.isBlank()) {
+            return null;
+        }
+
+        String[] parts = repoFullName.split("/");
+        if (parts.length != 2) {
+            return null;
+        }
+
+        try {
+            String since = LocalDateTime.now().minusDays(7).toInstant(ZoneOffset.UTC).toString();
+            JsonNode commits = gitHubWebClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/repos/{owner}/{repo}/commits")
+                            .queryParam("since", since)
+                            .queryParam("per_page", 20)
+                            .build(parts[0], parts[1]))
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .retrieve()
+                    .bodyToMono(JsonNode.class)
+                    .block();
+
+            if (commits == null || !commits.isArray() || commits.isEmpty()) {
+                return null;
+            }
+
+            StringBuilder sb = new StringBuilder();
+            int commitCount = 0;
+            for (JsonNode commit : commits) {
+                if (commitCount >= 10) break;
+
+                String sha = commit.path("sha").asText("");
+                String message = commit.path("commit").path("message").asText("").split("\n")[0];
+                String dateStr = commit.path("commit").path("author").path("date").asText("");
+
+                if (sha.isBlank()) continue;
+
+                JsonNode detail = gitHubWebClient.get()
+                        .uri("/repos/{owner}/{repo}/commits/{sha}", parts[0], parts[1], sha)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .retrieve()
+                        .bodyToMono(JsonNode.class)
+                        .block();
+
+                if (detail == null || !detail.has("files")) continue;
+
+                sb.append(message).append(" (").append(dateStr).append(")\n");
+                for (JsonNode file : detail.path("files")) {
+                    String filename = file.path("filename").asText("");
+                    String patch = file.path("patch").asText("");
+                    if (patch.isBlank()) continue;
+                    sb.append("--- ").append(filename).append(" ---\n");
+                    sb.append(patch).append("\n");
+                }
+                sb.append("\n");
+                commitCount++;
+
+                if (sb.length() > 3000) {
+                    int cutoff = sb.lastIndexOf("\n", 3000);
+                    if (cutoff <= 0) cutoff = 3000;
+                    return sb.substring(0, cutoff) + "\n[...truncated]";
+                }
+            }
+
+            return sb.isEmpty() ? null : sb.toString();
+        } catch (Exception e) {
+            log.warn("Failed to fetch Obsidian vault diffs for {}: {}", repoFullName, e.getMessage());
+            return null;
+        }
+    }
+
     public String getSelectedRepository(Map<String, Object> metadata) {
         List<Map<String, String>> resources = getSelectedResourceMaps(metadata);
         if (resources.isEmpty()) {

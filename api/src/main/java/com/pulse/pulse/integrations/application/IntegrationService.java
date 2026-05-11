@@ -716,6 +716,21 @@ public class IntegrationService {
         return objectMapper.convertValue(raw, new TypeReference<>() {});
     }
 
+    public String getObsidianVaultDiffs(Long userId) {
+        try {
+            UserIntegration obsidian = integrationRepo.findByUserIdAndProvider(userId, "obsidian")
+                    .orElse(null);
+            if (obsidian == null || !"connected".equals(obsidian.getStatus())) {
+                return null;
+            }
+            String token = resolveGitHubToken(userId);
+            return obsidianProvider.fetchRecentVaultDiffs(token, obsidian.getMetadata());
+        } catch (Exception e) {
+            log.warn("Could not fetch Obsidian vault diffs for user {}: {}", userId, e.getMessage());
+            return null;
+        }
+    }
+
     private String resolveGitHubToken(Long userId) {
         UserIntegration github = integrationRepo.findByUserIdAndProvider(userId, "github")
                 .orElseThrow(() -> new RuntimeException("GitHub must be connected first"));
