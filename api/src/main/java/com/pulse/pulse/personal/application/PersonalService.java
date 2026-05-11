@@ -6,12 +6,15 @@ import com.pulse.pulse.activity.application.ActivityEventView;
 import com.pulse.pulse.activity.application.DashboardService;
 import com.pulse.pulse.identity.application.CurrentUserView;
 import com.pulse.pulse.identity.application.UserService;
+import com.pulse.pulse.integrations.application.IntegrationService;
 import com.pulse.pulse.personal.api.dto.OnboardingRequest;
 import com.pulse.pulse.personal.domain.AiTask;
+import com.pulse.pulse.personal.domain.RoadmapItem;
 import com.pulse.pulse.personal.domain.UserGoal;
 import com.pulse.pulse.personal.domain.UserProfile;
 import com.pulse.pulse.personal.infrastructure.leetcode.LeetCodeService;
 import com.pulse.pulse.personal.infrastructure.persistence.AiTaskRepository;
+import com.pulse.pulse.personal.infrastructure.persistence.RoadmapItemRepository;
 import com.pulse.pulse.personal.infrastructure.persistence.UserGoalRepository;
 import com.pulse.pulse.personal.infrastructure.persistence.UserProfileRepository;
 import com.pulse.pulse.personal.infrastructure.resume.ResumeService;
@@ -39,8 +42,10 @@ public class PersonalService {
     private final UserProfileRepository profileRepo;
     private final UserGoalRepository goalRepo;
     private final AiTaskRepository aiTaskRepo;
+    private final RoadmapItemRepository roadmapRepo;
     private final DashboardService dashboardService;
     private final UserService userService;
+    private final IntegrationService integrationService;
     private final OpenAiService openAiService;
     private final LeetCodeService leetCodeService;
     private final ResumeService resumeService;
@@ -730,6 +735,30 @@ public class PersonalService {
                 for (ActivityEventView e : recentEvents) {
                     context.append(String.format("- [%s] %s\n", e.provider(), e.title()));
                 }
+                context.append("\n");
+            }
+
+            try {
+                String obsidianDiffs = integrationService.getObsidianVaultDiffs(userId);
+                if (obsidianDiffs != null && !obsidianDiffs.isBlank()) {
+                    context.append("=== OBSIDIAN DAILY NOTES (LAST 7 DAYS) ===\n");
+                    context.append(obsidianDiffs).append("\n\n");
+                }
+            } catch (Exception e) {
+                log.warn("Could not fetch Obsidian diffs for insights: {}", e.getMessage());
+            }
+
+            List<RoadmapItem> roadmapItems = roadmapRepo.findByUserIdOrderByFocusRankAsc(userId);
+            if (!roadmapItems.isEmpty()) {
+                context.append("=== CAREER ROADMAP ===\n");
+                for (RoadmapItem item : roadmapItems) {
+                    context.append("- [").append(item.getStatus()).append("] ").append(item.getTitle());
+                    if (item.getDeadline() != null) {
+                        context.append(" — deadline: ").append(item.getDeadline());
+                    }
+                    context.append("\n");
+                }
+                context.append("\n");
             }
 
             if (context.isEmpty()) {

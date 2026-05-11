@@ -5,9 +5,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pulse.pulse.activity.application.ActivityEventView;
 import com.pulse.pulse.activity.application.DashboardService;
 import com.pulse.pulse.activity.application.RepositorySnapshotView;
+import com.pulse.pulse.integrations.application.IntegrationService;
+import com.pulse.pulse.personal.domain.AiTask;
 import com.pulse.pulse.personal.domain.DailySuggestion;
+import com.pulse.pulse.personal.domain.RoadmapItem;
 import com.pulse.pulse.personal.domain.UserGoal;
+import com.pulse.pulse.personal.infrastructure.persistence.AiTaskRepository;
 import com.pulse.pulse.personal.infrastructure.persistence.DailySuggestionRepository;
+import com.pulse.pulse.personal.infrastructure.persistence.RoadmapItemRepository;
 import com.pulse.pulse.personal.infrastructure.persistence.UserGoalRepository;
 import com.pulse.pulse.personal.infrastructure.persistence.UserProfileRepository;
 import com.pulse.pulse.platform.ai.OpenAiService;
@@ -24,6 +29,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -38,6 +44,9 @@ public class DailySuggestionService {
     private final OpenAiService openAiService;
     private final ObjectMapper objectMapper;
     private final PulseObservability observability;
+    private final IntegrationService integrationService;
+    private final AiTaskRepository aiTaskRepo;
+    private final RoadmapItemRepository roadmapRepo;
 
     private static final long CACHE_HOURS = 12;
     private static final long REGENERATE_COOLDOWN_HOURS = 1;
@@ -48,7 +57,10 @@ public class DailySuggestionService {
                                   DashboardService dashboardService,
                                   OpenAiService openAiService,
                                   ObjectMapper objectMapper,
-                                  PulseObservability observability) {
+                                  PulseObservability observability,
+                                  IntegrationService integrationService,
+                                  AiTaskRepository aiTaskRepo,
+                                  RoadmapItemRepository roadmapRepo) {
         this.suggestionRepo = suggestionRepo;
         this.profileRepo = profileRepo;
         this.goalRepo = goalRepo;
@@ -56,6 +68,9 @@ public class DailySuggestionService {
         this.openAiService = openAiService;
         this.objectMapper = objectMapper;
         this.observability = observability;
+        this.integrationService = integrationService;
+        this.aiTaskRepo = aiTaskRepo;
+        this.roadmapRepo = roadmapRepo;
     }
 
     public DailySuggestionView getSuggestionsForToday(Long userId) {
@@ -194,8 +209,11 @@ public class DailySuggestionService {
 
         buildProfileBlock(sb, userId);
         buildGoalsBlock(sb, userId);
+        buildStudyPlanBlock(sb, userId);
+        buildRoadmapBlock(sb, userId);
         buildProjectsBlock(sb, userId);
         buildRecentEventsBlock(sb, userId);
+        buildObsidianBlock(sb, userId);
         buildDateBlock(sb);
 
         return sb.toString();
@@ -366,6 +384,58 @@ public class DailySuggestionService {
         sb.append("=== TODAY ===\n");
         sb.append("Date: ").append(today).append(" (")
                 .append(today.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH)).append(")\n");
+    }
+
+    private void buildStudyPlanBlock(StringBuilder sb, Long userId) {
+        List<AiTask> uncompleted = aiTaskRepo.findByUserIdOrderByAxisAscOrderIndexAsc(userId)
+                .stream()
+                .filter(t -> !t.isCompleted())
+                .limit(15)
+                .toList();
+
+        if (uncompleted.isEmpty()) return;
+
+        sb.append("=== STUDY PLAN (UNCOMPLETED TASKS) ===\n");
+        for (AiTask task : uncompleted) {
+            sb.append("- [").append(task.getAxis()).append("] ").append(task.getTitle());
+            if (task.getPriority() == 0) {
+                sb.append(" [HIGH PRIORITY]");
+            }
+            sb.append("\n");
+        }
+        sb.append("\n");
+    }
+
+    private void buildRoadmapBlock(StringBuilder sb, Long userId) {
+        List<RoadmapItem> items = roadmapRepo.findByUserIdOrderByFocusRankAsc(userId);
+        if (items.isEmpty()) return;
+
+        sb.append("=== CAREER ROADMAP ===\n");
+        for (RoadmapItem item : items) {
+            sb.append("- [").append(item.getStatus()).append("] ").append(item.getTitle());
+            if (item.getPhase() != null) {
+                sb.append(" (").append(item.getPhase()).append(")");
+            }
+            if (item.getDeadline() != null) {
+                long daysUntil = ChronoUnit.DAYS.between(LocalDate.now(), item.getDeadline());
+                sb.append(" — deadline: ").append(item.getDeadline())
+                        .append(" (").append(daysUntil).append(" days away)");
+            }
+            sb.append("\n");
+        }
+        sb.append("\n");
+    }
+
+    private void buildObsidianBlock(StringBuilder sb, Long userId) {
+        try {
+            String diffs = integrationService.getObsidianVaultDiffs(userId);
+            if (diffs != null && !diffs.isBlank()) {
+                sb.append("=== OBSIDIAN DAILY NOTES (LAST 7 DAYS) ===\n");
+                sb.append(diffs).append("\n\n");
+            }
+        } catch (Exception e) {
+            log.warn("Could not fetch Obsidian diffs for daily suggestions: {}", e.getMessage());
+        }
     }
 
     private String sha256(String input) {

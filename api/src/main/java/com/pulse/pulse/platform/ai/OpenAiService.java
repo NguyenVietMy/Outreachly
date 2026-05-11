@@ -56,9 +56,11 @@ public class OpenAiService {
     public Mono<String> generatePersonalInsights(String contextPrompt) {
         String model = "gpt-4o-mini";
         String systemPrompt = "You are a personal CS career and study coach. " +
-                "Based on the student's profile, knowledge levels, goals, and recent activity, " +
+                "Based on the student's profile, knowledge levels, goals, recent activity, and career roadmap, " +
                 "provide 3-5 actionable insights. Identify knowledge gaps, suggest focus areas, " +
                 "flag stale goals, and acknowledge progress. Be specific and reference their actual data. " +
+                "If Obsidian daily notes are provided, reference what the student has been journaling or studying. " +
+                "Reference the student's career roadmap if provided. Tie insights to upcoming deadlines and current focus area. " +
                 "Format as a numbered list. Keep each item to 1-2 sentences.";
 
         Map<String, Object> requestBody = new HashMap<>();
@@ -67,7 +69,7 @@ public class OpenAiService {
                 Map.of("role", "system", "content", systemPrompt),
                 Map.of("role", "user", "content", contextPrompt)
         });
-        requestBody.put("max_tokens", 500);
+        requestBody.put("max_tokens", 700);
         requestBody.put("temperature", 0.5);
 
         return executeChatCompletion("insights", model, contextPrompt.length(), requestBody,
@@ -93,16 +95,24 @@ public class OpenAiService {
 
     public Mono<String> generateDailySuggestions(String contextPrompt) {
         String model = "gpt-4o-mini";
-        String systemPrompt = "You are a daily work planning assistant for a software developer. " +
-                "Given their active projects, open work items, goals, and recent activity, " +
-                "suggest the 5-8 most impactful tasks they should work on today.\n\n" +
-                "Mix project-specific tasks with career growth tasks based on what's most urgent.\n" +
-                "Prioritize:\n" +
-                "1. Anything with an approaching deadline\n" +
-                "2. Open PRs that need attention (reviews, merge conflicts, stale drafts)\n" +
-                "3. Assigned issues that are in-progress or unstarted\n" +
-                "4. Logical next steps based on recent commit messages and project context\n" +
-                "5. Career/learning tasks to fill gaps in their readiness scores\n\n" +
+        String systemPrompt = "You are a daily work planning assistant for a CS student targeting software engineering roles. " +
+                "Based on the student's profile, projects, study plan, career roadmap, goals, and recent activity, " +
+                "generate EXACTLY 6-8 tasks structured as follows:\n\n" +
+                "REQUIRED STRUCTURE (in this order):\n" +
+                "- 2-3 tasks of category \"project\" — specific to their GitHub repos, open PRs, or issues\n" +
+                "- 1-2 tasks of category \"learning\" — MUST come directly from the STUDY PLAN section if present; reference the specific axis and task title\n" +
+                "- 1-2 tasks of category \"career\" — resume improvements, networking, interview prep, or career roadmap items\n\n" +
+                "IMPORTANT: If a STUDY PLAN (UNCOMPLETED TASKS) section is provided in the context, " +
+                "you MUST include 1-2 study plan tasks verbatim or closely paraphrased in the output. " +
+                "Prefer HIGH PRIORITY items.\n\n" +
+                "If a CAREER ROADMAP section is provided, tie career tasks to the current top-priority roadmap item and its deadline.\n\n" +
+                "If OBSIDIAN DAILY NOTES are provided, use them to understand what the student has been working on recently.\n\n" +
+                "PRIORITIZE:\n" +
+                "1. Anything with an approaching deadline (goals or roadmap)\n" +
+                "2. Open PRs that need attention\n" +
+                "3. High-priority study plan items\n" +
+                "4. Career roadmap deadlines\n" +
+                "5. Logical next steps based on recent commits and Obsidian notes\n\n" +
                 "Return ONLY a JSON array where each object has:\n" +
                 "- \"title\": actionable task, max 80 chars\n" +
                 "- \"description\": 1-2 sentences with specific context (mention the repo, issue, or PR)\n" +
@@ -118,7 +128,7 @@ public class OpenAiService {
                 Map.of("role", "system", "content", systemPrompt),
                 Map.of("role", "user", "content", contextPrompt)
         });
-        requestBody.put("max_tokens", 1200);
+        requestBody.put("max_tokens", 1500);
         requestBody.put("temperature", 0.5);
 
         return executeChatCompletion("daily_suggestions", model, contextPrompt.length(), requestBody,
@@ -149,6 +159,39 @@ public class OpenAiService {
 
         return executeChatCompletion("section_tasks", model, sectionContext.length(), requestBody,
                 "OpenAI section tasks error");
+    }
+
+    public Mono<String> generateRoadmap(String contextPrompt) {
+        String model = "gpt-4o-mini";
+        String systemPrompt = "You are a CS career strategy advisor for a student targeting software engineering roles. " +
+                "Based on their profile (target role, graduation year, axis scores, goals, resume, LeetCode stats, " +
+                "and the current date), generate a personalized career roadmap with 4-6 focus items.\n\n" +
+                "Today's date is provided in the context. Use graduation year and today's date to calculate " +
+                "realistic phase names (e.g., \"Summer 2026\", \"Fall 2026\") and specific deadlines.\n\n" +
+                "For each item, calculate a deadline based on:\n" +
+                "- Typical SWE internship application timelines (applications open Aug-Oct for summer internships)\n" +
+                "- The student's graduation year (work backwards from graduation)\n" +
+                "- Their current skill gaps (axis scores)\n" +
+                "- What they are currently working on (goals, recent activity)\n\n" +
+                "Return ONLY a JSON array where each object has:\n" +
+                "- \"title\": concise focus area name (e.g., \"Master Dynamic Programming\"), max 100 chars\n" +
+                "- \"description\": 2-3 sentences on what to do and why\n" +
+                "- \"phase\": semester/season label (e.g., \"Summer 2026\")\n" +
+                "- \"deadline\": ISO date string YYYY-MM-DD\n" +
+                "- \"rationale\": one sentence explaining why this is prioritized for this student\n\n" +
+                "Order items by urgency (nearest deadline first). Return ONLY the JSON array, no markdown fences.";
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", model);
+        requestBody.put("messages", new Object[]{
+                Map.of("role", "system", "content", systemPrompt),
+                Map.of("role", "user", "content", contextPrompt)
+        });
+        requestBody.put("max_tokens", 1500);
+        requestBody.put("temperature", 0.4);
+
+        return executeChatCompletion("roadmap_generate", model, contextPrompt.length(), requestBody,
+                "OpenAI roadmap generation error");
     }
 
     public Mono<String> updateMemory(String currentMemory, String fullContext) {
