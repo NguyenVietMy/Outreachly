@@ -27,6 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -58,14 +59,10 @@ public class PersonalService {
     }
 
     @Transactional
-    public UserProfileView updateProfile(Long userId, String profileMarkdown,
-                                      List<Map<String, Object>> knowledgeAreas) {
+    public UserProfileView updateProfile(Long userId, String profileMarkdown) {
         UserProfile profile = getOrCreateProfileEntity(userId);
         if (profileMarkdown != null) {
             profile.setProfileMarkdown(profileMarkdown);
-        }
-        if (knowledgeAreas != null) {
-            profile.setKnowledgeAreas(knowledgeAreas);
         }
         return toView(profileRepo.save(profile));
     }
@@ -74,77 +71,15 @@ public class PersonalService {
     public UserProfileView completeOnboarding(Long userId, OnboardingRequest request) {
         UserProfile profile = getOrCreateProfileEntity(userId);
 
-        profile.setKnowledgeAreas(request.knowledgeAreas());
-        profile.setProfileMarkdown(generateProfileMarkdown(request));
+        if (request.targetRole() != null) {
+            profile.setTargetRole(request.targetRole());
+        }
+        if (request.graduationYear() != null) {
+            profile.setGraduationYear(request.graduationYear());
+        }
         profile.setOnboardingCompleted(true);
-        profileRepo.save(profile);
 
-        if (request.goals() != null) {
-            for (OnboardingRequest.GoalInput goal : request.goals()) {
-                goalRepo.save(UserGoal.builder()
-                        .userId(userId)
-                        .title(goal.title())
-                        .category(goal.category())
-                        .targetValue(goal.targetValue())
-                        .unit(goal.unit() != null ? goal.unit() : "items")
-                        .build());
-            }
-        }
-
-        return toView(profile);
-    }
-
-    private String generateProfileMarkdown(OnboardingRequest request) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("# Personal Profile\n\n");
-
-        if (request.bio() != null && !request.bio().isBlank()) {
-            sb.append("## Background\n");
-            sb.append(request.bio()).append("\n\n");
-        }
-
-        if (request.knowledgeAreas() != null && !request.knowledgeAreas().isEmpty()) {
-            List<Map<String, Object>> strong = new ArrayList<>();
-            List<Map<String, Object>> weak = new ArrayList<>();
-
-            for (Map<String, Object> area : request.knowledgeAreas()) {
-                int level = ((Number) area.getOrDefault("level", 1)).intValue();
-                if (level >= 4) strong.add(area);
-                else if (level <= 2) weak.add(area);
-            }
-
-            if (!strong.isEmpty()) {
-                sb.append("## Strengths\n");
-                for (Map<String, Object> area : strong) {
-                    sb.append("- ").append(area.get("area"))
-                            .append(" (").append(area.get("level")).append("/5)\n");
-                }
-                sb.append("\n");
-            }
-
-            if (!weak.isEmpty()) {
-                sb.append("## Areas to Improve\n");
-                for (Map<String, Object> area : weak) {
-                    sb.append("- ").append(area.get("area"))
-                            .append(" (").append(area.get("level")).append("/5)\n");
-                }
-                sb.append("\n");
-            }
-        }
-
-        if (request.goals() != null && !request.goals().isEmpty()) {
-            sb.append("## Current Goals\n");
-            for (OnboardingRequest.GoalInput goal : request.goals()) {
-                sb.append("- ").append(goal.title());
-                if (goal.targetValue() != null) {
-                    sb.append(" (target: ").append(goal.targetValue())
-                            .append(" ").append(goal.unit() != null ? goal.unit() : "items").append(")");
-                }
-                sb.append("\n");
-            }
-        }
-
-        return sb.toString();
+        return toView(profileRepo.save(profile));
     }
 
     // --- Career Target ---
@@ -182,8 +117,8 @@ public class PersonalService {
                     "Connected LeetCode account: %s. Total %s (Easy: %s, Medium: %s, Hard: %s). DSA score: %s/100.",
                     username, stats.get("total"), stats.get("easy"),
                     stats.get("medium"), stats.get("hard"), stats.get("dsaScore"));
-            generateEventTasks(userId, "dsa", "leetcode_refresh", eventContext);
-            updateMemory(saved, eventContext);
+            CompletableFuture.runAsync(() -> generateEventTasks(userId, "dsa", "leetcode_refresh", eventContext));
+            CompletableFuture.runAsync(() -> updateMemory(getOrCreateProfileEntity(userId), eventContext));
             return toView(saved);
         });
     }
@@ -208,8 +143,8 @@ public class PersonalService {
                     "LeetCode stats updated for %s: Total %s (Easy: %s, Medium: %s, Hard: %s). DSA score: %s/100.",
                     profile.getLeetcodeUsername(), stats.get("total"), stats.get("easy"),
                     stats.get("medium"), stats.get("hard"), stats.get("dsaScore"));
-            generateEventTasks(userId, "dsa", "leetcode_refresh", eventContext);
-            updateMemory(saved, eventContext);
+            CompletableFuture.runAsync(() -> generateEventTasks(userId, "dsa", "leetcode_refresh", eventContext));
+            CompletableFuture.runAsync(() -> updateMemory(getOrCreateProfileEntity(userId), eventContext));
             return toView(saved);
         });
     }
@@ -284,8 +219,9 @@ public class PersonalService {
                 String summary = (String) breakdown.getOrDefault("summary", "");
                 String eventContext = String.format(
                         "Resume scored: %d/100 (%s). %s", score, decision, summary);
-                generateEventTasks(profile.getUserId(), "resume", "resume_upload", eventContext);
-                updateMemory(persisted, eventContext);
+                Long uid = profile.getUserId();
+                CompletableFuture.runAsync(() -> generateEventTasks(uid, "resume", "resume_upload", eventContext));
+                CompletableFuture.runAsync(() -> updateMemory(getOrCreateProfileEntity(uid), eventContext));
                 return persisted;
             });
             result = "success";
@@ -356,9 +292,11 @@ public class PersonalService {
                 }
 
                 UserProfile saved = profileRepo.save(profile);
-                generateSectionTasks(userId, axis, payload);
-                updateMemory(saved, String.format("Completed %s assessment section: %s. New %s score: %d/100.",
-                        axis, payload.get("sectionId"), axis, score));
+                CompletableFuture.runAsync(() -> generateSectionTasks(userId, axis, payload));
+                CompletableFuture.runAsync(() -> updateMemory(
+                        getOrCreateProfileEntity(userId),
+                        String.format("Completed %s assessment section: %s. New %s score: %d/100.",
+                                axis, payload.get("sectionId"), axis, score)));
                 return toView(saved);
             } else {
                 int score = computeLegacyScore(payload);
@@ -636,8 +574,9 @@ public class PersonalService {
                 String updated = openAiService.updateMemory(
                         profile.getProfileMarkdown(), fullContext).block();
                 if (updated != null && !updated.isBlank()) {
-                    profile.setProfileMarkdown(updated);
-                    profileRepo.save(profile);
+                    UserProfile fresh = getOrCreateProfileEntity(profile.getUserId());
+                    fresh.setProfileMarkdown(updated);
+                    profileRepo.save(fresh);
                 }
             } catch (Exception e) {
                 log.error("Failed to update memory", e);
@@ -697,22 +636,6 @@ public class PersonalService {
             String resumeText = profile.getResumeText();
             if (resumeText.length() > 3000) resumeText = resumeText.substring(0, 3000) + "\n[truncated]";
             ctx.append(resumeText).append("\n\n");
-        }
-
-        if (profile.getKnowledgeAreas() != null && !profile.getKnowledgeAreas().isEmpty()) {
-            ctx.append("=== KNOWLEDGE AREAS ===\n");
-            List<String> strong = new ArrayList<>(), developing = new ArrayList<>(), weak = new ArrayList<>();
-            for (Map<String, Object> area : profile.getKnowledgeAreas()) {
-                int level = ((Number) area.getOrDefault("level", 1)).intValue();
-                String name = (String) area.get("area");
-                if (level >= 4) strong.add(name + " (" + level + "/5)");
-                else if (level >= 3) developing.add(name + " (" + level + "/5)");
-                else weak.add(name + " (" + level + "/5)");
-            }
-            if (!strong.isEmpty()) ctx.append("Strong: ").append(String.join(", ", strong)).append("\n");
-            if (!developing.isEmpty()) ctx.append("Developing: ").append(String.join(", ", developing)).append("\n");
-            if (!weak.isEmpty()) ctx.append("Weak: ").append(String.join(", ", weak)).append("\n");
-            ctx.append("\n");
         }
 
         List<UserGoal> goals = goalRepo.findByUserId(profile.getUserId());
@@ -825,7 +748,6 @@ public class PersonalService {
     private UserProfileView toView(UserProfile profile) {
         return new UserProfileView(
                 profile.getProfileMarkdown(),
-                profile.getKnowledgeAreas(),
                 profile.isOnboardingCompleted(),
                 profile.getLeetcodeUsername(),
                 profile.getLeetcodeStats(),

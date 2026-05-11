@@ -13,6 +13,7 @@ import com.pulse.pulse.personal.application.DailySuggestionView;
 import com.pulse.pulse.personal.application.GoalCommand;
 import com.pulse.pulse.personal.application.PersonalService;
 import com.pulse.pulse.personal.application.UserGoalView;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import com.pulse.pulse.personal.application.UserProfileView;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -51,7 +52,7 @@ public class PersonalController {
         if (user == null) return ResponseEntity.status(401).build();
 
         UserProfileView profile = personalService.updateProfile(
-                user.id(), request.profileMarkdown(), request.knowledgeAreas());
+                user.id(), request.profileMarkdown());
         return ResponseEntity.ok(toDto(profile));
     }
 
@@ -158,8 +159,12 @@ public class PersonalController {
             return ResponseEntity.badRequest().build();
         }
 
-        UserProfileView profile = personalService.connectLeetCode(user.id(), username.trim());
-        return ResponseEntity.ok(toDto(profile));
+        try {
+            UserProfileView profile = personalService.connectLeetCode(user.id(), username.trim());
+            return ResponseEntity.ok(toDto(profile));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     @PostMapping("/leetcode/refresh")
@@ -212,8 +217,15 @@ public class PersonalController {
             return ResponseEntity.badRequest().build();
         }
 
-        UserProfileView profile = personalService.submitQuestionnaire(user.id(), axis, answers);
-        return ResponseEntity.ok(toDto(profile));
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                UserProfileView profile = personalService.submitQuestionnaire(user.id(), axis, answers);
+                return ResponseEntity.ok(toDto(profile));
+            } catch (ObjectOptimisticLockingFailureException e) {
+                if (attempt == 2) return ResponseEntity.status(409).build();
+            }
+        }
+        return ResponseEntity.status(409).build();
     }
 
     @GetMapping("/tasks")
@@ -286,7 +298,6 @@ public class PersonalController {
     private UserProfileDto toDto(UserProfileView profile) {
         return new UserProfileDto(
                 profile.profileMarkdown(),
-                profile.knowledgeAreas(),
                 profile.onboardingCompleted(),
                 profile.leetcodeUsername(),
                 profile.leetcodeStats(),
