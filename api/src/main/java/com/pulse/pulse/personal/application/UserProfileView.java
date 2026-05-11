@@ -1,11 +1,9 @@
 package com.pulse.pulse.personal.application;
 
-import java.util.List;
 import java.util.Map;
 
 public record UserProfileView(
         String profileMarkdown,
-        List<Map<String, Object>> knowledgeAreas,
         boolean onboardingCompleted,
         String leetcodeUsername,
         Map<String, Object> leetcodeStats,

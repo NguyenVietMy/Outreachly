@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/select";
 import {
   usePersonal,
-  KnowledgeArea,
   OnboardingData,
   AxisAssessmentPayload,
   SectionAssessment,
@@ -67,19 +66,6 @@ function computeLevel(graduationYear: number): string {
 
 // --- Constants ---
 
-const DEFAULT_AREAS = [
-  "Algorithms",
-  "Data Structures",
-  "Operating Systems",
-  "Computer Networks",
-  "Databases",
-  "Systems Design",
-  "Web Development",
-  "Math & Discrete",
-  "Machine Learning",
-  "Security",
-];
-
 function isNewFormatAssessment(
   data: AxisAssessmentPayload | Record<string, unknown> | null,
 ): data is AxisAssessmentPayload {
@@ -101,104 +87,164 @@ function getAssessmentProgress(
 
 function OnboardingModal({
   onComplete,
+  onUploadResume,
 }: {
   onComplete: (data: OnboardingData) => Promise<void>;
+  onUploadResume: (file: File) => Promise<unknown>;
 }) {
   const [step, setStep] = useState(0);
-  const [areas, setAreas] = useState<KnowledgeArea[]>(
-    DEFAULT_AREAS.map((a) => ({ area: a, level: 1 })),
+  const [targetRole, setTargetRole] = useState("swe_intern");
+  const [graduationYear, setGraduationYear] = useState(
+    new Date().getFullYear() + 2,
   );
-  const [bio, setBio] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingResume, setUploadingResume] = useState(false);
+  const resumeInputRef = useRef<HTMLInputElement>(null);
 
-  const updateLevel = (index: number, level: number) => {
-    setAreas((prev) => prev.map((a, i) => (i === index ? { ...a, level } : a)));
-  };
-
-  const handleSubmit = async () => {
+  const handleFinishStep1 = async () => {
     setSubmitting(true);
     try {
-      await onComplete({ knowledgeAreas: areas, goals: [], bio });
+      await onComplete({ targetRole, graduationYear });
+      setStep(1);
     } finally {
       setSubmitting(false);
     }
   };
 
+  const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingResume(true);
+    try {
+      await onUploadResume(file);
+    } finally {
+      setUploadingResume(false);
+      if (resumeInputRef.current) resumeInputRef.current.value = "";
+    }
+  };
+
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 7 }, (_, i) => currentYear + i);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="mx-4 w-full max-w-[640px] rounded-[20px] bg-white p-8 shadow-xl">
+      <div className="mx-4 w-full max-w-[540px] rounded-[20px] bg-white p-8 shadow-xl">
         <div className="mb-6">
           <p className="font-mono text-[12px] font-medium uppercase tracking-[0.6px] text-[#666666]">
             Step {step + 1} of 2
           </p>
           <h2 className="mt-1 text-[24px] font-semibold leading-[1.3] tracking-[-0.24px] text-[#0d0d0d]">
-            {step === 0 && "Rate your knowledge"}
-            {step === 1 && "Tell us about yourself"}
+            {step === 0 && "About you"}
+            {step === 1 && "Upload your resume"}
           </h2>
+          <p className="mt-1 text-[14px] text-[#666]">
+            {step === 0 && "Help us tailor your experience."}
+            {step === 1 && "We'll score it and generate study tasks."}
+          </p>
         </div>
 
         {step === 0 && (
-          <div className="max-h-[400px] space-y-3 overflow-y-auto pr-2">
-            {areas.map((area, i) => (
-              <div
-                key={area.area}
-                className="flex items-center justify-between"
-              >
-                <p className="text-[15px] text-[#333333]">{area.area}</p>
-                <div className="flex gap-1">
-                  {[1, 2, 3, 4, 5].map((level) => (
-                    <button
-                      key={level}
-                      onClick={() => updateLevel(i, level)}
-                      className={`h-8 w-8 rounded-lg text-[13px] font-medium transition-colors ${
-                        area.level >= level
-                          ? "bg-[#0d0d0d] text-white"
-                          : "bg-[#f5f5f5] text-[#666666] hover:bg-[#e5e5e5]"
-                      }`}
-                    >
-                      {level}
-                    </button>
-                  ))}
-                </div>
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <label className="text-[14px] font-medium text-[#333]">
+                What are you targeting?
+              </label>
+              <div className="flex gap-2">
+                {[
+                  {
+                    value: "swe_intern",
+                    label: "SWE Internship",
+                    icon: Target,
+                  },
+                  { value: "swe_job", label: "SWE Full-time", icon: Briefcase },
+                ].map(({ value, label, icon: Icon }) => (
+                  <button
+                    key={value}
+                    onClick={() => setTargetRole(value)}
+                    className={`flex flex-1 items-center justify-center gap-2 rounded-xl border px-4 py-3 text-[14px] font-medium transition-colors ${
+                      targetRole === value
+                        ? "border-[#0d0d0d] bg-[#0d0d0d] text-white"
+                        : "border-[rgba(0,0,0,0.1)] bg-white text-[#333] hover:border-[rgba(0,0,0,0.2)]"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {label}
+                  </button>
+                ))}
               </div>
-            ))}
+            </div>
+            <div className="space-y-2">
+              <label className="text-[14px] font-medium text-[#333]">
+                Expected graduation year
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {yearOptions.map((y) => (
+                  <button
+                    key={y}
+                    onClick={() => setGraduationYear(y)}
+                    className={`rounded-lg px-4 py-2 text-[14px] font-medium transition-colors ${
+                      graduationYear === y
+                        ? "bg-[#0d0d0d] text-white"
+                        : "bg-[#f5f5f5] text-[#666] hover:bg-[#e5e5e5]"
+                    }`}
+                  >
+                    {y}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
         {step === 1 && (
-          <textarea
-            placeholder="Tell us about yourself — your year, target companies, what you're working on, strengths, areas you want to improve..."
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            rows={8}
-            className="w-full rounded-lg border border-[rgba(0,0,0,0.1)] px-4 py-3 text-[15px] leading-[1.6] outline-none focus:border-[#0d0d0d]"
-          />
+          <div className="flex flex-col items-center gap-4 py-4">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f5f5f5]">
+              <Upload className="h-7 w-7 text-[#999]" />
+            </div>
+            <p className="text-center text-[14px] text-[#666]">
+              Upload your resume as a PDF to get AI-powered scoring and
+              personalized study tasks.
+            </p>
+            <Button
+              onClick={() => resumeInputRef.current?.click()}
+              disabled={uploadingResume}
+              className="h-auto rounded-full bg-[#0d0d0d] px-6 py-2.5 text-[15px] text-white"
+            >
+              {uploadingResume ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="mr-2 h-4 w-4" />
+              )}
+              {uploadingResume ? "Uploading..." : "Upload resume (PDF)"}
+            </Button>
+            <input
+              ref={resumeInputRef}
+              type="file"
+              accept=".pdf"
+              onChange={handleResumeUpload}
+              className="hidden"
+            />
+          </div>
         )}
 
-        <div className="mt-6 flex justify-between">
-          <Button
-            onClick={() => setStep((s) => s - 1)}
-            disabled={step === 0}
-            variant="outline"
-            className="h-auto rounded-full px-6 py-2 text-[15px]"
-          >
-            Back
-          </Button>
-          {step < 1 ? (
+        <div className="mt-6 flex justify-end">
+          {step === 0 && (
             <Button
-              onClick={() => setStep((s) => s + 1)}
+              onClick={handleFinishStep1}
+              disabled={submitting}
               className="h-auto rounded-full bg-[#0d0d0d] px-6 py-2 text-[15px] text-white"
             >
+              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Next
             </Button>
-          ) : (
+          )}
+          {step === 1 && (
             <Button
-              onClick={handleSubmit}
-              disabled={submitting}
-              className="h-auto rounded-full bg-primary px-6 py-2 text-[15px] text-primary-foreground"
+              onClick={() => window.location.reload()}
+              variant="outline"
+              className="h-auto rounded-full px-6 py-2 text-[15px]"
             >
-              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Complete setup
+              {uploadingResume ? "Please wait..." : "Skip"}
             </Button>
           )}
         </div>
@@ -518,7 +564,10 @@ export default function PersonalPage() {
     <AuthGuard>
       <DashboardLayout>
         {profile && !profile.onboardingCompleted && (
-          <OnboardingModal onComplete={completeOnboarding} />
+          <OnboardingModal
+            onComplete={completeOnboarding}
+            onUploadResume={uploadResume}
+          />
         )}
         {showSDAssessment && (
           <MilestoneAssessmentModal
@@ -590,10 +639,7 @@ export default function PersonalPage() {
                   <div
                     ref={leftScrollRef}
                     onScroll={(e) =>
-                      updateFadeState(
-                        e.currentTarget,
-                        setShowLeftFade,
-                      )
+                      updateFadeState(e.currentTarget, setShowLeftFade)
                     }
                     className="min-h-0 space-y-10 lg:h-full lg:overflow-y-auto lg:[scrollbar-width:none] lg:[-ms-overflow-style:none] lg:[&::-webkit-scrollbar]:hidden"
                   >
@@ -963,7 +1009,7 @@ export default function PersonalPage() {
                           label="System Design"
                           score={axes?.systemDesign ?? 0}
                           description="APIs, scaling, caching, cloud, tradeoffs"
-                          connected={(axes?.systemDesign ?? 0) > 0}
+                          connected={!!profile?.systemDesignAnswers && Object.keys(profile.systemDesignAnswers).length > 0}
                         >
                           {(() => {
                             const progress = getAssessmentProgress(
@@ -1001,7 +1047,7 @@ export default function PersonalPage() {
                           label="Core CS"
                           score={axes?.coreCs ?? 0}
                           description="OS, networking, concurrency, DB internals"
-                          connected={(axes?.coreCs ?? 0) > 0}
+                          connected={!!profile?.coreCsAnswers && Object.keys(profile.coreCsAnswers).length > 0}
                         >
                           {(() => {
                             const progress = getAssessmentProgress(
@@ -1122,82 +1168,83 @@ export default function PersonalPage() {
                   <div
                     ref={rightScrollRef}
                     onScroll={(e) =>
-                      updateFadeState(
-                        e.currentTarget,
-                        setShowRightFade,
-                      )
+                      updateFadeState(e.currentTarget, setShowRightFade)
                     }
                     className="min-h-0 space-y-6 lg:h-full lg:overflow-y-auto lg:[scrollbar-width:none] lg:[-ms-overflow-style:none] lg:[&::-webkit-scrollbar]:hidden"
                   >
                     {/* Study Plan */}
                     <div>
-                    <h2 className="mb-4 text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
-                      Study Plan
-                    </h2>
-                    <div className="space-y-3">
-                    {tasks.length > 0 ? (
-                      Object.entries(
-                        tasks.reduce<Record<string, AiTask[]>>((acc, task) => {
-                          const key = task.axis;
-                          if (!acc[key]) acc[key] = [];
-                          acc[key].push(task);
-                          return acc;
-                        }, {}),
-                      ).map(([axis, axisTasks]) => (
-                        <article
-                          key={axis}
-                          className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-5 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]"
-                        >
-                          <h3 className="mb-3 text-[15px] font-semibold capitalize text-[#0d0d0d]">
-                            {axis === "coreCs"
-                              ? "Core CS"
-                              : axis === "systemDesign"
-                                ? "System Design"
-                                : axis.toUpperCase()}
-                          </h3>
-                          <div className="space-y-2">
-                            {axisTasks.map((task) => (
-                              <label
-                                key={task.id}
-                                className="flex cursor-pointer items-start gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-[#fafafa]"
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={task.completed}
-                                  onChange={() => toggleTask(task.id)}
-                                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-[#ccc] accent-[#0fa76e]"
-                                />
-                                <div className="min-w-0">
-                                  <p
-                                    className={`text-[14px] leading-[1.5] ${task.completed ? "text-[#999] line-through" : "text-[#333]"}`}
+                      <h2 className="mb-4 text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
+                        Study Plan
+                      </h2>
+                      <div className="space-y-3">
+                        {tasks.length > 0 ? (
+                          Object.entries(
+                            tasks.reduce<Record<string, AiTask[]>>(
+                              (acc, task) => {
+                                const key = task.axis;
+                                if (!acc[key]) acc[key] = [];
+                                acc[key].push(task);
+                                return acc;
+                              },
+                              {},
+                            ),
+                          ).map(([axis, axisTasks]) => (
+                            <article
+                              key={axis}
+                              className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-5 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]"
+                            >
+                              <h3 className="mb-3 text-[15px] font-semibold capitalize text-[#0d0d0d]">
+                                {axis === "coreCs"
+                                  ? "Core CS"
+                                  : axis === "systemDesign"
+                                    ? "System Design"
+                                    : axis.toUpperCase()}
+                              </h3>
+                              <div className="space-y-2">
+                                {axisTasks.map((task) => (
+                                  <label
+                                    key={task.id}
+                                    className="flex cursor-pointer items-start gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-[#fafafa]"
                                   >
-                                    {task.title}
-                                  </p>
-                                  {task.description && (
-                                    <p className="mt-0.5 text-[12px] leading-[1.5] text-[#999]">
-                                      {task.description}
-                                    </p>
-                                  )}
-                                </div>
-                                {task.priority === 0 && !task.completed && (
-                                  <span className="mt-0.5 shrink-0 rounded-full bg-[#f7e5e5] px-2 py-0.5 text-[10px] font-semibold text-[#d45656]">
-                                    High
-                                  </span>
-                                )}
-                              </label>
-                            ))}
-                          </div>
-                        </article>
-                      ))
-                    ) : (
-                      <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-5 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
-                        <p className="text-[14px] leading-[1.6] text-[#666]">
-                          Your study plan will appear here once tasks are
-                          generated from your assessments and resume signals.
-                        </p>
-                      </article>
-                    )}
-                    </div>
+                                    <input
+                                      type="checkbox"
+                                      checked={task.completed}
+                                      onChange={() => toggleTask(task.id)}
+                                      className="mt-0.5 h-4 w-4 shrink-0 rounded border-[#ccc] accent-[#0fa76e]"
+                                    />
+                                    <div className="min-w-0">
+                                      <p
+                                        className={`text-[14px] leading-[1.5] ${task.completed ? "text-[#999] line-through" : "text-[#333]"}`}
+                                      >
+                                        {task.title}
+                                      </p>
+                                      {task.description && (
+                                        <p className="mt-0.5 text-[12px] leading-[1.5] text-[#999]">
+                                          {task.description}
+                                        </p>
+                                      )}
+                                    </div>
+                                    {task.priority === 0 && !task.completed && (
+                                      <span className="mt-0.5 shrink-0 rounded-full bg-[#f7e5e5] px-2 py-0.5 text-[10px] font-semibold text-[#d45656]">
+                                        High
+                                      </span>
+                                    )}
+                                  </label>
+                                ))}
+                              </div>
+                            </article>
+                          ))
+                        ) : (
+                          <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-5 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
+                            <p className="text-[14px] leading-[1.6] text-[#666]">
+                              Your study plan will appear here once tasks are
+                              generated from your assessments and resume
+                              signals.
+                            </p>
+                          </article>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div

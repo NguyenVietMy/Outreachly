@@ -2,11 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { API_BASE_URL } from "@/lib/config";
 
-export interface KnowledgeArea {
-  area: string;
-  level: number;
-}
-
 export interface AxisScores {
   dsa: number;
   projects: number;
@@ -87,7 +82,6 @@ export interface ResumeScoreBreakdown {
 
 export interface UserProfile {
   profileMarkdown: string;
-  knowledgeAreas: KnowledgeArea[];
   onboardingCompleted: boolean;
   leetcodeUsername: string | null;
   leetcodeStats: LeetCodeStats | null;
@@ -140,9 +134,8 @@ export interface DailySuggestionsResponse {
 }
 
 export interface OnboardingData {
-  knowledgeAreas: KnowledgeArea[];
-  goals: { title: string; category: string; targetValue: number | null; unit: string }[];
-  bio: string;
+  targetRole: string;
+  graduationYear: number;
 }
 
 export function usePersonal() {
@@ -208,12 +201,12 @@ export function usePersonal() {
     }
   }, [user]);
 
-  const updateProfile = async (profileMarkdown: string, knowledgeAreas: KnowledgeArea[]) => {
+  const updateProfile = async (profileMarkdown: string) => {
     const res = await fetch(`${API_BASE_URL}/api/personal/profile`, {
       method: "PUT",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profileMarkdown, knowledgeAreas }),
+      body: JSON.stringify({ profileMarkdown }),
     });
     if (res.ok) {
       const data = await res.json();

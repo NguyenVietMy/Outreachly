@@ -12,7 +12,6 @@ import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -28,17 +27,17 @@ public class UserProfile {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Version
+    @Column(name = "version", nullable = false)
+    @Builder.Default
+    private Long version = 0L;
+
     @Column(name = "user_id", nullable = false, unique = true)
     private Long userId;
 
     @Column(name = "profile_markdown", nullable = false, columnDefinition = "TEXT")
     @Builder.Default
     private String profileMarkdown = "";
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "knowledge_areas", nullable = false, columnDefinition = "jsonb")
-    @Builder.Default
-    private List<Map<String, Object>> knowledgeAreas = List.of();
 
     @Column(name = "onboarding_completed", nullable = false)
     @Builder.Default

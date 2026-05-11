@@ -145,7 +145,7 @@ function SettingsContent() {
     }
     setIsClearingMemory(true);
     try {
-      await updateProfile("", profile?.knowledgeAreas ?? []);
+      await updateProfile("");
       toast({
         title: "Memory Cleared",
         description: "Your profile memory has been cleared.",
