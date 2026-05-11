@@ -197,13 +197,7 @@ public class TimeService {
 
         String trimmed = timezone.trim();
 
-        // Handle UTC±0 case
-        if ("UTC±0".equals(trimmed)) {
-            return ZoneOffset.UTC;
-        }
-
-        // Handle UTC+0 case
-        if ("UTC+0".equals(trimmed)) {
+        if ("UTC".equals(trimmed) || "UTC±0".equals(trimmed) || "UTC+0".equals(trimmed)) {
             return ZoneOffset.UTC;
         }
 
