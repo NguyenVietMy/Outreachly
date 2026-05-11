@@ -133,6 +133,17 @@ export interface DailySuggestionsResponse {
   tasks: DailySuggestionTask[];
 }
 
+export interface RoadmapItem {
+  id: string;
+  title: string;
+  description: string | null;
+  phase: string | null;
+  deadline: string | null;
+  focusRank: number;
+  aiRationale: string | null;
+  status: "pending" | "in_progress" | "completed";
+}
+
 export interface OnboardingData {
   targetRole: string;
   graduationYear: number;
@@ -155,6 +166,10 @@ export function usePersonal() {
   const [loadingResume, setLoadingResume] = useState(false);
   const [loadingQuestionnaire, setLoadingQuestionnaire] = useState(false);
   const [scoringResume, setScoringResume] = useState(false);
+  const [roadmap, setRoadmap] = useState<RoadmapItem[]>([]);
+  const [loadingRoadmap, setLoadingRoadmap] = useState(true);
+  const [generatingRoadmap, setGeneratingRoadmap] = useState(false);
+  const [canGenerateRoadmap, setCanGenerateRoadmap] = useState(false);
   const { user } = useAuth();
 
   const fetchProfile = useCallback(async () => {
@@ -227,6 +242,7 @@ export function usePersonal() {
       const profile = await res.json();
       setProfile(profile);
       await fetchGoals();
+      fetchCanGenerateRoadmap();
       return profile;
     }
     throw new Error("Failed to complete onboarding");
@@ -244,6 +260,7 @@ export function usePersonal() {
       if (res.ok) {
         const data = await res.json();
         setProfile(data);
+        fetchCanGenerateRoadmap();
         return data;
       }
       const err = await res.text();
@@ -284,6 +301,7 @@ export function usePersonal() {
       if (res.ok) {
         const data = await res.json();
         setProfile(data);
+        fetchCanGenerateRoadmap();
         return data;
       }
       throw new Error("Failed to upload resume");
@@ -300,6 +318,7 @@ export function usePersonal() {
     if (res.ok) {
       const data = await res.json();
       setProfile(data);
+      fetchCanGenerateRoadmap();
     }
   };
 
@@ -347,6 +366,7 @@ export function usePersonal() {
         const data = await res.json();
         setProfile(data);
         fetchTasks();
+        fetchCanGenerateRoadmap();
         return data;
       }
       throw new Error("Failed to submit questionnaire");
@@ -365,6 +385,7 @@ export function usePersonal() {
     if (res.ok) {
       const data = await res.json();
       setProfile(data);
+      fetchCanGenerateRoadmap();
       return data;
     }
     throw new Error("Failed to update career info");
@@ -461,13 +482,80 @@ export function usePersonal() {
     }
   };
 
+  const fetchRoadmap = useCallback(async () => {
+    if (!user) { setLoadingRoadmap(false); return; }
+    try {
+      setLoadingRoadmap(true);
+      const res = await fetch(`${API_BASE_URL}/api/personal/roadmap`, { credentials: "include" });
+      if (res.ok) setRoadmap(await res.json());
+    } finally {
+      setLoadingRoadmap(false);
+    }
+  }, [user]);
+
+  const fetchCanGenerateRoadmap = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/personal/roadmap/can-generate`, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setCanGenerateRoadmap(data.canGenerate);
+      }
+    } catch {}
+  }, [user]);
+
+  const generateRoadmap = async () => {
+    setGeneratingRoadmap(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/personal/roadmap/generate`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRoadmap(data);
+        return data;
+      }
+      throw new Error("Failed to generate roadmap");
+    } finally {
+      setGeneratingRoadmap(false);
+    }
+  };
+
+  const reorderRoadmap = async (orderedIds: string[]) => {
+    const res = await fetch(`${API_BASE_URL}/api/personal/roadmap/reorder`, {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderedIds }),
+    });
+    if (res.ok) {
+      setRoadmap(await res.json());
+    }
+  };
+
+  const updateRoadmapItemStatus = async (id: string, status: string) => {
+    const res = await fetch(`${API_BASE_URL}/api/personal/roadmap/${id}/status`, {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (res.ok) {
+      const updated: RoadmapItem = await res.json();
+      setRoadmap((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+    }
+  };
+
   useEffect(() => {
     fetchProfile();
     fetchGoals();
     fetchHeatmap();
     fetchTasks();
     fetchSuggestions();
-  }, [fetchProfile, fetchGoals, fetchHeatmap, fetchTasks, fetchSuggestions]);
+    fetchRoadmap();
+    fetchCanGenerateRoadmap();
+  }, [fetchProfile, fetchGoals, fetchHeatmap, fetchTasks, fetchSuggestions, fetchRoadmap, fetchCanGenerateRoadmap]);
 
   return {
     profile,
@@ -475,12 +563,16 @@ export function usePersonal() {
     heatmap,
     tasks,
     insights,
+    roadmap,
     loadingProfile,
     loadingGoals,
     loadingHeatmap,
     loadingTasks,
     loadingInsights,
     loadingSuggestions,
+    loadingRoadmap,
+    generatingRoadmap,
+    canGenerateRoadmap,
     suggestions,
     loadingLeetCode,
     loadingResume,
@@ -502,6 +594,9 @@ export function usePersonal() {
     requestInsights,
     fetchSuggestions,
     regenerateSuggestions,
-    refetch: () => { fetchProfile(); fetchGoals(); fetchHeatmap(); fetchTasks(); fetchSuggestions(); },
+    generateRoadmap,
+    reorderRoadmap,
+    updateRoadmapItemStatus,
+    refetch: () => { fetchProfile(); fetchGoals(); fetchHeatmap(); fetchTasks(); fetchSuggestions(); fetchRoadmap(); fetchCanGenerateRoadmap(); },
   };
 }

@@ -20,6 +20,7 @@ import {
   ResumeScoreBreakdown,
   ResumeSubScore,
   AiTask,
+  RoadmapItem,
 } from "@/hooks/usePersonal";
 import MilestoneAssessmentModal from "@/components/assessment/MilestoneAssessmentModal";
 import {
@@ -30,6 +31,7 @@ import {
 import {
   Bot,
   FileText,
+  GripVertical,
   Loader2,
   RefreshCw,
   Sparkles,
@@ -39,6 +41,23 @@ import {
   Briefcase,
   Target,
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   Radar,
   RadarChart,
@@ -62,6 +81,177 @@ function computeLevel(graduationYear: number): string {
   if (yearsUntilGrad === 1) return "Junior";
   if (yearsUntilGrad === 0) return "Senior";
   return "New Grad";
+}
+
+// --- Roadmap Helpers ---
+
+const STATUS_CYCLE: Record<string, string> = {
+  pending: "in_progress",
+  in_progress: "completed",
+  completed: "pending",
+};
+
+const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  pending: { bg: "bg-[#f0f0f0]", text: "text-[#666]", label: "Pending" },
+  in_progress: { bg: "bg-[#fff3e0]", text: "text-[#e67e22]", label: "In Progress" },
+  completed: { bg: "bg-[#e8f5e9]", text: "text-[#2e7d32]", label: "Done" },
+};
+
+function daysUntilDeadline(deadline: string | null): string | null {
+  if (!deadline) return null;
+  const days = Math.ceil((new Date(deadline).getTime() - Date.now()) / 86400000);
+  if (days < 0) return `${Math.abs(days)}d overdue`;
+  if (days === 0) return "Today";
+  return `${days}d`;
+}
+
+function SortableRoadmapCard({
+  item,
+  onStatusChange,
+}: {
+  item: RoadmapItem;
+  onStatusChange: (id: string, status: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const statusStyle = STATUS_STYLES[item.status] ?? STATUS_STYLES.pending;
+  const countdown = daysUntilDeadline(item.deadline);
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="rounded-[12px] border border-[rgba(0,0,0,0.05)] bg-white p-4 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]"
+    >
+      <div className="flex items-start gap-2">
+        <button
+          {...attributes}
+          {...listeners}
+          className="mt-0.5 shrink-0 cursor-grab touch-none text-[#ccc] hover:text-[#999] active:cursor-grabbing"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onStatusChange(item.id, STATUS_CYCLE[item.status])}
+              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusStyle.bg} ${statusStyle.text}`}
+            >
+              {statusStyle.label}
+            </button>
+            <h4 className="text-[14px] font-semibold leading-[1.4] text-[#0d0d0d]">
+              {item.title}
+            </h4>
+          </div>
+          {(item.phase || countdown) && (
+            <div className="mt-1 flex items-center gap-2 text-[12px] text-[#999]">
+              {item.phase && <span>{item.phase}</span>}
+              {item.phase && countdown && <span>·</span>}
+              {countdown && (
+                <span className={countdown.includes("overdue") ? "text-[#d45656]" : ""}>
+                  {countdown}
+                </span>
+              )}
+            </div>
+          )}
+          {item.description && (
+            <p className="mt-1.5 text-[13px] leading-[1.5] text-[#555]">
+              {item.description}
+            </p>
+          )}
+          {item.aiRationale && (
+            <p className="mt-1 text-[11px] italic leading-[1.5] text-[#aaa]">
+              {item.aiRationale}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RoadmapSection({
+  roadmap,
+  canGenerate,
+  generating,
+  onGenerate,
+  onReorder,
+  onStatusChange,
+}: {
+  roadmap: RoadmapItem[];
+  canGenerate: boolean;
+  generating: boolean;
+  onGenerate: () => void;
+  onReorder: (orderedIds: string[]) => void;
+  onStatusChange: (id: string, status: string) => void;
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = roadmap.findIndex((r) => r.id === active.id);
+    const newIndex = roadmap.findIndex((r) => r.id === over.id);
+    const reordered = arrayMove(roadmap, oldIndex, newIndex);
+    onReorder(reordered.map((r) => r.id));
+  };
+
+  return (
+    <div>
+      <h2 className="mb-4 text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
+        Career Roadmap
+      </h2>
+      {roadmap.length > 0 ? (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={roadmap.map((r) => r.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-3">
+              {roadmap.map((item) => (
+                <SortableRoadmapCard key={item.id} item={item} onStatusChange={onStatusChange} />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      ) : canGenerate ? (
+        <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-5 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
+          <div className="flex flex-col items-center gap-3 py-2 text-center">
+            <Sparkles className="h-6 w-6 text-[#0fa76e]" />
+            <p className="text-[14px] leading-[1.6] text-[#666]">
+              Generate a personalized career roadmap with AI-calculated deadlines based on your profile.
+            </p>
+            <Button
+              onClick={onGenerate}
+              disabled={generating}
+              className="mt-1 rounded-lg bg-[#0fa76e] px-4 py-2 text-[13px] font-medium text-white hover:bg-[#0d8f5e]"
+            >
+              {generating ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="mr-2 h-4 w-4" />
+              )}
+              Generate Roadmap
+            </Button>
+          </div>
+        </article>
+      ) : (
+        <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-5 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
+          <p className="text-[14px] leading-[1.6] text-[#666]">
+            Complete your profile (set target role + finish an assessment or upload your resume)
+            to unlock your career roadmap.
+          </p>
+        </article>
+      )}
+    </div>
+  );
 }
 
 // --- Constants ---
@@ -447,11 +637,14 @@ export default function PersonalPage() {
     profile,
     tasks,
     insights,
+    roadmap,
     loadingProfile,
     loadingInsights,
     loadingLeetCode,
     loadingResume,
     scoringResume,
+    generatingRoadmap,
+    canGenerateRoadmap,
     completeOnboarding,
     updateCareer,
     connectLeetCode,
@@ -462,6 +655,9 @@ export default function PersonalPage() {
     submitQuestionnaire,
     toggleTask,
     requestInsights,
+    generateRoadmap,
+    reorderRoadmap,
+    updateRoadmapItemStatus,
   } = usePersonal();
 
   const [lcUsername, setLcUsername] = useState("");
@@ -1172,6 +1368,16 @@ export default function PersonalPage() {
                     }
                     className="min-h-0 space-y-6 lg:h-full lg:overflow-y-auto lg:[scrollbar-width:none] lg:[-ms-overflow-style:none] lg:[&::-webkit-scrollbar]:hidden"
                   >
+                    {/* Career Roadmap */}
+                    <RoadmapSection
+                      roadmap={roadmap}
+                      canGenerate={canGenerateRoadmap}
+                      generating={generatingRoadmap}
+                      onGenerate={generateRoadmap}
+                      onReorder={reorderRoadmap}
+                      onStatusChange={updateRoadmapItemStatus}
+                    />
+
                     {/* Study Plan */}
                     <div>
                       <h2 className="mb-4 text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">

@@ -4,7 +4,10 @@ import com.pulse.pulse.identity.application.CurrentUserView;
 import com.pulse.pulse.identity.application.UserService;
 import com.pulse.pulse.personal.api.dto.AiTaskDto;
 import com.pulse.pulse.personal.api.dto.OnboardingRequest;
+import com.pulse.pulse.personal.api.dto.ReorderRoadmapRequest;
+import com.pulse.pulse.personal.api.dto.RoadmapItemDto;
 import com.pulse.pulse.personal.api.dto.UpdateGoalRequest;
+import com.pulse.pulse.personal.api.dto.UpdateRoadmapStatusRequest;
 import com.pulse.pulse.personal.api.dto.UserGoalDto;
 import com.pulse.pulse.personal.api.dto.UserProfileDto;
 import com.pulse.pulse.personal.application.AiTaskView;
@@ -12,6 +15,8 @@ import com.pulse.pulse.personal.application.DailySuggestionService;
 import com.pulse.pulse.personal.application.DailySuggestionView;
 import com.pulse.pulse.personal.application.GoalCommand;
 import com.pulse.pulse.personal.application.PersonalService;
+import com.pulse.pulse.personal.application.RoadmapItemView;
+import com.pulse.pulse.personal.application.RoadmapService;
 import com.pulse.pulse.personal.application.UserGoalView;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import com.pulse.pulse.personal.application.UserProfileView;
@@ -33,6 +38,7 @@ public class PersonalController {
 
     private final PersonalService personalService;
     private final DailySuggestionService dailySuggestionService;
+    private final RoadmapService roadmapService;
     private final UserService userService;
 
     @GetMapping("/profile")
@@ -295,6 +301,73 @@ public class PersonalController {
         return ResponseEntity.ok(toSuggestionResponse(suggestion));
     }
 
+    @GetMapping("/roadmap")
+    public ResponseEntity<List<RoadmapItemDto>> getRoadmap(Authentication authentication) {
+        CurrentUserView user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        List<RoadmapItemDto> items = roadmapService.getRoadmap(user.id()).stream()
+                .map(this::toRoadmapDto)
+                .toList();
+        return ResponseEntity.ok(items);
+    }
+
+    @GetMapping("/roadmap/can-generate")
+    public ResponseEntity<Map<String, Boolean>> canGenerateRoadmap(Authentication authentication) {
+        CurrentUserView user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        return ResponseEntity.ok(Map.of("canGenerate", roadmapService.canGenerate(user.id())));
+    }
+
+    @PostMapping("/roadmap/generate")
+    public ResponseEntity<List<RoadmapItemDto>> generateRoadmap(Authentication authentication) {
+        CurrentUserView user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        try {
+            List<RoadmapItemDto> items = roadmapService.generateRoadmap(user.id()).stream()
+                    .map(this::toRoadmapDto)
+                    .toList();
+            return ResponseEntity.ok(items);
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PutMapping("/roadmap/reorder")
+    public ResponseEntity<List<RoadmapItemDto>> reorderRoadmap(
+            @RequestBody ReorderRoadmapRequest request,
+            Authentication authentication) {
+        CurrentUserView user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        try {
+            List<RoadmapItemDto> items = roadmapService.reorderRoadmap(user.id(), request.orderedIds()).stream()
+                    .map(this::toRoadmapDto)
+                    .toList();
+            return ResponseEntity.ok(items);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PutMapping("/roadmap/{id}/status")
+    public ResponseEntity<RoadmapItemDto> updateRoadmapStatus(
+            @PathVariable UUID id,
+            @RequestBody UpdateRoadmapStatusRequest request,
+            Authentication authentication) {
+        CurrentUserView user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        try {
+            RoadmapItemView item = roadmapService.updateStatus(user.id(), id, request.status());
+            return ResponseEntity.ok(toRoadmapDto(item));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     private UserProfileDto toDto(UserProfileView profile) {
         return new UserProfileDto(
                 profile.profileMarkdown(),
@@ -336,6 +409,19 @@ public class PersonalController {
                 task.source(),
                 task.priority(),
                 task.orderIndex()
+        );
+    }
+
+    private RoadmapItemDto toRoadmapDto(RoadmapItemView item) {
+        return new RoadmapItemDto(
+                item.id(),
+                item.title(),
+                item.description(),
+                item.phase(),
+                item.deadline(),
+                item.focusRank(),
+                item.aiRationale(),
+                item.status()
         );
     }
 
