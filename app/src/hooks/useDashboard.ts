@@ -80,6 +80,8 @@ export interface DailySuggestionTask {
   category: "project" | "learning" | "career" | "review";
   repoContext: string | null;
   rationale: string;
+  studyTaskId?: string | null;
+  roadmapItemId?: string | null;
 }
 
 export interface DailySuggestionsResponse {
@@ -103,6 +105,7 @@ export function useDashboard() {
   const [loadingDigest, setLoadingDigest] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [completedStudyTaskIds, setCompletedStudyTaskIds] = useState<Set<string>>(new Set());
   const { user } = useAuth();
   const activityRef = useRef<ActivityItem[]>([]);
   const autoDigestFired = useRef(false);
@@ -192,7 +195,30 @@ export function useDashboard() {
 
   useEffect(() => {
     fetchAll();
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/personal/tasks`, { credentials: "include" });
+        if (res.ok) {
+          const tasks: { id: string; completed: boolean }[] = await res.json();
+          setCompletedStudyTaskIds(new Set(tasks.filter((t) => t.completed).map((t) => t.id)));
+        }
+      } catch {}
+    })();
   }, [fetchAll]);
+
+  const toggleStudyTask = async (taskId: string) => {
+    const res = await fetch(`${API_BASE_URL}/api/personal/tasks/${taskId}/toggle`, {
+      method: "PUT",
+      credentials: "include",
+    });
+    if (!res.ok) return;
+    setCompletedStudyTaskIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  };
 
   useEffect(() => {
     activityRef.current = activity;
@@ -224,6 +250,8 @@ export function useDashboard() {
     error,
     requestDigest,
     regenerateSuggestions,
+    completedStudyTaskIds,
+    toggleStudyTask,
     refetch: fetchAll,
   };
 }

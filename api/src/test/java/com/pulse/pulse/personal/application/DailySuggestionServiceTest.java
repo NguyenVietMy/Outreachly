@@ -195,4 +195,28 @@ class DailySuggestionServiceTest {
 
         assertFalse(captor.getValue().contains("=== OBSIDIAN DAILY NOTES"));
     }
+
+    @Test
+    void buildContextIncludesStudyTaskIds() {
+        java.util.UUID taskId1 = java.util.UUID.randomUUID();
+        java.util.UUID taskId2 = java.util.UUID.randomUUID();
+        AiTask task1 = AiTask.builder().id(taskId1).userId(7L).axis("dsa").title("Practice binary search").priority(0).completed(false).orderIndex(0).build();
+        AiTask task2 = AiTask.builder().id(taskId2).userId(7L).axis("coreCs").title("Review OS scheduling").priority(1).completed(false).orderIndex(1).build();
+        when(aiTaskRepo.findByUserIdOrderByAxisAscOrderIndexAsc(7L)).thenReturn(List.of(task1, task2));
+
+        when(suggestionRepository.findByUserIdAndSuggestionDate(eq(7L), any())).thenReturn(Optional.empty());
+        when(openAiService.generateDailySuggestions(any()))
+                .thenReturn(Mono.just("[{\"title\":\"task\",\"priority\":0}]"));
+        when(suggestionRepository.save(any(DailySuggestion.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        service.getSuggestionsForToday(7L);
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(openAiService).generateDailySuggestions(captor.capture());
+        String context = captor.getValue();
+
+        assertTrue(context.contains("(studyTaskId: " + taskId1 + ")"), "Should contain studyTaskId for task1");
+        assertTrue(context.contains("(studyTaskId: " + taskId2 + ")"), "Should contain studyTaskId for task2");
+    }
 }

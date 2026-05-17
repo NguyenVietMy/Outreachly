@@ -397,7 +397,8 @@ public class DailySuggestionService {
 
         sb.append("=== STUDY PLAN (UNCOMPLETED TASKS) ===\n");
         for (AiTask task : uncompleted) {
-            sb.append("- [").append(task.getAxis()).append("] ").append(task.getTitle());
+            sb.append("- [").append(task.getAxis()).append("] ").append(task.getTitle())
+                    .append(" (studyTaskId: ").append(task.getId()).append(")");
             if (task.getPriority() == 0) {
                 sb.append(" [HIGH PRIORITY]");
             }
@@ -412,7 +413,8 @@ public class DailySuggestionService {
 
         sb.append("=== CAREER ROADMAP ===\n");
         for (RoadmapItem item : items) {
-            sb.append("- [").append(item.getStatus()).append("] ").append(item.getTitle());
+            sb.append("- [").append(item.getStatus()).append("] ").append(item.getTitle())
+                    .append(" (roadmapItemId: ").append(item.getId()).append(")");
             if (item.getPhase() != null) {
                 sb.append(" (").append(item.getPhase()).append(")");
             }

@@ -13,6 +13,7 @@ import {
 import {
   ArrowRight,
   Bot,
+  Check,
   Loader2,
   RefreshCw,
 } from "lucide-react";
@@ -321,6 +322,8 @@ export default function Dashboard() {
     loadingSuggestions,
     requestDigest,
     regenerateSuggestions,
+    completedStudyTaskIds,
+    toggleStudyTask,
   } = useDashboard();
 
   const [regenError, setRegenError] = useState("");
@@ -542,6 +545,20 @@ export default function Dashboard() {
                               <p className="mt-2 border-t border-[rgba(0,0,0,0.04)] pt-2 text-[11px] leading-[1.5] text-[#999]">
                                 {task.rationale}
                               </p>
+                            )}
+                            {task.studyTaskId && (
+                              completedStudyTaskIds.has(task.studyTaskId) ? (
+                                <span className="mt-2 flex items-center gap-1 text-[11px] font-medium text-[#0fa76e]">
+                                  <Check className="h-3 w-3" /> Done
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => toggleStudyTask(task.studyTaskId!)}
+                                  className="mt-2 text-[11px] font-medium text-[#0fa76e] hover:underline"
+                                >
+                                  Mark study task done
+                                </button>
+                              )
                             )}
                           </article>
                         );

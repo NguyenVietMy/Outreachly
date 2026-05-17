@@ -113,13 +113,17 @@ public class OpenAiService {
                 "3. High-priority study plan items\n" +
                 "4. Career roadmap deadlines\n" +
                 "5. Logical next steps based on recent commits and Obsidian notes\n\n" +
+                "When including a study plan task, copy the studyTaskId exactly from the context. " +
+                "When referencing a roadmap item, copy the roadmapItemId exactly from the context.\n\n" +
                 "Return ONLY a JSON array where each object has:\n" +
                 "- \"title\": actionable task, max 80 chars\n" +
                 "- \"description\": 1-2 sentences with specific context (mention the repo, issue, or PR)\n" +
                 "- \"priority\": 0 (do today), 1 (do this week), 2 (nice to have)\n" +
                 "- \"category\": \"project\" | \"learning\" | \"career\" | \"review\"\n" +
                 "- \"repoContext\": repo full name if task is repo-specific, null otherwise\n" +
-                "- \"rationale\": one sentence explaining why this is suggested today\n\n" +
+                "- \"rationale\": one sentence explaining why this is suggested today\n" +
+                "- \"studyTaskId\": the UUID from the context (studyTaskId: ...) if this learning task is drawn from the study plan, otherwise null\n" +
+                "- \"roadmapItemId\": the UUID from the context (roadmapItemId: ...) if this career task relates to a roadmap item, otherwise null\n\n" +
                 "Return ONLY the JSON array, no markdown fences.";
 
         Map<String, Object> requestBody = new HashMap<>();
