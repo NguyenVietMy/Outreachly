@@ -33,6 +33,7 @@ import {
   FileText,
   GripVertical,
   Loader2,
+  Pencil,
   RefreshCw,
   Sparkles,
   Trash2,
@@ -108,12 +109,19 @@ function daysUntilDeadline(deadline: string | null): string | null {
 function SortableRoadmapCard({
   item,
   onStatusChange,
+  onUpdate,
+  onDelete,
 }: {
   item: RoadmapItem;
   onStatusChange: (id: string, status: string) => void;
+  onUpdate: (id: string, updates: { title?: string; description?: string | null; deadline?: string | null }) => Promise<unknown>;
+  onDelete: (id: string) => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({ title: item.title, description: item.description ?? "", deadline: item.deadline ?? "" });
+
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: item.id });
+    useSortable({ id: item.id, disabled: editing });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -133,43 +141,101 @@ function SortableRoadmapCard({
       <div className="flex items-start gap-2">
         <button
           {...attributes}
-          {...listeners}
+          {...(editing ? {} : listeners)}
           className="mt-0.5 shrink-0 cursor-grab touch-none text-[#ccc] hover:text-[#999] active:cursor-grabbing"
         >
           <GripVertical className="h-4 w-4" />
         </button>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => onStatusChange(item.id, STATUS_CYCLE[item.status])}
-              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusStyle.bg} ${statusStyle.text}`}
-            >
-              {statusStyle.label}
-            </button>
-            <h4 className="text-[14px] font-semibold leading-[1.4] text-[#0d0d0d]">
-              {item.title}
-            </h4>
-          </div>
-          {(item.phase || countdown) && (
-            <div className="mt-1 flex items-center gap-2 text-[12px] text-[#999]">
-              {item.phase && <span>{item.phase}</span>}
-              {item.phase && countdown && <span>·</span>}
-              {countdown && (
-                <span className={countdown.includes("overdue") ? "text-[#d45656]" : ""}>
-                  {countdown}
-                </span>
-              )}
+          {editing ? (
+            <div className="space-y-2">
+              <input
+                value={draft.title}
+                onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+                className="w-full rounded border border-[rgba(0,0,0,0.15)] px-2 py-1 text-[14px] font-semibold"
+                placeholder="Title"
+              />
+              <textarea
+                value={draft.description}
+                onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
+                rows={2}
+                className="w-full rounded border border-[rgba(0,0,0,0.15)] px-2 py-1 text-[13px]"
+                placeholder="Description (optional)"
+              />
+              <input
+                type="date"
+                value={draft.deadline}
+                onChange={(e) => setDraft((d) => ({ ...d, deadline: e.target.value }))}
+                className="rounded border border-[rgba(0,0,0,0.15)] px-2 py-1 text-[13px]"
+              />
+              {item.phase && <p className="text-[12px] text-[#999]">{item.phase}</p>}
+              {item.aiRationale && <p className="text-[11px] italic text-[#aaa]">{item.aiRationale}</p>}
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    await onUpdate(item.id, {
+                      title: draft.title,
+                      description: draft.description || null,
+                      deadline: draft.deadline || null,
+                    });
+                    setEditing(false);
+                  }}
+                  className="text-[12px] font-medium text-[#0fa76e]"
+                >
+                  Save
+                </button>
+                <button onClick={() => setEditing(false)} className="text-[12px] text-[#999]">
+                  Cancel
+                </button>
+              </div>
             </div>
-          )}
-          {item.description && (
-            <p className="mt-1.5 text-[13px] leading-[1.5] text-[#555]">
-              {item.description}
-            </p>
-          )}
-          {item.aiRationale && (
-            <p className="mt-1 text-[11px] italic leading-[1.5] text-[#aaa]">
-              {item.aiRationale}
-            </p>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onStatusChange(item.id, STATUS_CYCLE[item.status])}
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusStyle.bg} ${statusStyle.text}`}
+                >
+                  {statusStyle.label}
+                </button>
+                <h4 className="text-[14px] font-semibold leading-[1.4] text-[#0d0d0d]">
+                  {item.title}
+                </h4>
+                <button
+                  onClick={() => {
+                    setDraft({ title: item.title, description: item.description ?? "", deadline: item.deadline ?? "" });
+                    setEditing(true);
+                  }}
+                  className="shrink-0 text-[#ccc] hover:text-[#666]"
+                >
+                  <Pencil className="h-3 w-3" />
+                </button>
+                <button onClick={() => onDelete(item.id)} className="shrink-0 text-[#ccc] hover:text-[#d45656]">
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+              {(item.phase || countdown) && (
+                <div className="mt-1 flex items-center gap-2 text-[12px] text-[#999]">
+                  {item.phase && <span>{item.phase}</span>}
+                  {item.phase && countdown && <span>·</span>}
+                  {countdown && (
+                    <span className={countdown.includes("overdue") ? "text-[#d45656]" : ""}>
+                      {countdown}
+                    </span>
+                  )}
+                </div>
+              )}
+              {item.description && (
+                <p className="mt-1.5 text-[13px] leading-[1.5] text-[#555]">
+                  {item.description}
+                </p>
+              )}
+              {item.aiRationale && (
+                <p className="mt-1 text-[11px] italic leading-[1.5] text-[#aaa]">
+                  {item.aiRationale}
+                </p>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -184,6 +250,9 @@ function RoadmapSection({
   onGenerate,
   onReorder,
   onStatusChange,
+  onUpdate,
+  onDelete,
+  onAdd,
 }: {
   roadmap: RoadmapItem[];
   canGenerate: boolean;
@@ -191,7 +260,13 @@ function RoadmapSection({
   onGenerate: () => void;
   onReorder: (orderedIds: string[]) => void;
   onStatusChange: (id: string, status: string) => void;
+  onUpdate: (id: string, updates: { title?: string; description?: string | null; deadline?: string | null }) => Promise<unknown>;
+  onDelete: (id: string) => void;
+  onAdd: (item: { title: string; description?: string | null; deadline?: string | null }) => Promise<unknown>;
 }) {
+  const [addingItem, setAddingItem] = useState(false);
+  const [addDraft, setAddDraft] = useState({ title: "", description: "", deadline: "" });
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -206,21 +281,87 @@ function RoadmapSection({
     onReorder(reordered.map((r) => r.id));
   };
 
+  const addMilestoneLink = (
+    !addingItem && (roadmap.length > 0 || canGenerate) && (
+      <button
+        onClick={() => setAddingItem(true)}
+        className="mt-2 text-[13px] font-medium text-[#0fa76e] hover:underline"
+      >
+        + Add milestone
+      </button>
+    )
+  );
+
+  const addMilestoneForm = addingItem && (
+    <div className="mt-3 rounded-[12px] border border-[rgba(0,0,0,0.08)] bg-white p-4">
+      <div className="space-y-2">
+        <input
+          value={addDraft.title}
+          onChange={(e) => setAddDraft((d) => ({ ...d, title: e.target.value }))}
+          className="w-full rounded border border-[rgba(0,0,0,0.15)] px-2 py-1 text-[14px] font-semibold"
+          placeholder="Title *"
+        />
+        <input
+          value={addDraft.description}
+          onChange={(e) => setAddDraft((d) => ({ ...d, description: e.target.value }))}
+          className="w-full rounded border border-[rgba(0,0,0,0.15)] px-2 py-1 text-[13px]"
+          placeholder="Description (optional)"
+        />
+        <input
+          type="date"
+          value={addDraft.deadline}
+          onChange={(e) => setAddDraft((d) => ({ ...d, deadline: e.target.value }))}
+          className="rounded border border-[rgba(0,0,0,0.15)] px-2 py-1 text-[13px]"
+        />
+        <div className="flex gap-2">
+          <button
+            onClick={async () => {
+              if (!addDraft.title.trim()) return;
+              await onAdd({
+                title: addDraft.title,
+                description: addDraft.description || null,
+                deadline: addDraft.deadline || null,
+              });
+              setAddDraft({ title: "", description: "", deadline: "" });
+              setAddingItem(false);
+            }}
+            className="text-[12px] font-medium text-[#0fa76e]"
+          >
+            Add
+          </button>
+          <button onClick={() => setAddingItem(false)} className="text-[12px] text-[#999]">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div>
       <h2 className="mb-4 text-[20px] font-semibold leading-[1.3] tracking-[-0.2px] text-[#0d0d0d]">
         Career Roadmap
       </h2>
       {roadmap.length > 0 ? (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={roadmap.map((r) => r.id)} strategy={verticalListSortingStrategy}>
-            <div className="space-y-3">
-              {roadmap.map((item) => (
-                <SortableRoadmapCard key={item.id} item={item} onStatusChange={onStatusChange} />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
+        <>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={roadmap.map((r) => r.id)} strategy={verticalListSortingStrategy}>
+              <div className="space-y-3">
+                {roadmap.map((item) => (
+                  <SortableRoadmapCard
+                    key={item.id}
+                    item={item}
+                    onStatusChange={onStatusChange}
+                    onUpdate={onUpdate}
+                    onDelete={onDelete}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+          {addMilestoneLink}
+          {addMilestoneForm}
+        </>
       ) : canGenerate ? (
         <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-5 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
           <div className="flex flex-col items-center gap-3 py-2 text-center">
@@ -240,6 +381,8 @@ function RoadmapSection({
               )}
               Generate Roadmap
             </Button>
+            {addMilestoneLink}
+            {addMilestoneForm}
           </div>
         </article>
       ) : (
@@ -658,6 +801,9 @@ export default function PersonalPage() {
     generateRoadmap,
     reorderRoadmap,
     updateRoadmapItemStatus,
+    updateRoadmapItem,
+    createRoadmapItem,
+    deleteRoadmapItem,
   } = usePersonal();
 
   const [lcUsername, setLcUsername] = useState("");
@@ -1376,6 +1522,9 @@ export default function PersonalPage() {
                       onGenerate={generateRoadmap}
                       onReorder={reorderRoadmap}
                       onStatusChange={updateRoadmapItemStatus}
+                      onUpdate={updateRoadmapItem}
+                      onDelete={deleteRoadmapItem}
+                      onAdd={createRoadmapItem}
                     />
 
                     {/* Study Plan */}

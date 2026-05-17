@@ -148,6 +148,55 @@ public class RoadmapService {
         return toView(roadmapRepo.save(item));
     }
 
+    @Transactional
+    public RoadmapItemView updateItem(Long userId, UUID itemId, String title, String description, LocalDate deadline) {
+        RoadmapItem item = roadmapRepo.findById(itemId)
+                .orElseThrow(() -> new IllegalArgumentException("Roadmap item not found"));
+        if (!item.getUserId().equals(userId)) {
+            throw new IllegalArgumentException("Not authorized");
+        }
+
+        if (title != null) {
+            if (title.isBlank()) {
+                throw new IllegalArgumentException("Title cannot be blank");
+            }
+            item.setTitle(truncate(title, 200));
+        }
+        item.setDescription(description);
+        item.setDeadline(deadline);
+        return toView(roadmapRepo.save(item));
+    }
+
+    @Transactional
+    public RoadmapItemView createItem(Long userId, String title, String description, LocalDate deadline) {
+        if (title == null || title.isBlank()) {
+            throw new IllegalArgumentException("Title is required");
+        }
+
+        List<RoadmapItem> existing = roadmapRepo.findByUserIdOrderByFocusRankAsc(userId);
+        int nextRank = existing.isEmpty() ? 0 : existing.get(existing.size() - 1).getFocusRank() + 1;
+
+        RoadmapItem item = roadmapRepo.save(RoadmapItem.builder()
+                .userId(userId)
+                .title(truncate(title, 200))
+                .description(description)
+                .deadline(deadline)
+                .focusRank(nextRank)
+                .status("pending")
+                .build());
+        return toView(item);
+    }
+
+    @Transactional
+    public void deleteItem(Long userId, UUID itemId) {
+        RoadmapItem item = roadmapRepo.findById(itemId)
+                .orElseThrow(() -> new IllegalArgumentException("Roadmap item not found"));
+        if (!item.getUserId().equals(userId)) {
+            throw new IllegalArgumentException("Not authorized");
+        }
+        roadmapRepo.deleteById(itemId);
+    }
+
     private String buildRoadmapContext(Long userId) {
         UserProfile profile = profileRepo.findByUserId(userId).orElseThrow();
         StringBuilder sb = new StringBuilder();

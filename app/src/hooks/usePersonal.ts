@@ -125,6 +125,8 @@ export interface DailySuggestionTask {
   category: "project" | "learning" | "career" | "review";
   repoContext: string | null;
   rationale: string;
+  studyTaskId?: string | null;
+  roadmapItemId?: string | null;
 }
 
 export interface DailySuggestionsResponse {
@@ -547,6 +549,55 @@ export function usePersonal() {
     }
   };
 
+  const updateRoadmapItem = async (
+    id: string,
+    updates: { title?: string; description?: string | null; deadline?: string | null }
+  ) => {
+    const res = await fetch(`${API_BASE_URL}/api/personal/roadmap/${id}`, {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    if (res.ok) {
+      const updated: RoadmapItem = await res.json();
+      setRoadmap((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+      return updated;
+    }
+    throw new Error("Failed to update roadmap item");
+  };
+
+  const createRoadmapItem = async (item: {
+    title: string;
+    description?: string | null;
+    deadline?: string | null;
+  }) => {
+    const res = await fetch(`${API_BASE_URL}/api/personal/roadmap`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(item),
+    });
+    if (res.ok) {
+      const created: RoadmapItem = await res.json();
+      setRoadmap((prev) => [...prev, created]);
+      return created;
+    }
+    throw new Error("Failed to create roadmap item");
+  };
+
+  const deleteRoadmapItem = async (id: string) => {
+    const res = await fetch(`${API_BASE_URL}/api/personal/roadmap/${id}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (res.ok) {
+      setRoadmap((prev) => prev.filter((r) => r.id !== id));
+    } else {
+      throw new Error("Failed to delete roadmap item");
+    }
+  };
+
   useEffect(() => {
     fetchProfile();
     fetchGoals();
@@ -597,6 +648,9 @@ export function usePersonal() {
     generateRoadmap,
     reorderRoadmap,
     updateRoadmapItemStatus,
+    updateRoadmapItem,
+    createRoadmapItem,
+    deleteRoadmapItem,
     refetch: () => { fetchProfile(); fetchGoals(); fetchHeatmap(); fetchTasks(); fetchSuggestions(); fetchRoadmap(); fetchCanGenerateRoadmap(); },
   };
 }

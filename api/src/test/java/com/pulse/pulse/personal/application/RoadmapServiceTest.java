@@ -181,4 +181,56 @@ class RoadmapServiceTest {
         List<RoadmapItemView> result = service.generateRoadmap(1L);
         assertEquals(6, result.size());
     }
+
+    @Test
+    void updateItemRejectsBlankTitle() {
+        UUID id = UUID.randomUUID();
+        RoadmapItem item = RoadmapItem.builder().id(id).userId(1L).title("Original").build();
+        when(roadmapRepo.findById(id)).thenReturn(Optional.of(item));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.updateItem(1L, id, "  ", null, null));
+    }
+
+    @Test
+    void updateItemAcceptsPartialUpdate() {
+        UUID id = UUID.randomUUID();
+        RoadmapItem item = RoadmapItem.builder().id(id).userId(1L).title("Original").description("Desc").build();
+        when(roadmapRepo.findById(id)).thenReturn(Optional.of(item));
+        when(roadmapRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        RoadmapItemView result = service.updateItem(1L, id, null, null, java.time.LocalDate.of(2026, 9, 1));
+        assertEquals("Original", result.title());
+        assertEquals(java.time.LocalDate.of(2026, 9, 1), result.deadline());
+    }
+
+    @Test
+    void createItemUsesMaxRankPlusOne() {
+        RoadmapItem item0 = RoadmapItem.builder().id(UUID.randomUUID()).userId(1L).title("A").focusRank(0).build();
+        RoadmapItem item2 = RoadmapItem.builder().id(UUID.randomUUID()).userId(1L).title("C").focusRank(2).build();
+        when(roadmapRepo.findByUserIdOrderByFocusRankAsc(1L)).thenReturn(List.of(item0, item2));
+        when(roadmapRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        RoadmapItemView result = service.createItem(1L, "New", null, null);
+        assertEquals(3, result.focusRank());
+    }
+
+    @Test
+    void createItemStartsAtZeroWhenEmpty() {
+        when(roadmapRepo.findByUserIdOrderByFocusRankAsc(1L)).thenReturn(List.of());
+        when(roadmapRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        RoadmapItemView result = service.createItem(1L, "First", null, null);
+        assertEquals(0, result.focusRank());
+    }
+
+    @Test
+    void deleteItemRejectsWrongUser() {
+        UUID id = UUID.randomUUID();
+        RoadmapItem item = RoadmapItem.builder().id(id).userId(1L).title("A").build();
+        when(roadmapRepo.findById(id)).thenReturn(Optional.of(item));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.deleteItem(2L, id));
+    }
 }

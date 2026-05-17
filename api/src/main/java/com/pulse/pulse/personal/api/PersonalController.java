@@ -7,6 +7,8 @@ import com.pulse.pulse.personal.api.dto.OnboardingRequest;
 import com.pulse.pulse.personal.api.dto.ReorderRoadmapRequest;
 import com.pulse.pulse.personal.api.dto.RoadmapItemDto;
 import com.pulse.pulse.personal.api.dto.UpdateGoalRequest;
+import com.pulse.pulse.personal.api.dto.CreateRoadmapItemRequest;
+import com.pulse.pulse.personal.api.dto.UpdateRoadmapItemRequest;
 import com.pulse.pulse.personal.api.dto.UpdateRoadmapStatusRequest;
 import com.pulse.pulse.personal.api.dto.UserGoalDto;
 import com.pulse.pulse.personal.api.dto.UserProfileDto;
@@ -363,6 +365,54 @@ public class PersonalController {
         try {
             RoadmapItemView item = roadmapService.updateStatus(user.id(), id, request.status());
             return ResponseEntity.ok(toRoadmapDto(item));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PutMapping("/roadmap/{id}")
+    public ResponseEntity<RoadmapItemDto> updateRoadmapItem(
+            @PathVariable UUID id,
+            @RequestBody UpdateRoadmapItemRequest request,
+            Authentication authentication) {
+        CurrentUserView user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        try {
+            RoadmapItemView item = roadmapService.updateItem(
+                    user.id(), id, request.title(), request.description(), request.deadline());
+            return ResponseEntity.ok(toRoadmapDto(item));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PostMapping("/roadmap")
+    public ResponseEntity<RoadmapItemDto> createRoadmapItem(
+            @RequestBody CreateRoadmapItemRequest request,
+            Authentication authentication) {
+        CurrentUserView user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        try {
+            RoadmapItemView item = roadmapService.createItem(
+                    user.id(), request.title(), request.description(), request.deadline());
+            return ResponseEntity.status(201).body(toRoadmapDto(item));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @DeleteMapping("/roadmap/{id}")
+    public ResponseEntity<Void> deleteRoadmapItem(
+            @PathVariable UUID id,
+            Authentication authentication) {
+        CurrentUserView user = getUser(authentication);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        try {
+            roadmapService.deleteItem(user.id(), id);
+            return ResponseEntity.noContent().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
