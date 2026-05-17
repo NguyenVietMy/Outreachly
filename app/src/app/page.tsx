@@ -4,7 +4,7 @@ import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import HeroSection from "@/components/HeroSection";
-import DemoSection from "@/components/DemoSection";
+
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function Home() {
@@ -46,15 +46,6 @@ export default function Home() {
     <div className="min-h-screen bg-background">
       <Header />
       <HeroSection />
-      <DemoSection />
-
-      <footer className="w-full py-12 bg-background border-t border-border">
-        <div className="container px-4 md:px-6 text-center">
-          <p className="text-sm text-muted-foreground">
-            &copy; 2026 Pulse
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }
