@@ -13,6 +13,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -229,6 +230,18 @@ public class OpenAiService {
 
         return executeChatCompletion("memory_update", model, userPrompt.length(), requestBody,
                 "OpenAI memory update error");
+    }
+
+    public Mono<String> generateChat(List<Map<String, String>> messages) {
+        String model = "gpt-4o-mini";
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", model);
+        requestBody.put("messages", messages.toArray());
+        requestBody.put("max_tokens", 800);
+        requestBody.put("temperature", 0.4);
+
+        int totalChars = messages.stream().mapToInt(m -> m.getOrDefault("content", "").length()).sum();
+        return executeChatCompletion("chat", model, totalChars, requestBody, "OpenAI chat error");
     }
 
     public Mono<String> generateEventTasks(String eventContext) {

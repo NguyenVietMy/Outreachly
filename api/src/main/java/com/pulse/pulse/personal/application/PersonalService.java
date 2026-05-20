@@ -51,6 +51,7 @@ public class PersonalService {
     private final ResumeService resumeService;
     private final ObjectMapper objectMapper;
     private final PulseObservability observability;
+    private final KnowledgeIndexingService knowledgeIndexingService;
 
     public UserProfileView getOrCreateProfile(Long userId) {
         return toView(getOrCreateProfileEntity(userId));
@@ -169,6 +170,8 @@ public class PersonalService {
             profile.setResumeFilename(file.getOriginalFilename());
             profile.setResumeUploadedAt(OffsetDateTime.now());
             profileRepo.save(profile);
+
+            CompletableFuture.runAsync(() -> knowledgeIndexingService.indexResumeSections(userId, text));
 
             try {
                 return toView(applyResumeScore(profile));

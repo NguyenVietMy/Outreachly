@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @Slf4j
@@ -31,6 +32,7 @@ public class GitHubProjectSyncService {
     private final WebClient gitHubWebClient;
     private final GitHubRepositoryRepository repoRepository;
     private final PulseObservability observability;
+    private final com.pulse.pulse.personal.application.KnowledgeIndexingService knowledgeIndexingService;
 
     private static final int MAX_ACTIVE_REPOS = 5;
     private static final int MAX_COMMITS_PER_REPO = 20;
@@ -42,10 +44,12 @@ public class GitHubProjectSyncService {
 
     public GitHubProjectSyncService(@Qualifier("gitHubWebClient") WebClient gitHubWebClient,
                                     GitHubRepositoryRepository repoRepository,
-                                    PulseObservability observability) {
+                                    PulseObservability observability,
+                                    com.pulse.pulse.personal.application.KnowledgeIndexingService knowledgeIndexingService) {
         this.gitHubWebClient = gitHubWebClient;
         this.repoRepository = repoRepository;
         this.observability = observability;
+        this.knowledgeIndexingService = knowledgeIndexingService;
     }
 
     public boolean shouldSync(GitHubProjectSyncRequest request) {
@@ -137,6 +141,14 @@ public class GitHubProjectSyncService {
 
                 repo.setLastSyncedAt(LocalDateTime.now());
                 repoRepository.save(repo);
+
+                if (repo.getReadmeContent() != null && repo.getReadmeContent().trim().length() >= 50) {
+                    final GitHubRepository savedRepo = repo;
+                    CompletableFuture.runAsync(() ->
+                            knowledgeIndexingService.indexGitHubReadme(savedRepo.getUserId(),
+                                    savedRepo.getRepoFullName(), savedRepo.getRepoName(),
+                                    savedRepo.getPrimaryLanguage(), savedRepo.getReadmeContent()));
+                }
             }
 
             if (trackedRepos.isEmpty()) {

@@ -23,6 +23,8 @@ import {
   RoadmapItem,
 } from "@/hooks/usePersonal";
 import MilestoneAssessmentModal from "@/components/assessment/MilestoneAssessmentModal";
+import ChatPanel from "@/components/personal/ChatPanel";
+import { MarkdownText } from "@/lib/renderMarkdown";
 import {
   CS_FUNDAMENTALS_SECTIONS,
   SYSTEM_DESIGN_SECTIONS,
@@ -169,7 +171,7 @@ function SortableRoadmapCard({
                 className="rounded border border-[rgba(0,0,0,0.15)] px-2 py-1 text-[13px]"
               />
               {item.phase && <p className="text-[12px] text-[#999]">{item.phase}</p>}
-              {item.aiRationale && <p className="text-[11px] italic text-[#aaa]">{item.aiRationale}</p>}
+              {item.aiRationale && <p className="text-[11px] italic text-[#aaa]"><MarkdownText>{item.aiRationale}</MarkdownText></p>}
               <div className="flex gap-2">
                 <button
                   onClick={async () => {
@@ -232,7 +234,7 @@ function SortableRoadmapCard({
               )}
               {item.aiRationale && (
                 <p className="mt-1 text-[11px] italic leading-[1.5] text-[#aaa]">
-                  {item.aiRationale}
+                  <MarkdownText>{item.aiRationale}</MarkdownText>
                 </p>
               )}
             </>
@@ -655,7 +657,7 @@ function ScoreBar({ label, sub }: { label: string; sub?: ResumeSubScore }) {
       </div>
       {sub.rationale && (
         <div className="pointer-events-none absolute bottom-full left-0 z-10 mb-2 hidden w-64 rounded-lg border border-[rgba(0,0,0,0.08)] bg-white p-2.5 text-[11px] leading-[1.5] text-[#555] shadow-lg group-hover:block">
-          {sub.rationale}
+          <MarkdownText>{sub.rationale}</MarkdownText>
         </div>
       )}
     </div>
@@ -1212,7 +1214,7 @@ export default function PersonalPage() {
                                     <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#d4fae8] font-mono text-[11px] font-semibold text-[#0fa76e]">
                                       {i + 1}
                                     </span>
-                                    <span>{line.replace(/^\d+\.\s*/, "")}</span>
+                                    <MarkdownText>{line.replace(/^\d+\.\s*/, "")}</MarkdownText>
                                   </li>
                                 ))}
                             </ol>
@@ -1611,6 +1613,7 @@ export default function PersonalPage() {
           </div>
         </div>
       </DashboardLayout>
+      <ChatPanel />
     </AuthGuard>
   );
 }
