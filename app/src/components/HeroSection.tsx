@@ -28,7 +28,7 @@ const HeroSection = ({
   };
 
   return (
-    <section className="w-full bg-background py-20 md:py-28 lg:py-32 relative overflow-hidden">
+    <section className="relative w-full overflow-hidden bg-transparent py-20 md:py-28 lg:py-32">
       <div className="absolute inset-0 bg-grid-pattern opacity-[0.03] pointer-events-none"></div>
 
       <div className="absolute -top-20 -right-20 w-64 h-64 bg-brand-light dark:bg-brand-deep/10 rounded-full blur-3xl"></div>
