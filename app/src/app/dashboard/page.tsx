@@ -2,6 +2,7 @@
 
 import DashboardLayout from "@/components/DashboardLayout";
 import AuthGuard from "@/components/AuthGuard";
+import { MarkdownText } from "@/lib/renderMarkdown";
 import { Button } from "@/components/ui/button";
 import {
   useDashboard,
@@ -383,7 +384,7 @@ export default function Dashboard() {
                 </div>
                 {digest ? (
                   <p className="text-[14px] leading-[1.6] text-[#333333]">
-                    {digest}
+                    <MarkdownText>{digest}</MarkdownText>
                   </p>
                 ) : (
                   <p className="text-[14px] leading-[1.6] text-[#999999]">
@@ -522,7 +523,7 @@ export default function Dashboard() {
                                   </span>
                                 </div>
                                 <p className="mt-1 text-[13px] leading-[1.5] text-[#555]">
-                                  {task.description}
+                                  <MarkdownText>{task.description}</MarkdownText>
                                 </p>
                                 <div className="mt-2 flex flex-wrap items-center gap-2">
                                   {task.repoContext && (
@@ -543,7 +544,7 @@ export default function Dashboard() {
                             </div>
                             {task.rationale && (
                               <p className="mt-2 border-t border-[rgba(0,0,0,0.04)] pt-2 text-[11px] leading-[1.5] text-[#999]">
-                                {task.rationale}
+                                <MarkdownText>{task.rationale}</MarkdownText>
                               </p>
                             )}
                             {task.studyTaskId && (
