@@ -81,11 +81,16 @@ public class DailySuggestionService {
         try {
             return observability.scoped(observation, () -> {
                 LocalDate today = LocalDate.now();
+                String context = buildContextPrompt(userId);
+                String contextHash = sha256(context);
                 Optional<DailySuggestion> cached = suggestionRepo.findByUserIdAndSuggestionDate(userId, today);
 
                 if (cached.isPresent()) {
                     DailySuggestion existing = cached.get();
-                    if (existing.getGeneratedAt().plusHours(CACHE_HOURS).isAfter(LocalDateTime.now())) {
+                    boolean withinTtl = existing.getGeneratedAt().plusHours(CACHE_HOURS).isAfter(LocalDateTime.now());
+                    boolean contextUnchanged = existing.getContextHash() == null || contextHash.equals(existing.getContextHash());
+
+                    if (withinTtl && contextUnchanged) {
                         observability.low(observation, "cache", "cache_hit");
                         observability.low(observation, "result", "cache_hit");
                         observability.counter("pulse.suggestions.requests",
@@ -94,10 +99,11 @@ public class DailySuggestionService {
                                 .increment();
                         return toView(existing);
                     }
+                    observability.low(observation, "cache", contextUnchanged ? "ttl_expired" : "context_changed");
                 }
 
                 observability.low(observation, "cache", "miss");
-                DailySuggestionView result = generateSuggestions(userId, today, "today");
+                DailySuggestionView result = generateSuggestions(userId, today, "today", context, contextHash);
                 observability.low(observation, "result", "generated");
                 return result;
             });
@@ -134,7 +140,9 @@ public class DailySuggestionService {
                 }
 
                 observability.low(observation, "cache", "regenerate");
-                DailySuggestionView result = generateSuggestions(userId, today, "regenerate");
+                String context = buildContextPrompt(userId);
+                String contextHash = sha256(context);
+                DailySuggestionView result = generateSuggestions(userId, today, "regenerate", context, contextHash);
                 observability.low(observation, "result", "generated");
                 return result;
             });
@@ -155,11 +163,10 @@ public class DailySuggestionService {
     }
 
     @Transactional
-    private DailySuggestionView generateSuggestions(Long userId, LocalDate date, String operation) {
+    private DailySuggestionView generateSuggestions(Long userId, LocalDate date, String operation,
+                                                    String context, String contextHash) {
         Timer.Sample sample = observability.timerSample();
         String result = "error";
-        String context = buildContextPrompt(userId);
-        String contextHash = sha256(context);
 
         try {
             String response = openAiService.generateDailySuggestions(context).block();
