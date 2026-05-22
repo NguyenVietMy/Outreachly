@@ -23,8 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
+import com.pulse.pulse.platform.util.HashUtil;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -82,7 +81,7 @@ public class DailySuggestionService {
             return observability.scoped(observation, () -> {
                 LocalDate today = LocalDate.now();
                 String context = buildContextPrompt(userId);
-                String contextHash = sha256(context);
+                String contextHash = HashUtil.sha256(context);
                 Optional<DailySuggestion> cached = suggestionRepo.findByUserIdAndSuggestionDate(userId, today);
 
                 if (cached.isPresent()) {
@@ -141,7 +140,7 @@ public class DailySuggestionService {
 
                 observability.low(observation, "cache", "regenerate");
                 String context = buildContextPrompt(userId);
-                String contextHash = sha256(context);
+                String contextHash = HashUtil.sha256(context);
                 DailySuggestionView result = generateSuggestions(userId, today, "regenerate", context, contextHash);
                 observability.low(observation, "result", "generated");
                 return result;
@@ -444,20 +443,6 @@ public class DailySuggestionService {
             }
         } catch (Exception e) {
             log.warn("Could not fetch Obsidian diffs for daily suggestions: {}", e.getMessage());
-        }
-    }
-
-    private String sha256(String input) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hex = new StringBuilder();
-            for (byte b : hash) {
-                hex.append(String.format("%02x", b));
-            }
-            return hex.toString();
-        } catch (Exception e) {
-            return "";
         }
     }
 

@@ -81,9 +81,21 @@ public class UserProfile {
             "dsa", 0, "projects", 0, "systemDesign", 0, "coreCs", 0, "resume", 0);
 
     @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "raw_axis_scores", columnDefinition = "jsonb")
+    @Builder.Default
+    private Map<String, Object> rawAxisScores = Map.of(
+            "dsa", 0, "projects", 0, "systemDesign", 0, "coreCs", 0, "resume", 0);
+
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "resume_score_breakdown", columnDefinition = "jsonb")
     @Builder.Default
     private Map<String, Object> resumeScoreBreakdown = Map.of();
+
+    @Column(name = "resume_context_hash", length = 64)
+    private String resumeContextHash;
+
+    @Column(name = "resume_scored_at")
+    private OffsetDateTime resumeScoredAt;
 
     @Column(name = "target_role", length = 20)
     private String targetRole;

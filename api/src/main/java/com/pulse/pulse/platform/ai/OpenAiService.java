@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import com.pulse.pulse.platform.util.HashUtil;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -444,4 +446,34 @@ public class OpenAiService {
                     "\"conciseness\":{\"score\":0,\"max\":5,\"rationale\":\"\"}}}," +
                     "\"total_score\":0,\"max_score\":100," +
                     "\"decision\":\"ADVANCE|HOLD|REJECT\",\"flags\":[],\"summary\":\"\"}";
+
+    private static final String RESUME_SCORING_PROMPT_HASH =
+            HashUtil.sha256(RESUME_SCORING_SYSTEM_PROMPT + "\n\n" + RESUME_SCORING_RUBRIC);
+
+    public String getResumeScoringPromptHash() {
+        return RESUME_SCORING_PROMPT_HASH;
+    }
+
+    public Mono<String> judgeGroundedness(String judgePrompt) {
+        String model = "gpt-4o";
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", model);
+        requestBody.put("messages", new Object[]{
+                Map.of("role", "system", "content",
+                        "You are an evaluation judge. Determine whether each rationale in a resume scoring " +
+                                "response is grounded — meaning it references information that actually appears in " +
+                                "the resume text provided.\n\n" +
+                                "A rationale is GROUNDED if it quotes or paraphrases text from the resume, " +
+                                "or states \"No evidence found\" when the resume has no relevant content.\n\n" +
+                                "A rationale is HALLUCINATED if it references technologies, companies, or outcomes " +
+                                "not present in the resume, or implies the resume demonstrates something it does not.\n\n" +
+                                "Return ONLY a JSON array. No preamble."),
+                Map.of("role", "user", "content", judgePrompt)
+        });
+        requestBody.put("max_tokens", 2000);
+        requestBody.put("temperature", 0.0);
+
+        return executeChatCompletion("eval_judge", model, judgePrompt.length(), requestBody,
+                "OpenAI judge error");
+    }
 }

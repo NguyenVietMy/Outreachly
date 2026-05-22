@@ -20,6 +20,7 @@ import com.pulse.pulse.personal.infrastructure.persistence.UserProfileRepository
 import com.pulse.pulse.personal.infrastructure.resume.ResumeService;
 import com.pulse.pulse.platform.ai.OpenAiService;
 import com.pulse.pulse.platform.observability.PulseObservability;
+import com.pulse.pulse.platform.util.HashUtil;
 import io.micrometer.observation.Observation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -197,6 +198,19 @@ public class PersonalService {
     }
 
     private UserProfile applyResumeScore(UserProfile profile) {
+        String resumeHash = HashUtil.sha256(
+                profile.getResumeText() + "::" + openAiService.getResumeScoringPromptHash());
+
+        if (resumeHash.equals(profile.getResumeContextHash())
+                && profile.getResumeScoreBreakdown() != null
+                && !profile.getResumeScoreBreakdown().isEmpty()) {
+            observability.counter("pulse.resume.score.cache", "result", "hit").increment();
+            log.debug("Resume score cache hit for user {}", profile.getUserId());
+            return profile;
+        }
+
+        observability.counter("pulse.resume.score.cache", "result", "miss").increment();
+
         Observation observation = observability.start("pulse.resume.score");
         String result = "error";
 
@@ -213,6 +227,8 @@ public class PersonalService {
                     throw new RuntimeException("Failed to parse resume score", e);
                 }
                 profile.setResumeScoreBreakdown(breakdown);
+                profile.setResumeContextHash(resumeHash);
+                profile.setResumeScoredAt(java.time.OffsetDateTime.now());
 
                 Number totalScore = (Number) breakdown.get("total_score");
                 int score = totalScore != null ? totalScore.intValue() : 0;
@@ -271,6 +287,8 @@ public class PersonalService {
         profile.setResumeFilename(null);
         profile.setResumeUploadedAt(null);
         profile.setResumeScoreBreakdown(Map.of());
+        profile.setResumeContextHash(null);
+        profile.setResumeScoredAt(null);
         updateAxisScore(profile, "resume", 0);
         updateAxisScore(profile, "projects", 0);
         return toView(profileRepo.save(profile));
@@ -407,8 +425,26 @@ public class PersonalService {
     }
 
     private void updateAxisScore(UserProfile profile, String axis, int score) {
+        Map<String, Object> rawScores = new HashMap<>(profile.getRawAxisScores());
+        rawScores.put(axis, score);
+        profile.setRawAxisScores(rawScores);
+        recalculateBlendedScore(profile, axis);
+    }
+
+    private void recalculateBlendedScore(UserProfile profile, String axis) {
+        Map<String, Object> rawScores = profile.getRawAxisScores();
+        int rawScore = rawScores.containsKey(axis) ? ((Number) rawScores.get(axis)).intValue() : 0;
+
+        List<AiTask> axisTasks = aiTaskRepo.findByUserIdAndAxisOrderByOrderIndexAsc(profile.getUserId(), axis);
+        int taskCompletion = 0;
+        if (!axisTasks.isEmpty()) {
+            long completed = axisTasks.stream().filter(AiTask::isCompleted).count();
+            taskCompletion = (int) Math.round((double) completed / axisTasks.size() * 100);
+        }
+
+        int blended = (int) Math.round(rawScore * 0.7 + taskCompletion * 0.3);
         Map<String, Object> scores = new HashMap<>(profile.getAxisScores());
-        scores.put(axis, score);
+        scores.put(axis, blended);
         profile.setAxisScores(scores);
     }
 
@@ -479,7 +515,7 @@ public class PersonalService {
     }
 
     @Transactional
-    public AiTaskView toggleTask(Long userId, UUID taskId) {
+    public ToggleTaskResult toggleTask(Long userId, UUID taskId) {
         AiTask task = aiTaskRepo.findById(taskId)
                 .orElseThrow(() -> new RuntimeException("Task not found"));
         if (!task.getUserId().equals(userId)) {
@@ -487,7 +523,13 @@ public class PersonalService {
         }
         task.setCompleted(!task.isCompleted());
         task.setCompletedAt(task.isCompleted() ? java.time.OffsetDateTime.now() : null);
-        return toView(aiTaskRepo.save(task));
+        AiTask saved = aiTaskRepo.save(task);
+
+        UserProfile profile = getOrCreateProfileEntity(userId);
+        recalculateBlendedScore(profile, saved.getAxis());
+        profileRepo.save(profile);
+
+        return new ToggleTaskResult(toView(saved), profile.getAxisScores());
     }
 
     @SuppressWarnings("unchecked")
@@ -534,6 +576,10 @@ public class PersonalService {
                             .orderIndex(idx++)
                             .build());
                 }
+
+                UserProfile profile = getOrCreateProfileEntity(userId);
+                recalculateBlendedScore(profile, axis);
+                profileRepo.save(profile);
             } catch (Exception e) {
                 log.error("Failed to generate section tasks for {}/{}", axis,
                         sectionPayload.get("sectionId"), e);
@@ -566,6 +612,10 @@ public class PersonalService {
                             .orderIndex(idx++)
                             .build());
                 }
+
+                UserProfile profile = getOrCreateProfileEntity(userId);
+                recalculateBlendedScore(profile, axis);
+                profileRepo.save(profile);
             } catch (Exception e) {
                 log.error("Failed to generate event tasks for {}", source, e);
             }
