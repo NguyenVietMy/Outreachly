@@ -1,6 +1,7 @@
 package com.pulse.pulse.activity.infrastructure.persistence;
 
 import com.pulse.pulse.activity.domain.GitHubRepository;
+import com.pulse.pulse.activity.domain.GitHubRepositoryReader;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -13,7 +14,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface GitHubRepositoryRepository extends JpaRepository<GitHubRepository, UUID> {
+public interface GitHubRepositoryRepository extends JpaRepository<GitHubRepository, UUID>, GitHubRepositoryReader {
 
     List<GitHubRepository> findByUserIdOrderByPushedAtDesc(Long userId);
 

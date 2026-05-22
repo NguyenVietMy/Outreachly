@@ -1,7 +1,7 @@
 package com.pulse.pulse.personal.application;
 
 import com.pulse.pulse.activity.domain.GitHubRepository;
-import com.pulse.pulse.activity.infrastructure.persistence.GitHubRepositoryRepository;
+import com.pulse.pulse.activity.domain.GitHubRepositoryReader;
 import com.pulse.pulse.personal.domain.AiTask;
 import com.pulse.pulse.personal.domain.RoadmapItem;
 import com.pulse.pulse.personal.domain.UserGoal;
@@ -32,7 +32,7 @@ public class ChatService {
     private final UserGoalRepository goalRepo;
     private final AiTaskRepository aiTaskRepo;
     private final RoadmapItemRepository roadmapRepo;
-    private final GitHubRepositoryRepository githubRepo;
+    private final GitHubRepositoryReader githubRepo;
     private final KnowledgeChunkRepository chunkRepo;
     private final HybridRetrievalService retrievalService;
     private final OpenAiService openAiService;

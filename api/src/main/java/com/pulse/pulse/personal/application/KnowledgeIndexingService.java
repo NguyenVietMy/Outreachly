@@ -3,7 +3,7 @@ package com.pulse.pulse.personal.application;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pulse.pulse.activity.domain.GitHubRepository;
-import com.pulse.pulse.activity.infrastructure.persistence.GitHubRepositoryRepository;
+import com.pulse.pulse.activity.domain.GitHubRepositoryReader;
 import com.pulse.pulse.personal.domain.AiTask;
 import com.pulse.pulse.personal.domain.RoadmapItem;
 import com.pulse.pulse.personal.domain.UserGoal;
@@ -32,7 +32,7 @@ public class KnowledgeIndexingService {
     );
 
     private final KnowledgeChunkRepository chunkRepo;
-    private final GitHubRepositoryRepository githubRepo;
+    private final GitHubRepositoryReader githubRepo;
     private final UserProfileRepository profileRepo;
     private final UserGoalRepository goalRepo;
     private final AiTaskRepository aiTaskRepo;
