@@ -1546,18 +1546,33 @@ export default function PersonalPage() {
                               },
                               {},
                             ),
-                          ).map(([axis, axisTasks]) => (
+                          ).map(([axis, axisTasks]) => {
+                            const completedCount = axisTasks.filter((t) => t.completed).length;
+                            const totalCount = axisTasks.length;
+                            const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+                            return (
                             <article
                               key={axis}
                               className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-5 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]"
                             >
-                              <h3 className="mb-3 text-[15px] font-semibold capitalize text-[#0d0d0d]">
-                                {axis === "coreCs"
-                                  ? "Core CS"
-                                  : axis === "systemDesign"
-                                    ? "System Design"
-                                    : axis.toUpperCase()}
-                              </h3>
+                              <div className="mb-3 flex items-center justify-between">
+                                <h3 className="text-[15px] font-semibold capitalize text-[#0d0d0d]">
+                                  {axis === "coreCs"
+                                    ? "Core CS"
+                                    : axis === "systemDesign"
+                                      ? "System Design"
+                                      : axis.toUpperCase()}
+                                </h3>
+                                <span className="text-[12px] tabular-nums text-[#999]">
+                                  {completedCount}/{totalCount}
+                                </span>
+                              </div>
+                              <div className="mb-3 h-1 overflow-hidden rounded-full bg-[#f0f0f0]">
+                                <div
+                                  className="h-full rounded-full bg-[#0fa76e] transition-all duration-300"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
                               <div className="space-y-2">
                                 {axisTasks.map((task) => (
                                   <label
@@ -1591,7 +1606,8 @@ export default function PersonalPage() {
                                 ))}
                               </div>
                             </article>
-                          ))
+                            );
+                          })
                         ) : (
                           <article className="rounded-[16px] border border-[rgba(0,0,0,0.05)] bg-white p-5 shadow-[rgba(0,0,0,0.03)_0px_2px_4px]">
                             <p className="text-[14px] leading-[1.6] text-[#666]">

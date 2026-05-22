@@ -55,7 +55,21 @@
       "mcp__plugin_playwright_playwright__browser_run_code_unsafe",
       "mcp__plugin_playwright_playwright__browser_console_messages",
       "PowerShell(Invoke-WebRequest -Uri \"http://localhost:3000\" -UseBasicParsing -TimeoutSec 5 | Select-Object StatusCode, StatusDescription)",
-      "mcp__plugin_playwright_playwright__browser_network_requests"
+      "mcp__plugin_playwright_playwright__browser_network_requests",
+      "Bash(.\\\\mvnw clean *)",
+      "WebFetch(domain:mvnrepository.com)",
+      "WebFetch(domain:central.sonatype.com)",
+      "PowerShell(aws ecs list-services *)",
+      "PowerShell(aws ecs list-tasks *)",
+      "PowerShell(aws ecs describe-tasks *)",
+      "PowerShell(aws ecs describe-services *)",
+      "PowerShell(aws ecs describe-task-definition *)",
+      "PowerShell(aws ecs update-service *)",
+      "Bash(.\\\\mvnw.cmd clean *)",
+      "Bash(./mvnw test *)",
+      "Bash(ffprobe *)",
+      "PowerShell(Split-Path *)",
+      "Bash(awk -F: '{sum+=$2} END {print sum}')"
     ]
   }
 }

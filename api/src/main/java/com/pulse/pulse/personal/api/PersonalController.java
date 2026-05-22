@@ -3,6 +3,7 @@ package com.pulse.pulse.personal.api;
 import com.pulse.pulse.identity.application.CurrentUserView;
 import com.pulse.pulse.identity.application.UserService;
 import com.pulse.pulse.personal.api.dto.AiTaskDto;
+import com.pulse.pulse.personal.api.dto.ToggleTaskResponse;
 import com.pulse.pulse.personal.api.dto.OnboardingRequest;
 import com.pulse.pulse.personal.api.dto.ReorderRoadmapRequest;
 import com.pulse.pulse.personal.api.dto.RoadmapItemDto;
@@ -13,6 +14,7 @@ import com.pulse.pulse.personal.api.dto.UpdateRoadmapStatusRequest;
 import com.pulse.pulse.personal.api.dto.UserGoalDto;
 import com.pulse.pulse.personal.api.dto.UserProfileDto;
 import com.pulse.pulse.personal.application.AiTaskView;
+import com.pulse.pulse.personal.application.ToggleTaskResult;
 import com.pulse.pulse.personal.application.DailySuggestionService;
 import com.pulse.pulse.personal.application.DailySuggestionView;
 import com.pulse.pulse.personal.application.GoalCommand;
@@ -248,14 +250,14 @@ public class PersonalController {
     }
 
     @PutMapping("/tasks/{id}/toggle")
-    public ResponseEntity<AiTaskDto> toggleTask(
+    public ResponseEntity<ToggleTaskResponse> toggleTask(
             @PathVariable UUID id,
             Authentication authentication) {
         CurrentUserView user = getUser(authentication);
         if (user == null) return ResponseEntity.status(401).build();
 
-        AiTaskView task = personalService.toggleTask(user.id(), id);
-        return ResponseEntity.ok(toTaskDto(task));
+        ToggleTaskResult result = personalService.toggleTask(user.id(), id);
+        return ResponseEntity.ok(new ToggleTaskResponse(toTaskDto(result.task()), result.axisScores()));
     }
 
     @PutMapping("/career")

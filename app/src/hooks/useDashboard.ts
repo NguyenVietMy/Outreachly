@@ -212,10 +212,11 @@ export function useDashboard() {
       credentials: "include",
     });
     if (!res.ok) return;
+    const { task } = await res.json() as { task: { completed: boolean } };
     setCompletedStudyTaskIds((prev) => {
       const next = new Set(prev);
-      if (next.has(taskId)) next.delete(taskId);
-      else next.add(taskId);
+      if (task.completed) next.add(taskId);
+      else next.delete(taskId);
       return next;
     });
   };

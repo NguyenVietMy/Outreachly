@@ -186,3 +186,10 @@ dev-debug.log
 # tasks/ 
 
 .playwright-mcp
+
+# Eval fixtures (generated, not source-controlled)
+api/src/test/resources/evals/
+api/src/test/java/com/pulse/pulse/evals/gen/
+
+# Workspace files
+pulse.code-workspace

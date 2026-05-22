@@ -348,8 +348,11 @@ export function usePersonal() {
       credentials: "include",
     });
     if (res.ok) {
-      const updated: AiTask = await res.json();
+      const { task: updated, axisScores } = await res.json() as { task: AiTask; axisScores: AxisScores };
       setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      if (axisScores) {
+        setProfile((prev) => prev ? { ...prev, axisScores } : prev);
+      }
       return updated;
     }
     throw new Error("Failed to toggle task");
