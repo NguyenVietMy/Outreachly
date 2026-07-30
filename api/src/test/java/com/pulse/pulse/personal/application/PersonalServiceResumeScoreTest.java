@@ -11,7 +11,7 @@ import com.pulse.pulse.personal.infrastructure.persistence.RoadmapItemRepository
 import com.pulse.pulse.personal.infrastructure.persistence.UserGoalRepository;
 import com.pulse.pulse.personal.infrastructure.persistence.UserProfileRepository;
 import com.pulse.pulse.personal.infrastructure.resume.ResumeService;
-import com.pulse.pulse.platform.ai.OpenAiService;
+import com.pulse.pulse.platform.ai.AnthropicService;
 import com.pulse.pulse.platform.observability.PulseObservability;
 import com.pulse.pulse.platform.util.HashUtil;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -33,7 +33,7 @@ import static org.mockito.Mockito.*;
 class PersonalServiceResumeScoreTest {
 
     private UserProfileRepository profileRepo;
-    private OpenAiService openAiService;
+    private AnthropicService anthropicService;
     private AiTaskRepository aiTaskRepo;
     private SimpleMeterRegistry meterRegistry;
     private PersonalService service;
@@ -47,12 +47,12 @@ class PersonalServiceResumeScoreTest {
     @BeforeEach
     void setUp() {
         profileRepo = Mockito.mock(UserProfileRepository.class);
-        openAiService = Mockito.mock(OpenAiService.class);
+        anthropicService = Mockito.mock(AnthropicService.class);
         aiTaskRepo = Mockito.mock(AiTaskRepository.class);
         meterRegistry = new SimpleMeterRegistry();
         TestObservationRegistry observationRegistry = TestObservationRegistry.create();
 
-        when(openAiService.getResumeScoringPromptHash()).thenReturn(PROMPT_HASH);
+        when(anthropicService.getResumeScoringPromptHash()).thenReturn(PROMPT_HASH);
         when(aiTaskRepo.findByUserIdAndAxisOrderByOrderIndexAsc(any(), any())).thenReturn(List.of());
 
         service = new PersonalService(
@@ -63,7 +63,7 @@ class PersonalServiceResumeScoreTest {
                 Mockito.mock(DashboardService.class),
                 Mockito.mock(UserService.class),
                 Mockito.mock(IntegrationService.class),
-                openAiService,
+                anthropicService,
                 Mockito.mock(LeetCodeService.class),
                 Mockito.mock(ResumeService.class),
                 new ObjectMapper(),
@@ -87,7 +87,7 @@ class PersonalServiceResumeScoreTest {
 
         service.scoreResume(1L);
 
-        verify(openAiService, never()).scoreResume(any());
+        verify(anthropicService, never()).scoreResume(any());
         assertEquals(1.0, meterRegistry.get("pulse.resume.score.cache")
                 .tag("result", "hit").counter().count());
     }
@@ -103,12 +103,12 @@ class PersonalServiceResumeScoreTest {
                 .rawAxisScores(Map.of("dsa", 0, "projects", 0, "systemDesign", 0, "coreCs", 0, "resume", 50))
                 .build();
         when(profileRepo.findByUserId(1L)).thenReturn(Optional.of(profile));
-        when(openAiService.scoreResume(RESUME_TEXT)).thenReturn(Mono.just(VALID_SCORE_JSON));
+        when(anthropicService.scoreResume(RESUME_TEXT)).thenReturn(Mono.just(VALID_SCORE_JSON));
         when(profileRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.scoreResume(1L);
 
-        verify(openAiService).scoreResume(RESUME_TEXT);
+        verify(anthropicService).scoreResume(RESUME_TEXT);
         assertEquals(1.0, meterRegistry.get("pulse.resume.score.cache")
                 .tag("result", "miss").counter().count());
 
@@ -128,12 +128,12 @@ class PersonalServiceResumeScoreTest {
                 .rawAxisScores(Map.of("dsa", 0, "projects", 0, "systemDesign", 0, "coreCs", 0, "resume", 0))
                 .build();
         when(profileRepo.findByUserId(1L)).thenReturn(Optional.of(profile));
-        when(openAiService.scoreResume(RESUME_TEXT)).thenReturn(Mono.just(VALID_SCORE_JSON));
+        when(anthropicService.scoreResume(RESUME_TEXT)).thenReturn(Mono.just(VALID_SCORE_JSON));
         when(profileRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.scoreResume(1L);
 
-        verify(openAiService).scoreResume(RESUME_TEXT);
+        verify(anthropicService).scoreResume(RESUME_TEXT);
         assertEquals(1.0, meterRegistry.get("pulse.resume.score.cache")
                 .tag("result", "miss").counter().count());
     }
@@ -150,12 +150,12 @@ class PersonalServiceResumeScoreTest {
                 .rawAxisScores(Map.of("dsa", 0, "projects", 0, "systemDesign", 0, "coreCs", 0, "resume", 0))
                 .build();
         when(profileRepo.findByUserId(1L)).thenReturn(Optional.of(profile));
-        when(openAiService.scoreResume(RESUME_TEXT)).thenReturn(Mono.just(VALID_SCORE_JSON));
+        when(anthropicService.scoreResume(RESUME_TEXT)).thenReturn(Mono.just(VALID_SCORE_JSON));
         when(profileRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.scoreResume(1L);
 
-        verify(openAiService).scoreResume(RESUME_TEXT);
+        verify(anthropicService).scoreResume(RESUME_TEXT);
     }
 
     @Test

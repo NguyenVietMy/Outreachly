@@ -16,7 +16,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
-import com.pulse.pulse.platform.ai.OpenAiService;
+import com.pulse.pulse.platform.ai.AnthropicService;
 
 @Service
 @RequiredArgsConstructor
@@ -25,7 +25,7 @@ public class DashboardService {
 
     private final IntegrationEventRepository eventRepo;
     private final GitHubRepositoryRepository gitHubRepositoryRepository;
-    private final OpenAiService openAiService;
+    private final AnthropicService anthropicService;
     private final PulseObservability observability;
 
     public Map<String, Long> getMetrics(Long userId) {
@@ -212,7 +212,7 @@ public class DashboardService {
                             e.getEventTimestamp().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"))));
                 }
 
-                String digest = openAiService.generateDigest(context.toString()).block();
+                String digest = anthropicService.generateDigest(context.toString()).block();
                 observability.low(observation, "result", "success");
                 return digest;
             });

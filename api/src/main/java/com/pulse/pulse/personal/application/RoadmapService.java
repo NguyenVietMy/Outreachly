@@ -10,7 +10,7 @@ import com.pulse.pulse.personal.infrastructure.persistence.AiTaskRepository;
 import com.pulse.pulse.personal.infrastructure.persistence.RoadmapItemRepository;
 import com.pulse.pulse.personal.infrastructure.persistence.UserGoalRepository;
 import com.pulse.pulse.personal.infrastructure.persistence.UserProfileRepository;
-import com.pulse.pulse.platform.ai.OpenAiService;
+import com.pulse.pulse.platform.ai.AnthropicService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,7 +32,7 @@ public class RoadmapService {
     private final UserProfileRepository profileRepo;
     private final UserGoalRepository goalRepo;
     private final AiTaskRepository aiTaskRepo;
-    private final OpenAiService openAiService;
+    private final AnthropicService anthropicService;
     private final ObjectMapper objectMapper;
 
     public List<RoadmapItemView> getRoadmap(Long userId) {
@@ -59,7 +59,7 @@ public class RoadmapService {
         }
 
         String context = buildRoadmapContext(userId);
-        String raw = openAiService.generateRoadmap(context).block();
+        String raw = anthropicService.generateRoadmap(context).block();
         if (raw == null) {
             throw new RuntimeException("Failed to generate roadmap");
         }

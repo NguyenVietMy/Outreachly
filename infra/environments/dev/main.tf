@@ -147,6 +147,11 @@ module "ecs_api" {
     DB_USER                          = aws_secretsmanager_secret.db_user.arn
     DB_PASSWORD                      = aws_secretsmanager_secret.db_password.arn
     OPENAI_API_KEY                   = aws_secretsmanager_secret.openai_api_key.arn
+    ANTHROPIC_API_KEY                = aws_secretsmanager_secret.anthropic_api_key.arn
+    LANGFUSE_PUBLIC_KEY              = aws_secretsmanager_secret.langfuse_public_key.arn
+    LANGFUSE_SECRET_KEY              = aws_secretsmanager_secret.langfuse_secret_key.arn
+    QDRANT_URL                       = aws_secretsmanager_secret.qdrant_url.arn
+    QDRANT_API_KEY                   = aws_secretsmanager_secret.qdrant_api_key.arn
     GOOGLE_CLIENT_ID                 = aws_secretsmanager_secret.google_client_id.arn
     GOOGLE_CLIENT_SECRET             = aws_secretsmanager_secret.google_client_secret.arn
     GITHUB_APP_ID                    = aws_secretsmanager_secret.github_app_id.arn
@@ -291,6 +296,31 @@ resource "aws_secretsmanager_secret" "db_password" {
 
 resource "aws_secretsmanager_secret" "openai_api_key" {
   name                    = "pulse/dev/OPENAI_API_KEY"
+  recovery_window_in_days = 0
+}
+
+resource "aws_secretsmanager_secret" "anthropic_api_key" {
+  name                    = "pulse/dev/ANTHROPIC_API_KEY"
+  recovery_window_in_days = 0
+}
+
+resource "aws_secretsmanager_secret" "langfuse_public_key" {
+  name                    = "pulse/dev/LANGFUSE_PUBLIC_KEY"
+  recovery_window_in_days = 0
+}
+
+resource "aws_secretsmanager_secret" "langfuse_secret_key" {
+  name                    = "pulse/dev/LANGFUSE_SECRET_KEY"
+  recovery_window_in_days = 0
+}
+
+resource "aws_secretsmanager_secret" "qdrant_url" {
+  name                    = "pulse/dev/QDRANT_URL"
+  recovery_window_in_days = 0
+}
+
+resource "aws_secretsmanager_secret" "qdrant_api_key" {
+  name                    = "pulse/dev/QDRANT_API_KEY"
   recovery_window_in_days = 0
 }
 

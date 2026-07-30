@@ -18,7 +18,7 @@ import com.pulse.pulse.personal.infrastructure.persistence.RoadmapItemRepository
 import com.pulse.pulse.personal.infrastructure.persistence.UserGoalRepository;
 import com.pulse.pulse.personal.infrastructure.persistence.UserProfileRepository;
 import com.pulse.pulse.personal.infrastructure.resume.ResumeService;
-import com.pulse.pulse.platform.ai.OpenAiService;
+import com.pulse.pulse.platform.ai.AnthropicService;
 import com.pulse.pulse.platform.observability.PulseObservability;
 import com.pulse.pulse.platform.util.HashUtil;
 import io.micrometer.observation.Observation;
@@ -47,7 +47,7 @@ public class PersonalService {
     private final DashboardService dashboardService;
     private final UserService userService;
     private final IntegrationService integrationService;
-    private final OpenAiService openAiService;
+    private final AnthropicService anthropicService;
     private final LeetCodeService leetCodeService;
     private final ResumeService resumeService;
     private final ObjectMapper objectMapper;
@@ -199,7 +199,7 @@ public class PersonalService {
 
     private UserProfile applyResumeScore(UserProfile profile) {
         String resumeHash = HashUtil.sha256(
-                profile.getResumeText() + "::" + openAiService.getResumeScoringPromptHash());
+                profile.getResumeText() + "::" + anthropicService.getResumeScoringPromptHash());
 
         if (resumeHash.equals(profile.getResumeContextHash())
                 && profile.getResumeScoreBreakdown() != null
@@ -218,7 +218,7 @@ public class PersonalService {
         observability.high(observation, "user.id", profile.getUserId());
         try {
             UserProfile saved = observability.scoped(observation, () -> {
-                String raw = openAiService.scoreResume(profile.getResumeText()).block();
+                String raw = anthropicService.scoreResume(profile.getResumeText()).block();
                 Map<String, Object> breakdown;
                 try {
                     breakdown = objectMapper.readValue(raw, new TypeReference<>() {
@@ -557,7 +557,7 @@ public class PersonalService {
                             subskill.get("subskillId"), subskill.get("tier")));
                 }
 
-                String raw = openAiService.generateSectionTasks(context.toString()).block();
+                String raw = anthropicService.generateSectionTasks(context.toString()).block();
                 List<Map<String, Object>> tasks = objectMapper.readValue(raw, new TypeReference<>() {
                 });
 
@@ -594,7 +594,7 @@ public class PersonalService {
             observability.high(observation, "user.id", userId);
         }, () -> {
             try {
-                String raw = openAiService.generateEventTasks(eventContext).block();
+                String raw = anthropicService.generateEventTasks(eventContext).block();
                 List<Map<String, Object>> tasks = objectMapper.readValue(raw, new TypeReference<>() {
                 });
 
@@ -629,7 +629,7 @@ public class PersonalService {
         }, () -> {
             try {
                 String fullContext = buildFullContext(profile, eventDescription);
-                String updated = openAiService.updateMemory(
+                String updated = anthropicService.updateMemory(
                         profile.getProfileMarkdown(), fullContext).block();
                 if (updated != null && !updated.isBlank()) {
                     UserProfile fresh = getOrCreateProfileEntity(profile.getUserId());
@@ -819,7 +819,7 @@ public class PersonalService {
             }
 
             try {
-                return openAiService.generatePersonalInsights(context.toString()).block();
+                return anthropicService.generatePersonalInsights(context.toString()).block();
             } catch (Exception e) {
                 log.error("Failed to generate personal insights", e);
                 return "Could not generate insights at this time.";

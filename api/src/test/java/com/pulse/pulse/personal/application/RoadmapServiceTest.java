@@ -7,7 +7,7 @@ import com.pulse.pulse.personal.infrastructure.persistence.AiTaskRepository;
 import com.pulse.pulse.personal.infrastructure.persistence.RoadmapItemRepository;
 import com.pulse.pulse.personal.infrastructure.persistence.UserGoalRepository;
 import com.pulse.pulse.personal.infrastructure.persistence.UserProfileRepository;
-import com.pulse.pulse.platform.ai.OpenAiService;
+import com.pulse.pulse.platform.ai.AnthropicService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -28,20 +28,20 @@ class RoadmapServiceTest {
 
     private RoadmapItemRepository roadmapRepo;
     private UserProfileRepository profileRepo;
-    private OpenAiService openAiService;
+    private AnthropicService anthropicService;
     private RoadmapService service;
 
     @BeforeEach
     void setUp() {
         roadmapRepo = Mockito.mock(RoadmapItemRepository.class);
         profileRepo = Mockito.mock(UserProfileRepository.class);
-        openAiService = Mockito.mock(OpenAiService.class);
+        anthropicService = Mockito.mock(AnthropicService.class);
         service = new RoadmapService(
                 roadmapRepo,
                 profileRepo,
                 Mockito.mock(UserGoalRepository.class),
                 Mockito.mock(AiTaskRepository.class),
-                openAiService,
+                anthropicService,
                 new ObjectMapper()
         );
     }
@@ -131,14 +131,14 @@ class RoadmapServiceTest {
                 .resumeScoreBreakdown(Map.of("total_score", 72, "decision", "ADVANCE"))
                 .build();
         when(profileRepo.findByUserId(1L)).thenReturn(Optional.of(profile));
-        when(openAiService.generateRoadmap(any()))
+        when(anthropicService.generateRoadmap(any()))
                 .thenReturn(Mono.just("[{\"title\":\"A\",\"description\":\"d\",\"phase\":\"Summer\",\"deadline\":\"2026-08-01\",\"rationale\":\"r\"}]"));
         when(roadmapRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.generateRoadmap(1L);
 
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(openAiService).generateRoadmap(captor.capture());
+        verify(anthropicService).generateRoadmap(captor.capture());
         String context = captor.getValue();
 
         assertTrue(context.contains("Score: 72/100"), "Should contain 'Score: 72/100' from total_score field");
@@ -155,7 +155,7 @@ class RoadmapServiceTest {
     @Test
     void generateRoadmapRejectsEmptyLlmResponse() {
         stubGeneratableProfile();
-        when(openAiService.generateRoadmap(any())).thenReturn(Mono.just("[]"));
+        when(anthropicService.generateRoadmap(any())).thenReturn(Mono.just("[]"));
 
         assertThrows(RuntimeException.class, () -> service.generateRoadmap(1L));
     }
@@ -163,7 +163,7 @@ class RoadmapServiceTest {
     @Test
     void generateRoadmapFiltersItemsWithoutTitle() {
         stubGeneratableProfile();
-        when(openAiService.generateRoadmap(any())).thenReturn(Mono.just(
+        when(anthropicService.generateRoadmap(any())).thenReturn(Mono.just(
                 "[{\"description\":\"no title\"},{\"title\":\"Valid\",\"description\":\"d\"}]"));
 
         List<RoadmapItemView> result = service.generateRoadmap(1L);
@@ -174,7 +174,7 @@ class RoadmapServiceTest {
     @Test
     void generateRoadmapCapsAtSixItems() {
         stubGeneratableProfile();
-        when(openAiService.generateRoadmap(any())).thenReturn(Mono.just(
+        when(anthropicService.generateRoadmap(any())).thenReturn(Mono.just(
                 "[{\"title\":\"A\"},{\"title\":\"B\"},{\"title\":\"C\"},{\"title\":\"D\"},"
                 + "{\"title\":\"E\"},{\"title\":\"F\"},{\"title\":\"G\"},{\"title\":\"H\"}]"));
 

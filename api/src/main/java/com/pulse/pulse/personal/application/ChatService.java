@@ -7,7 +7,7 @@ import com.pulse.pulse.personal.domain.RoadmapItem;
 import com.pulse.pulse.personal.domain.UserGoal;
 import com.pulse.pulse.personal.domain.UserProfile;
 import com.pulse.pulse.personal.infrastructure.persistence.*;
-import com.pulse.pulse.platform.ai.OpenAiService;
+import com.pulse.pulse.platform.ai.AnthropicService;
 import com.pulse.pulse.platform.observability.PulseObservability;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,7 +35,7 @@ public class ChatService {
     private final GitHubRepositoryReader githubRepo;
     private final KnowledgeChunkRepository chunkRepo;
     private final HybridRetrievalService retrievalService;
-    private final OpenAiService openAiService;
+    private final AnthropicService anthropicService;
     private final PulseObservability observability;
 
     public ChatResponse chat(Long userId, String message, List<ChatMessage> history) {
@@ -197,7 +197,7 @@ public class ChatService {
             }
             messages.add(Map.of("role", "user", "content", message));
 
-            String response = openAiService.generateChat(messages).block();
+            String response = anthropicService.generateChat(messages).block();
 
             return new ChatResponse(response, sources, routingDecisions);
         });

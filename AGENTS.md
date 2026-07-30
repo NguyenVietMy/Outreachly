@@ -116,7 +116,7 @@ All Java code under `com.pulse.pulse`:
   - `DashboardService` — Aggregates integration activity metrics, trends, and AI digest generation
   - `IntegrationService` — Manages user integrations (GitHub, Obsidian, Slack, Linear) with OAuth and API key flows
   - `IntegrationSyncScheduler` — Background auto-sync for connected integrations
-  - `OpenAiService` — WebFlux client to OpenAI for digest, personal insights, resume scoring, and task generation
+  - `AnthropicService` — Anthropic Java SDK client (Claude Sonnet 5 for resume scoring + eval judge, Haiku 4.5 for digest, insights, chat, and task generation); `EmbeddingService` remains on OpenAI for pgvector embeddings
   - `PersonalService` — SWE profile, goals, resume scoring, and AI-driven study tasks
   - `ResumeService` — PDF parsing and resume text extraction
 - `service/integration/` — Per-provider sync implementations:
