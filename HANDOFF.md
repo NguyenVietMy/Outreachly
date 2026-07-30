@@ -3,7 +3,8 @@
 Start here to pick up work on `PRD-agentic.md` / `docs/issues/`. Written to be readable cold, by a
 fresh session or by you in three weeks.
 
-**Status as of 2026-07-30:** scope agreed, PRD written, 11 issues broken out. **Zero code written.**
+**Status as of 2026-07-30:** issues **01, 02, 03, 09** landed. Retrieval now reads from Qdrant;
+Postgres is still dual-written and is dropped by issue 04. Next up: 05/06 (unblocked) or 04.
 
 ---
 
@@ -114,9 +115,27 @@ the real cluster (1.18.3) via the Java client: `VectorFactory.vector(Points.Docu
 payload index. Found in issue 02 via `deleteBySourceKey`; `QdrantSchemaInitializer` now creates the
 indexes on every boot, so adding one is a one-line change that back-fills onto the live collection.
 
-**Two retrieval constants must be carried over exactly.** `RRF_K = 60` (matches Qdrant's built-in
-RRF) and `MIN_RRF_THRESHOLD = 0.008`. Qdrant has **no equivalent** of the threshold — it must be
-applied client-side after fusion. Dropping it silently widens recall.
+**Two retrieval constants must be carried over exactly.** `RRF_K = 60` and
+`MIN_RRF_THRESHOLD = 0.008`. Qdrant has **no equivalent** of the threshold — it must be applied
+client-side after fusion. Dropping it silently widens recall. Issue 03 refinements: `Points.Rrf` in
+client 1.18.3 has a settable `k`, so 60 is passed explicitly rather than trusting the server
+default; and with `fetchK = 10` the threshold is currently a no-op (worst single-arm score
+`1/70 ≈ 0.0143`), kept because it binds again if `fetchK` grows past ~65.
+
+**The pgvector keyword arm was nearly dead — don't treat it as the reference.** `plainto_tsquery`
+ANDs its terms, so `"Terraform ECS Fargate"` needs one chunk containing all three and matches
+nothing. Measured in issue 03: it returned rows on **3 of 20** frozen queries, never more than one
+row; Qdrant's disjunctive BM25 contributes on 19 of 20. The shipped "hybrid" search was effectively
+dense-only. This is why issue 03's fused parity landed at 77%, not ≥80% — see that issue's
+*Why the gate was not met*. It also makes issue 04's "keep `search_vector` as a fallback" question
+mostly moot: there is little there to fall back to.
+
+**`QdrantVectorStore` is gated on `qdrant.enabled` alone** and takes an `ObjectMapper` (it rebuilds
+the metadata JSON string `RetrievedChunk` used to get from jsonb). Reads must not depend on a
+write-side flag, so `pulse.vector.dual-write` moved into `KnowledgeIndexingService`.
+
+**Tagged tests need their profile.** Surefire's default `<excludedGroups>evals,langfuse,qdrant</excludedGroups>`
+is *not* overridden by `-Dtest=`. Run `./mvnw test -Pqdrant -Dtest=RetrievalParityTest`.
 
 **The frontend contract is the compatibility boundary.** These four records in `ChatService` must
 survive verbatim through issue 08:
@@ -164,7 +183,9 @@ isn't re-litigated in every issue.
 From `PRD-agentic.md` §9:
 
 - [ ] `mvn test` green; Python suite green
-- [ ] Retrieval parity ≥80% top-5 overlap, measured and recorded in issue 03
+- [x] Retrieval parity measured and recorded in issue 03 — **77% fused / 99.5% dense arm**. The
+      ≥80% target was not met and was deliberately not chased; the gap is Postgres's broken keyword
+      arm, not the migration. Read issue 03's *Why the gate was not met* before citing this number.
 - [ ] `embedding vector(1536)` dropped; `pgvector` gone from `api/pom.xml`
 - [ ] One Langfuse trace per chat spanning Java → Python → Anthropic, with token counts and
       **zero raw resume text**
