@@ -109,6 +109,11 @@ hybrid retrieval survive the migration without a BM25 encoder in Java. **Confirm
 the real cluster (1.18.3) via the Java client: `VectorFactory.vector(Points.Document)` to write and
 `QueryFactory.nearest(Points.Document)` to read. The fallback written down in issue 01 is not needed.
 
+**Qdrant Cloud rejects filters on unindexed payload fields** rather than falling back to a scan
+(`Index required but not found for "…"`). Every field the read or write path filters on needs a
+payload index. Found in issue 02 via `deleteBySourceKey`; `QdrantSchemaInitializer` now creates the
+indexes on every boot, so adding one is a one-line change that back-fills onto the live collection.
+
 **Two retrieval constants must be carried over exactly.** `RRF_K = 60` (matches Qdrant's built-in
 RRF) and `MIN_RRF_THRESHOLD = 0.008`. Qdrant has **no equivalent** of the threshold — it must be
 applied client-side after fusion. Dropping it silently widens recall.
