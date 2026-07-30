@@ -11,6 +11,8 @@ import com.pulse.pulse.personal.domain.UserProfile;
 import com.pulse.pulse.personal.infrastructure.persistence.*;
 import com.pulse.pulse.platform.ai.EmbeddingService;
 import com.pulse.pulse.platform.observability.PulseObservability;
+import com.pulse.pulse.platform.vector.QdrantVectorStore;
+import com.pulse.pulse.platform.vector.QdrantVectorStore.ChunkPoint;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -40,6 +43,8 @@ public class KnowledgeIndexingService {
     private final EmbeddingService embeddingService;
     private final ObjectMapper objectMapper;
     private final PulseObservability observability;
+    /** Empty unless dual-write is on; Postgres stays authoritative either way. */
+    private final Optional<QdrantVectorStore> qdrantStore;
 
     @Transactional
     public void indexGitHubReadme(Long userId, String repoFullName, String repoName,
@@ -90,7 +95,7 @@ public class KnowledgeIndexingService {
             observability.low(obs, "source_type", "resume_section");
             observability.high(obs, "user.id", userId);
         }, () -> {
-            chunkRepo.deleteByUserIdAndSourceType(userId, "resume_section");
+            deleteBySourceType(userId, "resume_section");
 
             List<Map.Entry<String, String>> sections = parseResumeSections(resumeText);
             List<String> texts = sections.stream().map(Map.Entry::getValue).toList();
@@ -99,12 +104,14 @@ public class KnowledgeIndexingService {
 
             List<float[]> embeddings = embeddingService.embedBatch(texts).block();
 
+            List<ChunkPoint> chunks = new ArrayList<>();
             for (int i = 0; i < sections.size(); i++) {
                 Map.Entry<String, String> section = sections.get(i);
                 Map<String, Object> metadata = Map.of("sectionName", section.getKey());
-                upsertChunk(userId, "resume_section", section.getKey(), i, section.getValue(),
-                        embeddings.get(i), metadata);
+                chunks.add(new ChunkPoint(userId, "resume_section", section.getKey(), i,
+                        section.getValue(), embeddings.get(i), metadata));
             }
+            upsertChunks(chunks);
             return null;
         });
     }
@@ -115,9 +122,9 @@ public class KnowledgeIndexingService {
             observability.low(obs, "source_type", "goals_tasks");
             observability.high(obs, "user.id", userId);
         }, () -> {
-            chunkRepo.deleteByUserIdAndSourceType(userId, "goal");
-            chunkRepo.deleteByUserIdAndSourceType(userId, "task");
-            chunkRepo.deleteByUserIdAndSourceType(userId, "roadmap");
+            deleteBySourceType(userId, "goal");
+            deleteBySourceType(userId, "task");
+            deleteBySourceType(userId, "roadmap");
 
             List<UserGoal> goals = goalRepo.findByUserId(userId);
             List<AiTask> tasks = aiTaskRepo.findByUserIdOrderByAxisAscOrderIndexAsc(userId).stream()
@@ -160,11 +167,13 @@ public class KnowledgeIndexingService {
 
             List<float[]> embeddings = embeddingService.embedBatch(allTexts).block();
 
+            List<ChunkPoint> chunks = new ArrayList<>();
             for (int i = 0; i < allTexts.size(); i++) {
                 ChunkMeta meta = allMeta.get(i);
-                upsertChunk(userId, meta.sourceType, meta.sourceKey, meta.chunkIndex,
-                        allTexts.get(i), embeddings.get(i), meta.metadata);
+                chunks.add(new ChunkPoint(userId, meta.sourceType, meta.sourceKey, meta.chunkIndex,
+                        allTexts.get(i), embeddings.get(i), meta.metadata));
             }
+            upsertChunks(chunks);
             return null;
         });
     }
@@ -172,7 +181,7 @@ public class KnowledgeIndexingService {
     @Transactional
     public void reindexAll(Long userId) {
         log.info("Starting full reindex for user {}", userId);
-        chunkRepo.deleteByUserId(userId);
+        deleteAllForUser(userId);
 
         UserProfile profile = profileRepo.findByUserId(userId).orElse(null);
         if (profile != null && profile.getResumeText() != null && !profile.getResumeText().isBlank()) {
@@ -230,21 +239,57 @@ public class KnowledgeIndexingService {
 
     private void upsertChunk(Long userId, String sourceType, String sourceKey, int chunkIndex,
                              String content, float[] embedding, Map<String, Object> metadata) {
-        String embeddingStr = EmbeddingService.toVectorString(embedding);
-        String metadataStr;
-        try {
-            metadataStr = objectMapper.writeValueAsString(metadata);
-        } catch (JsonProcessingException e) {
-            metadataStr = "{}";
+        upsertChunks(List.of(new ChunkPoint(userId, sourceType, sourceKey, chunkIndex, content,
+                embedding, metadata)));
+    }
+
+    /** The single write seam: Postgres is authoritative, Qdrant is mirrored in one batched call. */
+    private void upsertChunks(List<ChunkPoint> chunks) {
+        for (ChunkPoint chunk : chunks) {
+            String metadataStr;
+            try {
+                metadataStr = objectMapper.writeValueAsString(chunk.metadata());
+            } catch (JsonProcessingException e) {
+                metadataStr = "{}";
+            }
+            chunkRepo.upsertChunk(chunk.userId(), chunk.sourceType(), chunk.sourceKey(), chunk.chunkIndex(),
+                    chunk.content(), EmbeddingService.toVectorString(chunk.denseVector()), metadataStr);
         }
-        chunkRepo.upsertChunk(userId, sourceType, sourceKey, chunkIndex, content, embeddingStr, metadataStr);
+        mirror("upsert of " + chunks.size() + " chunk(s)", store -> store.upsertBatch(chunks));
+    }
+
+    private void deleteBySourceType(Long userId, String sourceType) {
+        chunkRepo.deleteByUserIdAndSourceType(userId, sourceType);
+        mirror("delete of source type " + sourceType, store -> store.deleteBySource(userId, sourceType));
+    }
+
+    private void deleteBySourceKey(Long userId, String sourceType, String sourceKey) {
+        chunkRepo.deleteByUserIdAndSourceTypeAndSourceKey(userId, sourceType, sourceKey);
+        mirror("delete of " + sourceType + "/" + sourceKey,
+                store -> store.deleteBySourceKey(userId, sourceType, sourceKey));
+    }
+
+    private void deleteAllForUser(Long userId) {
+        chunkRepo.deleteByUserId(userId);
+        mirror("delete of all chunks", store -> store.deleteByUser(userId));
+    }
+
+    /** A failing mirror must never fail the Postgres write; issue 03 still reads from pgvector. */
+    private void mirror(String operation, Consumer<QdrantVectorStore> write) {
+        qdrantStore.ifPresent(store -> {
+            try {
+                write.accept(store);
+            } catch (RuntimeException e) {
+                log.error("Qdrant dual-write failed ({}); Postgres write kept", operation, e);
+            }
+        });
     }
 
     private void pruneOldObsidianDiffs(Long userId) {
         String cutoffDate = LocalDate.now().minusDays(14).toString();
         chunkRepo.findByUserIdAndSourceType(userId, "obsidian_diff").stream()
                 .filter(c -> c.getSourceKey().compareTo(cutoffDate) < 0)
-                .forEach(c -> chunkRepo.deleteByUserIdAndSourceTypeAndSourceKey(userId, "obsidian_diff", c.getSourceKey()));
+                .forEach(c -> deleteBySourceKey(userId, "obsidian_diff", c.getSourceKey()));
     }
 
     private record ChunkMeta(String sourceType, String sourceKey, int chunkIndex, Map<String, Object> metadata) {}

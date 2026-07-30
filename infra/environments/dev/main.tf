@@ -168,6 +168,7 @@ module "ecs_api" {
   }
 
   extra_environment = {
+    QDRANT_ENABLED                             = "true"
     OBSERVABILITY_TRACING_ENABLED              = "true"
     OBSERVABILITY_OTLP_ENDPOINT                = local.observability_otlp_endpoint
     OBSERVABILITY_METRICS_ENABLED              = "true"

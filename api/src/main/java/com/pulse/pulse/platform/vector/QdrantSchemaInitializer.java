@@ -51,28 +51,34 @@ public class QdrantSchemaInitializer implements ApplicationRunner {
     void ensureCollection() throws ExecutionException, InterruptedException {
         if (qdrantClient.collectionExistsAsync(COLLECTION).get()) {
             log.info("Qdrant collection {} already exists", COLLECTION);
-            return;
+        } else {
+            qdrantClient.createCollectionAsync(CreateCollection.newBuilder()
+                    .setCollectionName(COLLECTION)
+                    .setVectorsConfig(VectorsConfig.newBuilder()
+                            .setParamsMap(VectorParamsMap.newBuilder()
+                                    .putMap(DENSE_VECTOR, VectorParams.newBuilder()
+                                            .setSize(DENSE_SIZE)
+                                            .setDistance(Distance.Cosine)
+                                            .build())))
+                    .setSparseVectorsConfig(SparseVectorConfig.newBuilder()
+                            .putMap(SPARSE_VECTOR, SparseVectorParams.newBuilder()
+                                    .setModifier(Modifier.Idf)
+                                    .build()))
+                    .build()).get();
+            log.info("Created Qdrant collection {}", COLLECTION);
         }
 
-        qdrantClient.createCollectionAsync(CreateCollection.newBuilder()
-                .setCollectionName(COLLECTION)
-                .setVectorsConfig(VectorsConfig.newBuilder()
-                        .setParamsMap(VectorParamsMap.newBuilder()
-                                .putMap(DENSE_VECTOR, VectorParams.newBuilder()
-                                        .setSize(DENSE_SIZE)
-                                        .setDistance(Distance.Cosine)
-                                        .build())))
-                .setSparseVectorsConfig(SparseVectorConfig.newBuilder()
-                        .putMap(SPARSE_VECTOR, SparseVectorParams.newBuilder()
-                                .setModifier(Modifier.Idf)
-                                .build()))
-                .build()).get();
+        // Outside the branch above so a collection created before a field was indexed still gets it.
+        // Every field the write path filters on needs an index — Qdrant Cloud rejects filters on
+        // unindexed payload fields rather than falling back to a scan.
+        createIndex("user_id", PayloadSchemaType.Integer);
+        createIndex("source_type", PayloadSchemaType.Keyword);
+        createIndex("source_key", PayloadSchemaType.Keyword);
+    }
 
-        qdrantClient.createPayloadIndexAsync(COLLECTION, "user_id",
-                PayloadSchemaType.Integer, null, true, null, null).get();
-        qdrantClient.createPayloadIndexAsync(COLLECTION, "source_type",
-                PayloadSchemaType.Keyword, null, true, null, null).get();
-
-        log.info("Created Qdrant collection {}", COLLECTION);
+    /** Re-creating an existing payload index is a no-op on the server, so this is safe on every boot. */
+    private void createIndex(String field, PayloadSchemaType type)
+            throws ExecutionException, InterruptedException {
+        qdrantClient.createPayloadIndexAsync(COLLECTION, field, type, null, true, null, null).get();
     }
 }
