@@ -42,23 +42,48 @@ target plus correct span attributes, not new infrastructure.
 
 `PLAN.md` mandates it and resume text is the most sensitive data in the system.
 
-- [ ] Never attach full prompt or completion bodies as span attributes by default
-- [ ] If prompt capture is enabled for debugging, truncate to ≤200 chars and redact
-      email addresses and phone numbers
-- [ ] Verify by inspecting an actual trace in the Langfuse UI after a resume-scoring run —
-      not by reading the code
+- [x] Never attach full prompt or completion bodies as span attributes by default
+- [ ] ~~If prompt capture is enabled for debugging, truncate to ≤200 chars and redact
+      email addresses and phone numbers~~ — **not built.** No prompt-capture toggle exists, so
+      there is nothing to truncate. Building the toggle purely to redact it would be speculative
+      configurability. Revisit if a debugging need appears.
+- [x] Verified by fetching traces back through `langfuse-cli` after a resume-scoring run with
+      deliberately PII-laden input — not by reading the code
 
 ## Acceptance criteria
 
-- [ ] A chat and a resume-scoring request each produce a Langfuse trace
-- [ ] Model, input tokens, output tokens, and latency visible per generation
-- [ ] Grafana Tempo still receives traces (no regression)
-- [ ] Manual inspection of ≥3 traces shows zero resume content
-- [ ] `PLAN.md` Phase 2.2 checked off
+- [x] A chat and a resume-scoring request each produce a Langfuse trace
+- [x] Model, input tokens, output tokens, and latency visible per generation
+- [ ] ~~Grafana Tempo still receives traces (no regression)~~ — **not exercisable.** The premise is
+      wrong: `management.otlp.tracing.export.enabled` defaults to `false` and
+      `OBSERVABILITY_OTLP_ENDPOINT` is unset in both `.env.local.properties` and
+      `.env.prod.properties`. No Grafana target exists to regress. Coexistence is instead
+      *proven structurally* by `LangfuseConfigTest.primaryOtlpExporterSurvivesAlongsideLangfuse`.
+- [x] Manual inspection of ≥3 traces shows zero resume content — 6 observations audited
+- [x] `PLAN.md` Phase 2.2 checked off
 
 ## Verify
 
 ```bash
-cd api && ./mvnw spring-boot:run
-# trigger chat + a resume score, then inspect traces in the Langfuse UI
+cd api
+set -a && . ./.env.local.properties && set +a
+./mvnw test -Plangfuse          # real Anthropic call -> real Langfuse export
+export LANGFUSE_BASE_URL="$LANGFUSE_HOST"
+npx langfuse-cli api observations list --fields core,basic,io,model,usage --limit 5
+# expect: type=GENERATION, model set, usageDetails populated, input=null, output=null
 ```
+
+## Result
+
+| Check | Outcome |
+|---|---|
+| Observations audited | 6 |
+| Observation type | `GENERATION` (auto-typed from `gen_ai.request.model`) |
+| `input` / `output` | `null` on all 6 |
+| PII string search across full JSON | no matches |
+| Cost — digest (`claude-haiku-4-5`) | $0.000300 |
+| Cost — resume score (`claude-sonnet-5`) | $0.038128 |
+
+Langfuse computes cost itself from the token counts; no pricing table needed in Java. The
+**~127× cost gap** between the two models is the measurement `PLAN.md` 2.4's routing
+experiment exists to attack.

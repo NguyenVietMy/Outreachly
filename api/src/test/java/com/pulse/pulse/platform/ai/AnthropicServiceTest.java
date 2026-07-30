@@ -5,6 +5,7 @@ import com.anthropic.models.messages.ContentBlock;
 import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageCreateParams;
 import com.anthropic.models.messages.TextBlock;
+import com.anthropic.models.messages.Usage;
 import com.pulse.pulse.platform.observability.PulseObservability;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.tck.TestObservationRegistry;
@@ -12,7 +13,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.StreamSupport;
 
@@ -63,6 +66,42 @@ class AnthropicServiceTest {
     }
 
     @Test
+    void generateDigestRecordsGenAiSemanticConventionAttributes() {
+        Message message = messageWithText("done");
+        when(client.messages().create(any(MessageCreateParams.class))).thenReturn(message);
+
+        AnthropicService service = new AnthropicService(
+                client,
+                new PulseObservability(observationRegistry, meterRegistry)
+        );
+
+        service.generateDigest("abc").block();
+
+        assertThat(observationKeyValues())
+                .containsEntry("gen_ai.system", "anthropic")
+                .containsEntry("gen_ai.operation.name", "chat")
+                .containsEntry("gen_ai.request.model", "claude-haiku-4-5")
+                .containsEntry("gen_ai.usage.input_tokens", "120")
+                .containsEntry("gen_ai.usage.output_tokens", "45");
+    }
+
+    @Test
+    void spanCarriesNoPromptOrCompletionBodies() {
+        Message message = messageWithText("candidate john.doe@example.com scored 82");
+        when(client.messages().create(any(MessageCreateParams.class))).thenReturn(message);
+
+        AnthropicService service = new AnthropicService(
+                client,
+                new PulseObservability(observationRegistry, meterRegistry)
+        );
+
+        service.scoreResume("Jane Smith, 555-0100, jane@example.com, Senior SWE").block();
+
+        assertThat(observationValues()).noneSatisfy(value -> assertThat(value)
+                .containsAnyOf("Jane Smith", "555-0100", "jane@example.com", "john.doe@example.com"));
+    }
+
+    @Test
     void generateDigestRecordsErrorMetricsWhenCallFails() {
         when(client.messages().create(any(MessageCreateParams.class))).thenThrow(new RuntimeException("boom"));
 
@@ -86,9 +125,22 @@ class AnthropicServiceTest {
         when(textBlock.text()).thenReturn(text);
         ContentBlock block = mock(ContentBlock.class);
         when(block.text()).thenReturn(Optional.of(textBlock));
+        Usage usage = mock(Usage.class);
+        when(usage.inputTokens()).thenReturn(120L);
+        when(usage.outputTokens()).thenReturn(45L);
         Message message = mock(Message.class);
         when(message.content()).thenReturn(List.of(block));
+        when(message.usage()).thenReturn(usage);
         return message;
+    }
+
+    private Map<String, String> observationKeyValues() {
+        Map<String, String> keyValues = new HashMap<>();
+        assertThat(observationRegistry).hasHandledContextsThatSatisfy(contexts -> contexts.forEach(context ->
+                context.getAllKeyValues().forEach(keyValue ->
+                        keyValues.put(keyValue.getKey(), keyValue.getValue()))
+        ));
+        return keyValues;
     }
 
     private List<String> observationValues() {

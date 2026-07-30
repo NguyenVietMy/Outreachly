@@ -65,8 +65,13 @@ The eval harness already exists and is further along than it looks:
 - [ ] **2.1 Token/cost capture.** In `executeChatCompletion`, stop discarding `usage`; emit
       Micrometer counters (input/output tokens + dollar cost from a pricing table), tagged by
       `operation` and `model`, through the existing Prometheus export.
-- [ ] **2.2 Langfuse tracing.** Export OTel traces (GenAI semantic conventions) from the existing
+- [x] **2.2 Langfuse tracing.** Export OTel traces (GenAI semantic conventions) from the existing
       Micrometer Observation setup to Langfuse Cloud's OTLP endpoint. Redact/truncate resume text.
+      Landed via issue 09. Spans carry no prompt/completion bodies at all, verified by fetching
+      6 traces back through `langfuse-cli`. **2.1 is now trivial:** `AnthropicService.recordUsage`
+      already reads `usage.inputTokens()`/`outputTokens()` — 2.1 is just emitting those as
+      Micrometer counters. Note Langfuse already computes dollar cost server-side, so the pricing
+      table 2.1 calls for is only needed for the Prometheus path.
 - [ ] **2.3 Model config.** Make the model per-operation configurable (properties-driven) instead
       of hard-coded constants in `AnthropicService`. (The digest 3.5-turbo→cheap-tier win landed
       already as part of the provider switch: digest now runs on Haiku 4.5.)

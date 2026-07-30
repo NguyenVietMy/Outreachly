@@ -5,6 +5,7 @@ import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageCreateParams;
 import com.anthropic.models.messages.MessageParam;
 import com.anthropic.models.messages.TextBlock;
+import com.anthropic.models.messages.Usage;
 import com.pulse.pulse.platform.observability.PulseObservability;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.observation.Observation;
@@ -298,9 +299,15 @@ public class AnthropicService {
             observability.low(observation, "model", model);
             observability.high(observation, "prompt.char_count", promptCharCount);
 
+            // OTel GenAI semantic conventions, read by Langfuse to type the span as a generation.
+            observability.low(observation, "gen_ai.system", "anthropic");
+            observability.low(observation, "gen_ai.operation.name", "chat");
+            observability.low(observation, "gen_ai.request.model", model);
+
             return Mono.using(
                     observation::openScope,
                     scope -> Mono.fromCallable(() -> client.messages().create(params))
+                            .doOnNext(message -> recordUsage(observation, message))
                             .map(this::extractText)
                             .doOnNext(content -> {
                                 result.set("success");
@@ -327,6 +334,13 @@ public class AnthropicService {
                     Observation.Scope::close
             );
         });
+    }
+
+    // Token counts are high-cardinality: they belong on the span, not on Prometheus labels.
+    private void recordUsage(Observation observation, Message message) {
+        Usage usage = message.usage();
+        observability.high(observation, "gen_ai.usage.input_tokens", usage.inputTokens());
+        observability.high(observation, "gen_ai.usage.output_tokens", usage.outputTokens());
     }
 
     private String extractText(Message message) {
