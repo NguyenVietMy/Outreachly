@@ -39,16 +39,49 @@ The PRD assumes **Qdrant generates BM25 sparse vectors server-side** (documented
 If (2) is false, stop and re-plan issue 02 — the fallback is Java writing dense-only while a small
 Python reindex path writes sparse, which changes the ownership table in PRD §5.
 
+### Result — confirmed, no fallback needed
+
+1. Cluster reports `{"version":"1.18.3"}` — well past 1.15.2.
+2. The Java client exposes server-side inference directly: `VectorFactory.vector(Points.Document)`
+   for writes and `QueryFactory.nearest(Points.Document)` for reads, both present in
+   `io.qdrant:client:1.18.3`. `QdrantConnectivityTest` upserts a point whose `bm25` vector is a
+   `Document` (text + `qdrant/bm25`, no client-side encoder) and retrieves it by a BM25 text query
+   with a positive score. **No BM25 encoder is needed in Java.**
+
+Collection state read back from the cluster after bootstrap:
+
+```
+dense:           {"dense": {"size": 1536, "distance": "Cosine"}}
+sparse:          {"bm25": {"modifier": "idf"}}
+payload_indexes: {"user_id": {"data_type": "integer"}, "source_type": {"data_type": "keyword"}}
+```
+
 ## Acceptance criteria
 
-- [ ] Server-side BM25 confirmed available to the Java client, or fallback documented
-- [ ] Collection exists with both named vectors and both payload indexes
-- [ ] A throwaway integration test upserts one point with text + dense vector and retrieves it by
+- [x] Server-side BM25 confirmed available to the Java client, or fallback documented
+- [x] Collection exists with both named vectors and both payload indexes
+- [x] A throwaway integration test upserts one point with text + dense vector and retrieves it by
       both a dense query and a BM25 query
-- [ ] No credentials committed; `git status` clean of `.env.*`
+- [x] No credentials committed; `git status` clean of `.env.*`
 
 ## Verify
 
 ```bash
-cd api && ./mvnw test -Dtest=QdrantConnectivityTest
+cd api && ./mvnw test -Pqdrant     # requires QDRANT_URL + QDRANT_API_KEY in the environment
 ```
+
+The test is tagged `qdrant` and excluded from `mvn test`, matching how the `evals` and `langfuse`
+network-dependent suites are already gated — so `-Dtest=QdrantConnectivityTest` alone would filter
+it out.
+
+## Notes
+
+- `qdrant.enabled` defaults to **false**. Both `QdrantConfig` and `QdrantSchemaInitializer` are gated
+  on it, so the app boots unchanged where QDRANT_URL is absent (CI, local runs). Issue 02 turns it on.
+- `QDRANT_URL` is the REST URL Qdrant Cloud hands out and carries no port; the client is gRPC, so
+  `QdrantConfig` substitutes 6334.
+- Terraform declares the `QDRANT_URL` / `QDRANT_API_KEY` secrets (plus `ANTHROPIC_API_KEY` and the
+  two `LANGFUSE_*` keys, which were missing). Values are carried in the gitignored
+  `infra/environments/dev/secrets.json` and pushed by `spinup.ps1`, which runs `terraform apply`
+  and then `put-secret-value` for every entry — so no manual AWS step is needed. All 22 entries in
+  `secrets.json` now match the 22 secrets declared in `main.tf` one-for-one.

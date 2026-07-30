@@ -105,9 +105,9 @@ the `claude-api` skill) is primed to flag `import openai` as a provider mixup. I
 in issue 05.
 
 **Qdrant generates BM25 sparse vectors server-side** (since 1.15.2, all clients). This is what makes
-hybrid retrieval survive the migration without a BM25 encoder in Java. **Issue 01 verifies this for
-the Java client specifically before anything depends on it** — the whole plan pivots on it, and the
-fallback is written down there.
+hybrid retrieval survive the migration without a BM25 encoder in Java. **Confirmed in issue 01** on
+the real cluster (1.18.3) via the Java client: `VectorFactory.vector(Points.Document)` to write and
+`QueryFactory.nearest(Points.Document)` to read. The fallback written down in issue 01 is not needed.
 
 **Two retrieval constants must be carried over exactly.** `RRF_K = 60` (matches Qdrant's built-in
 RRF) and `MIN_RRF_THRESHOLD = 0.008`. Qdrant has **no equivalent** of the threshold — it must be
