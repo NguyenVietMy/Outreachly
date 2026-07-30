@@ -15,7 +15,7 @@ import com.pulse.pulse.personal.infrastructure.persistence.DailySuggestionReposi
 import com.pulse.pulse.personal.infrastructure.persistence.RoadmapItemRepository;
 import com.pulse.pulse.personal.infrastructure.persistence.UserGoalRepository;
 import com.pulse.pulse.personal.infrastructure.persistence.UserProfileRepository;
-import com.pulse.pulse.platform.ai.OpenAiService;
+import com.pulse.pulse.platform.ai.AnthropicService;
 import com.pulse.pulse.platform.observability.PulseObservability;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.observation.Observation;
@@ -40,7 +40,7 @@ public class DailySuggestionService {
     private final UserProfileRepository profileRepo;
     private final UserGoalRepository goalRepo;
     private final DashboardService dashboardService;
-    private final OpenAiService openAiService;
+    private final AnthropicService anthropicService;
     private final ObjectMapper objectMapper;
     private final PulseObservability observability;
     private final IntegrationService integrationService;
@@ -54,7 +54,7 @@ public class DailySuggestionService {
                                   UserProfileRepository profileRepo,
                                   UserGoalRepository goalRepo,
                                   DashboardService dashboardService,
-                                  OpenAiService openAiService,
+                                  AnthropicService anthropicService,
                                   ObjectMapper objectMapper,
                                   PulseObservability observability,
                                   IntegrationService integrationService,
@@ -64,7 +64,7 @@ public class DailySuggestionService {
         this.profileRepo = profileRepo;
         this.goalRepo = goalRepo;
         this.dashboardService = dashboardService;
-        this.openAiService = openAiService;
+        this.anthropicService = anthropicService;
         this.objectMapper = objectMapper;
         this.observability = observability;
         this.integrationService = integrationService;
@@ -168,7 +168,7 @@ public class DailySuggestionService {
         String result = "error";
 
         try {
-            String response = openAiService.generateDailySuggestions(context).block();
+            String response = anthropicService.generateDailySuggestions(context).block();
             if (response == null) {
                 throw new RuntimeException("Failed to generate daily suggestions");
             }

@@ -1,81 +1,94 @@
 package com.pulse.pulse.platform.ai;
 
+import com.anthropic.client.AnthropicClient;
+import com.anthropic.models.messages.ContentBlock;
+import com.anthropic.models.messages.Message;
+import com.anthropic.models.messages.MessageCreateParams;
+import com.anthropic.models.messages.TextBlock;
 import com.pulse.pulse.platform.observability.PulseObservability;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.tck.TestObservationRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.reactive.function.client.ClientResponse;
-import org.springframework.web.reactive.function.client.ExchangeFunction;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.StreamSupport;
 
 import static io.micrometer.observation.tck.TestObservationRegistryAssert.assertThat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-class OpenAiServiceTest {
+class AnthropicServiceTest {
 
     private SimpleMeterRegistry meterRegistry;
     private TestObservationRegistry observationRegistry;
+    private AnthropicClient client;
 
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
         observationRegistry = TestObservationRegistry.create();
+        client = mock(AnthropicClient.class, RETURNS_DEEP_STUBS);
     }
 
     @Test
     void generateDigestRecordsSuccessMetricsAndObservation() {
-        OpenAiService service = new OpenAiService(
-                WebClient.builder().exchangeFunction(successExchange("{\"choices\":[{\"message\":{\"content\":\"done\"}}]}")),
-                "test-key",
+        Message message = messageWithText("done");
+        when(client.messages().create(any(MessageCreateParams.class))).thenReturn(message);
+
+        AnthropicService service = new AnthropicService(
+                client,
                 new PulseObservability(observationRegistry, meterRegistry)
         );
 
         String response = service.generateDigest("abc").block();
 
         assertEquals("done", response);
-        assertEquals(1.0, meterRegistry.get("pulse.openai.calls")
+        assertEquals(1.0, meterRegistry.get("pulse.ai.calls")
                 .tag("operation", "digest")
-                .tag("model", "gpt-3.5-turbo")
+                .tag("model", "claude-haiku-4-5")
                 .tag("result", "success")
                 .counter()
                 .count());
-        assertEquals(1L, meterRegistry.get("pulse.openai.call.duration").timer().count());
-        assertThat(observationRegistry).hasObservationWithNameEqualTo("pulse.openai.chat");
+        assertEquals(1L, meterRegistry.get("pulse.ai.call.duration").timer().count());
+        assertThat(observationRegistry).hasObservationWithNameEqualTo("pulse.ai.chat");
         assertThat(observationValues()).doesNotContain("abc", "done");
     }
 
     @Test
     void generateDigestRecordsErrorMetricsWhenCallFails() {
-        OpenAiService service = new OpenAiService(
-                WebClient.builder().exchangeFunction(request -> Mono.error(new RuntimeException("boom"))),
-                "test-key",
+        when(client.messages().create(any(MessageCreateParams.class))).thenThrow(new RuntimeException("boom"));
+
+        AnthropicService service = new AnthropicService(
+                client,
                 new PulseObservability(observationRegistry, meterRegistry)
         );
 
         assertThrows(RuntimeException.class, () -> service.generateDigest("abc").block());
 
-        assertEquals(1.0, meterRegistry.get("pulse.openai.calls")
+        assertEquals(1.0, meterRegistry.get("pulse.ai.calls")
                 .tag("operation", "digest")
-                .tag("model", "gpt-3.5-turbo")
+                .tag("model", "claude-haiku-4-5")
                 .tag("result", "error")
                 .counter()
                 .count());
     }
 
-    private ExchangeFunction successExchange(String body) {
-        return request -> Mono.just(ClientResponse.create(HttpStatus.OK)
-                .header("Content-Type", "application/json")
-                .body(body)
-                .build());
+    private Message messageWithText(String text) {
+        TextBlock textBlock = mock(TextBlock.class);
+        when(textBlock.text()).thenReturn(text);
+        ContentBlock block = mock(ContentBlock.class);
+        when(block.text()).thenReturn(Optional.of(textBlock));
+        Message message = mock(Message.class);
+        when(message.content()).thenReturn(List.of(block));
+        return message;
     }
 
     private List<String> observationValues() {

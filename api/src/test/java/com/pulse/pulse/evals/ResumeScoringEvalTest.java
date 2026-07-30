@@ -1,9 +1,11 @@
 package com.pulse.pulse.evals;
 
+import com.anthropic.client.AnthropicClient;
+import com.anthropic.client.okhttp.AnthropicOkHttpClient;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.pulse.pulse.platform.ai.OpenAiService;
+import com.pulse.pulse.platform.ai.AnthropicService;
 import com.pulse.pulse.platform.observability.PulseObservability;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.tck.TestObservationRegistry;
@@ -13,9 +15,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.InputStream;
 import java.nio.file.*;
@@ -28,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Tag("evals")
 class ResumeScoringEvalTest {
 
-    private static OpenAiService openAiService;
+    private static AnthropicService anthropicService;
     private static ObjectMapper objectMapper;
 
     private static final Map<String, Boolean> results = new ConcurrentHashMap<>();
@@ -36,21 +35,20 @@ class ResumeScoringEvalTest {
 
     @BeforeAll
     static void setUp() {
-        String apiKey = System.getenv("OPENAI_API_KEY");
+        String apiKey = System.getenv("ANTHROPIC_API_KEY");
         if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException("OPENAI_API_KEY environment variable is required for eval tests");
+            throw new IllegalStateException("ANTHROPIC_API_KEY environment variable is required for eval tests");
         }
 
-        WebClient.Builder builder = WebClient.builder()
-                .baseUrl("https://api.openai.com/v1")
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
-                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+        AnthropicClient client = AnthropicOkHttpClient.builder()
+                .apiKey(apiKey)
+                .build();
 
         SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
         TestObservationRegistry observationRegistry = TestObservationRegistry.create();
         PulseObservability observability = new PulseObservability(observationRegistry, meterRegistry);
 
-        openAiService = new OpenAiService(builder, apiKey, observability);
+        anthropicService = new AnthropicService(client, observability);
         objectMapper = new ObjectMapper();
     }
 
@@ -59,7 +57,7 @@ class ResumeScoringEvalTest {
     void scoredResumeIsGroundedAndWithinExpectedRange(String fixtureId, ResumeFixture fixture) throws Exception {
         System.out.printf("[EVAL] Starting %s...%n", fixtureId);
         long start = System.currentTimeMillis();
-        String raw = openAiService.scoreResume(fixture.resumeText()).block();
+        String raw = anthropicService.scoreResume(fixture.resumeText()).block();
         Map<String, Object> breakdown = objectMapper.readValue(raw, new TypeReference<>() {});
 
         int totalScore = ((Number) breakdown.get("total_score")).intValue();
@@ -167,7 +165,7 @@ class ResumeScoringEvalTest {
         prompt.append("]\n\n");
         prompt.append("Return: [{\"field\": \"...\", \"verdict\": \"GROUNDED|HALLUCINATED\", \"reason\": \"one sentence\"}]");
 
-        String response = openAiService.judgeGroundedness(prompt.toString()).block();
+        String response = anthropicService.judgeGroundedness(prompt.toString()).block();
         if (response == null) return List.of("Judge returned null response");
 
         List<Map<String, String>> verdicts;

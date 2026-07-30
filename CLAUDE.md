@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+IMPORTANT: Always read `PLAN.md` at the start of a session. It tracks the active evals/cost-observability workstream — current phase, locked-in decisions, and task status. Update its checkboxes as work lands.
+
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
 Tradeoff: These guidelines bias toward caution over speed. For trivial tasks, use judgment.
@@ -116,7 +118,7 @@ All Java code under `com.pulse.pulse`:
   - `DashboardService` — Aggregates integration activity metrics, trends, and AI digest generation
   - `IntegrationService` — Manages user integrations (GitHub, Obsidian, Slack, Linear) with OAuth and API key flows
   - `IntegrationSyncScheduler` — Background auto-sync for connected integrations
-  - `OpenAiService` — WebFlux client to OpenAI for digest, personal insights, resume scoring, and task generation
+  - `AnthropicService` — Anthropic Java SDK client (Claude Sonnet 5 for resume scoring + eval judge, Haiku 4.5 for digest, insights, chat, and task generation); `EmbeddingService` remains on OpenAI (`text-embedding-3-small`) for pgvector embeddings
   - `PersonalService` — SWE profile, goals, resume scoring, and AI-driven study tasks
   - `ResumeService` — PDF parsing and resume text extraction
 - `service/integration/` — Per-provider sync implementations:

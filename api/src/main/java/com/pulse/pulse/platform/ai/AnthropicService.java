@@ -1,63 +1,57 @@
 package com.pulse.pulse.platform.ai;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.anthropic.client.AnthropicClient;
+import com.anthropic.models.messages.Message;
+import com.anthropic.models.messages.MessageCreateParams;
+import com.anthropic.models.messages.MessageParam;
+import com.anthropic.models.messages.TextBlock;
 import com.pulse.pulse.platform.observability.PulseObservability;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.observation.Observation;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import com.pulse.pulse.platform.util.HashUtil;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
-public class OpenAiService {
+public class AnthropicService {
 
-    private final WebClient webClient;
+    private static final String SCORING_MODEL = "claude-sonnet-5";
+    private static final String JUDGE_MODEL = "claude-sonnet-5";
+    private static final String FAST_MODEL = "claude-haiku-4-5";
+
+    private final AnthropicClient client;
     private final PulseObservability observability;
 
-    public OpenAiService(WebClient.Builder webClientBuilder,
-                         @Value("${OPENAI_API_KEY}") String apiKey,
-                         PulseObservability observability) {
-        this.webClient = webClientBuilder
-                .baseUrl("https://api.openai.com/v1")
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
-                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                .build();
+    public AnthropicService(AnthropicClient client, PulseObservability observability) {
+        this.client = client;
         this.observability = observability;
     }
 
     public Mono<String> generateDigest(String activityContext) {
-        String model = "gpt-3.5-turbo";
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", model);
-        requestBody.put("messages", new Object[]{
-                Map.of("role", "system", "content",
-                        "You are a personal productivity assistant for a CS student. " +
-                                "Write a 2-3 sentence plain-text daily digest summarizing the developer's recent activity. " +
-                                "Be concise, direct, and highlight the most significant work. " +
-                                "Start with the most impactful thing they did. " +
-                                "Do not use bullet points or markdown."),
-                Map.of("role", "user", "content", activityContext)
-        });
-        requestBody.put("max_tokens", 200);
-        requestBody.put("temperature", 0.6);
+        MessageCreateParams params = MessageCreateParams.builder()
+                .model(FAST_MODEL)
+                .maxTokens(200L)
+                .temperature(0.6)
+                .system("You are a personal productivity assistant for a CS student. " +
+                        "Write a 2-3 sentence plain-text daily digest summarizing the developer's recent activity. " +
+                        "Be concise, direct, and highlight the most significant work. " +
+                        "Start with the most impactful thing they did. " +
+                        "Do not use bullet points or markdown.")
+                .addUserMessage(activityContext)
+                .build();
 
-        return executeChatCompletion("digest", model, activityContext.length(), requestBody, "OpenAI digest error");
+        return executeMessage("digest", FAST_MODEL, activityContext.length(), params, "Anthropic digest error");
     }
 
     public Mono<String> generatePersonalInsights(String contextPrompt) {
-        String model = "gpt-4o-mini";
         String systemPrompt = "You are a personal CS career and study coach. " +
                 "Based on the student's profile, knowledge levels, goals, recent activity, and career roadmap, " +
                 "provide 3-5 actionable insights. Identify knowledge gaps, suggest focus areas, " +
@@ -66,38 +60,35 @@ public class OpenAiService {
                 "Reference the student's career roadmap if provided. Tie insights to upcoming deadlines and current focus area. " +
                 "Format as a numbered list. Keep each item to 1-2 sentences.";
 
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", model);
-        requestBody.put("messages", new Object[]{
-                Map.of("role", "system", "content", systemPrompt),
-                Map.of("role", "user", "content", contextPrompt)
-        });
-        requestBody.put("max_tokens", 700);
-        requestBody.put("temperature", 0.5);
+        MessageCreateParams params = MessageCreateParams.builder()
+                .model(FAST_MODEL)
+                .maxTokens(700L)
+                .temperature(0.5)
+                .system(systemPrompt)
+                .addUserMessage(contextPrompt)
+                .build();
 
-        return executeChatCompletion("insights", model, contextPrompt.length(), requestBody,
-                "OpenAI personal insights error");
+        return executeMessage("insights", FAST_MODEL, contextPrompt.length(), params,
+                "Anthropic personal insights error");
     }
 
     public Mono<String> scoreResume(String resumeText) {
-        String model = "gpt-5.2";
         String systemPrompt = RESUME_SCORING_SYSTEM_PROMPT + "\n\n" + RESUME_SCORING_RUBRIC;
 
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", model);
-        requestBody.put("messages", new Object[]{
-                Map.of("role", "system", "content", systemPrompt),
-                Map.of("role", "user", "content", resumeText)
-        });
-        requestBody.put("max_completion_tokens", 4000);
-        requestBody.put("reasoning_effort", "low");
+        // No temperature: Sonnet 5 rejects non-default sampling params. Adaptive thinking
+        // runs by default and counts against maxTokens, hence the headroom.
+        MessageCreateParams params = MessageCreateParams.builder()
+                .model(SCORING_MODEL)
+                .maxTokens(8000L)
+                .system(systemPrompt)
+                .addUserMessage(resumeText)
+                .build();
 
-        return executeChatCompletion("resume_score", model, resumeText.length(), requestBody,
-                "OpenAI resume scoring error");
+        return executeMessage("resume_score", SCORING_MODEL, resumeText.length(), params,
+                "Anthropic resume scoring error");
     }
 
     public Mono<String> generateDailySuggestions(String contextPrompt) {
-        String model = "gpt-4o-mini";
         String systemPrompt = "You are a daily work planning assistant for a CS student targeting software engineering roles. " +
                 "Based on the student's profile, projects, study plan, career roadmap, goals, and recent activity, " +
                 "generate EXACTLY 6-8 tasks structured as follows:\n\n" +
@@ -129,21 +120,19 @@ public class OpenAiService {
                 "- \"roadmapItemId\": the UUID from the context (roadmapItemId: ...) if this career task relates to a roadmap item, otherwise null\n\n" +
                 "Return ONLY the JSON array, no markdown fences.";
 
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", model);
-        requestBody.put("messages", new Object[]{
-                Map.of("role", "system", "content", systemPrompt),
-                Map.of("role", "user", "content", contextPrompt)
-        });
-        requestBody.put("max_tokens", 1500);
-        requestBody.put("temperature", 0.5);
+        MessageCreateParams params = MessageCreateParams.builder()
+                .model(FAST_MODEL)
+                .maxTokens(1500L)
+                .temperature(0.5)
+                .system(systemPrompt)
+                .addUserMessage(contextPrompt)
+                .build();
 
-        return executeChatCompletion("daily_suggestions", model, contextPrompt.length(), requestBody,
-                "OpenAI daily suggestions error");
+        return executeMessage("daily_suggestions", FAST_MODEL, contextPrompt.length(), params,
+                "Anthropic daily suggestions error");
     }
 
     public Mono<String> generateSectionTasks(String sectionContext) {
-        String model = "gpt-4o-mini";
         String systemPrompt = "You are a CS study coach. Given a student's assessment results for a specific section, " +
                 "generate a checklist of concrete topics and skills to learn or master. " +
                 "Focus on weak areas (tier 0-2). For strong areas (tier 3-4), suggest advanced practice only.\n\n" +
@@ -155,21 +144,19 @@ public class OpenAiService {
                 "If the student scored tier 3-4 on everything, return 1-2 stretch tasks.\n" +
                 "Return ONLY the JSON array, no markdown fences.";
 
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", model);
-        requestBody.put("messages", new Object[]{
-                Map.of("role", "system", "content", systemPrompt),
-                Map.of("role", "user", "content", sectionContext)
-        });
-        requestBody.put("max_tokens", 800);
-        requestBody.put("temperature", 0.4);
+        MessageCreateParams params = MessageCreateParams.builder()
+                .model(FAST_MODEL)
+                .maxTokens(800L)
+                .temperature(0.4)
+                .system(systemPrompt)
+                .addUserMessage(sectionContext)
+                .build();
 
-        return executeChatCompletion("section_tasks", model, sectionContext.length(), requestBody,
-                "OpenAI section tasks error");
+        return executeMessage("section_tasks", FAST_MODEL, sectionContext.length(), params,
+                "Anthropic section tasks error");
     }
 
     public Mono<String> generateRoadmap(String contextPrompt) {
-        String model = "gpt-4o-mini";
         String systemPrompt = "You are a CS career strategy advisor for a student targeting software engineering roles. " +
                 "Based on their profile (target role, graduation year, axis scores, goals, resume, LeetCode stats, " +
                 "and the current date), generate a personalized career roadmap with 4-6 focus items.\n\n" +
@@ -188,66 +175,75 @@ public class OpenAiService {
                 "- \"rationale\": one sentence explaining why this is prioritized for this student\n\n" +
                 "Order items by urgency (nearest deadline first). Return ONLY the JSON array, no markdown fences.";
 
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", model);
-        requestBody.put("messages", new Object[]{
-                Map.of("role", "system", "content", systemPrompt),
-                Map.of("role", "user", "content", contextPrompt)
-        });
-        requestBody.put("max_tokens", 1500);
-        requestBody.put("temperature", 0.4);
+        MessageCreateParams params = MessageCreateParams.builder()
+                .model(FAST_MODEL)
+                .maxTokens(1500L)
+                .temperature(0.4)
+                .system(systemPrompt)
+                .addUserMessage(contextPrompt)
+                .build();
 
-        return executeChatCompletion("roadmap_generate", model, contextPrompt.length(), requestBody,
-                "OpenAI roadmap generation error");
+        return executeMessage("roadmap_generate", FAST_MODEL, contextPrompt.length(), params,
+                "Anthropic roadmap generation error");
     }
 
     public Mono<String> updateMemory(String currentMemory, String fullContext) {
-        String model = "gpt-4o-mini";
         String systemPrompt = "You are a memory manager for a CS student career platform called Pulse. " +
                 "You maintain a markdown profile about the student that evolves as they progress.\n\n" +
                 "You receive the current memory and the student's full data context (stats, resume, goals, activity, etc.) " +
                 "along with the specific event that triggered this update.\n\n" +
                 "Rules:\n" +
-                "- Rewrite the profile using ALL provided data â€” scores, resume details, projects, goals, activity\n" +
+                "- Rewrite the profile using ALL provided data — scores, resume details, projects, goals, activity\n" +
                 "- Use the student's real name if provided\n" +
                 "- Extract concrete details from the resume: project names, technologies, job titles, companies\n" +
                 "- Include specific numbers: LeetCode counts, axis scores, resume score\n" +
-                "- NEVER use bracket placeholders like [Student Name] or [Project Name] â€” if data is unknown, omit it entirely\n" +
+                "- NEVER use bracket placeholders like [Student Name] or [Project Name] — if data is unknown, omit it entirely\n" +
                 "- Use markdown: # for title, ## for sections, bullet points for lists\n" +
                 "- Write in third person about the student\n" +
-                "- Keep it concise â€” under 500 words total\n\n" +
+                "- Keep it concise — under 500 words total\n\n" +
                 "Return ONLY the updated markdown profile, no preamble or code fences.";
 
         String userPrompt = "=== CURRENT MEMORY ===\n" + currentMemory +
                 "\n\n=== FULL CONTEXT ===\n" + fullContext;
 
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", model);
-        requestBody.put("messages", new Object[]{
-                Map.of("role", "system", "content", systemPrompt),
-                Map.of("role", "user", "content", userPrompt)
-        });
-        requestBody.put("max_tokens", 1000);
-        requestBody.put("temperature", 0.3);
+        MessageCreateParams params = MessageCreateParams.builder()
+                .model(FAST_MODEL)
+                .maxTokens(1000L)
+                .temperature(0.3)
+                .system(systemPrompt)
+                .addUserMessage(userPrompt)
+                .build();
 
-        return executeChatCompletion("memory_update", model, userPrompt.length(), requestBody,
-                "OpenAI memory update error");
+        return executeMessage("memory_update", FAST_MODEL, userPrompt.length(), params,
+                "Anthropic memory update error");
     }
 
     public Mono<String> generateChat(List<Map<String, String>> messages) {
-        String model = "gpt-4o-mini";
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", model);
-        requestBody.put("messages", messages.toArray());
-        requestBody.put("max_tokens", 800);
-        requestBody.put("temperature", 0.4);
+        MessageCreateParams.Builder builder = MessageCreateParams.builder()
+                .model(FAST_MODEL)
+                .maxTokens(800L)
+                .temperature(0.4);
+
+        for (Map<String, String> message : messages) {
+            String role = message.getOrDefault("role", "user");
+            String content = message.getOrDefault("content", "");
+            if ("system".equals(role)) {
+                builder.system(content);
+            } else if ("assistant".equals(role)) {
+                builder.addMessage(MessageParam.builder()
+                        .role(MessageParam.Role.ASSISTANT)
+                        .content(content)
+                        .build());
+            } else {
+                builder.addUserMessage(content);
+            }
+        }
 
         int totalChars = messages.stream().mapToInt(m -> m.getOrDefault("content", "").length()).sum();
-        return executeChatCompletion("chat", model, totalChars, requestBody, "OpenAI chat error");
+        return executeMessage("chat", FAST_MODEL, totalChars, builder.build(), "Anthropic chat error");
     }
 
     public Mono<String> generateEventTasks(String eventContext) {
-        String model = "gpt-4o-mini";
         String systemPrompt = "You are a CS career coach. Based on a student event (resume upload, LeetCode progress), " +
                 "generate actionable study/improvement tasks.\n\n" +
                 "Return ONLY a JSON array of objects, each with:\n" +
@@ -257,26 +253,44 @@ public class OpenAiService {
                 "Generate 2-5 tasks. Be specific to the student's data. " +
                 "Return ONLY the JSON array, no markdown fences.";
 
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", model);
-        requestBody.put("messages", new Object[]{
-                Map.of("role", "system", "content", systemPrompt),
-                Map.of("role", "user", "content", eventContext)
-        });
-        requestBody.put("max_tokens", 600);
-        requestBody.put("temperature", 0.4);
+        MessageCreateParams params = MessageCreateParams.builder()
+                .model(FAST_MODEL)
+                .maxTokens(600L)
+                .temperature(0.4)
+                .system(systemPrompt)
+                .addUserMessage(eventContext)
+                .build();
 
-        return executeChatCompletion("event_tasks", model, eventContext.length(), requestBody,
-                "OpenAI event tasks error");
+        return executeMessage("event_tasks", FAST_MODEL, eventContext.length(), params,
+                "Anthropic event tasks error");
     }
 
-    private Mono<String> executeChatCompletion(String operation,
-                                               String model,
-                                               int promptCharCount,
-                                               Map<String, Object> requestBody,
-                                               String errorLogMessage) {
+    public Mono<String> judgeGroundedness(String judgePrompt) {
+        MessageCreateParams params = MessageCreateParams.builder()
+                .model(JUDGE_MODEL)
+                .maxTokens(4000L)
+                .system("You are an evaluation judge. Determine whether each rationale in a resume scoring " +
+                        "response is grounded — meaning it references information that actually appears in " +
+                        "the resume text provided.\n\n" +
+                        "A rationale is GROUNDED if it quotes or paraphrases text from the resume, " +
+                        "or states \"No evidence found\" when the resume has no relevant content.\n\n" +
+                        "A rationale is HALLUCINATED if it references technologies, companies, or outcomes " +
+                        "not present in the resume, or implies the resume demonstrates something it does not.\n\n" +
+                        "Return ONLY a JSON array. No preamble.")
+                .addUserMessage(judgePrompt)
+                .build();
+
+        return executeMessage("eval_judge", JUDGE_MODEL, judgePrompt.length(), params,
+                "Anthropic judge error");
+    }
+
+    private Mono<String> executeMessage(String operation,
+                                        String model,
+                                        int promptCharCount,
+                                        MessageCreateParams params,
+                                        String errorLogMessage) {
         return Mono.defer(() -> {
-            Observation observation = observability.start("pulse.openai.chat");
+            Observation observation = observability.start("pulse.ai.chat");
             Timer.Sample sample = observability.timerSample();
             AtomicReference<String> result = new AtomicReference<>("unknown");
 
@@ -286,12 +300,8 @@ public class OpenAiService {
 
             return Mono.using(
                     observation::openScope,
-                    scope -> webClient.post()
-                            .uri("/chat/completions")
-                            .bodyValue(requestBody)
-                            .retrieve()
-                            .bodyToMono(JsonNode.class)
-                            .map(this::extractMessageContent)
+                    scope -> Mono.fromCallable(() -> client.messages().create(params))
+                            .map(this::extractText)
                             .doOnNext(content -> {
                                 result.set("success");
                                 observability.high(observation, "response.char_count", content.length());
@@ -303,12 +313,12 @@ public class OpenAiService {
                             })
                             .doFinally(signal -> {
                                 observability.low(observation, "result", result.get());
-                                observability.counter("pulse.openai.calls",
+                                observability.counter("pulse.ai.calls",
                                                 "operation", operation,
                                                 "model", model,
                                                 "result", result.get())
                                         .increment();
-                                observability.stopTimer(sample, "pulse.openai.call.duration",
+                                observability.stopTimer(sample, "pulse.ai.call.duration",
                                         "operation", operation,
                                         "model", model,
                                         "result", result.get());
@@ -319,15 +329,15 @@ public class OpenAiService {
         });
     }
 
-    private String extractMessageContent(JsonNode response) {
-        JsonNode choices = response.get("choices");
-        if (choices != null && choices.isArray() && choices.size() > 0) {
-            JsonNode message = choices.get(0).get("message");
-            if (message != null) {
-                return message.get("content").asText();
-            }
+    private String extractText(Message message) {
+        String text = message.content().stream()
+                .flatMap(block -> block.text().stream())
+                .map(TextBlock::text)
+                .collect(Collectors.joining());
+        if (text.isBlank()) {
+            throw new RuntimeException("No text response from Anthropic");
         }
-        throw new RuntimeException("No response from OpenAI");
+        return text;
     }
 
     private static final String RESUME_SCORING_SYSTEM_PROMPT =
@@ -356,7 +366,7 @@ public class OpenAiService {
                     "| 6. Resume Quality & Parsability | 10 |\n" +
                     "| Total | 100 |\n\n" +
                     "Pass threshold: 60/100 to ADVANCE. 45-59 = HOLD. <45 = REJECT. 80+ = auto-priority.\n\n" +
-                    "## Section 1 â€” Technical Skills Match (25 pts)\n\n" +
+                    "## Section 1 — Technical Skills Match (25 pts)\n\n" +
                     "### Language & Framework Market Tiers\n" +
                     "Tier 1 (High demand): Python, Java, TypeScript/JavaScript, Go, C#\n" +
                     "Tier 2 (Solid demand): Kotlin, Rust, Ruby, C++, Scala, Swift (server-side)\n" +
@@ -389,7 +399,7 @@ public class OpenAiService {
                     "3: >=2 infra tools with light context.\n" +
                     "1: Infra tools in skills list only.\n" +
                     "0: No infrastructure evidence.\n\n" +
-                    "## Section 2 â€” Professional Experience (30 pts)\n\n" +
+                    "## Section 2 — Professional Experience (30 pts)\n\n" +
                     "### 2A. Years of Relevant Experience (10 pts)\n" +
                     "10: >=5 years. 7: 3-4 years. 4: 1-2 years. 2: <1 year but internships/projects. 0: No dateable experience.\n\n" +
                     "### 2B. Role Progression & Scope (10 pts)\n" +
@@ -402,21 +412,21 @@ public class OpenAiService {
                     "7: Engineering-adjacent with backend overlap.\n" +
                     "4: In tech but not engineering.\n" +
                     "0: Non-technical or >2 year gap.\n\n" +
-                    "## Section 3 â€” Impact & Quantification (15 pts)\n\n" +
+                    "## Section 3 — Impact & Quantification (15 pts)\n\n" +
                     "### 3A. Quantified Outcomes (10 pts)\n" +
                     "10: >=4 quantified outcome bullets. 7: 2-3. 4: 1. 0: Zero.\n\n" +
                     "### 3B. Scope of Impact (5 pts)\n" +
                     "5: Org/company-wide impact. 3: Team-level. 1: Task-level only. 0: No impact inferable.\n\n" +
-                    "## Section 4 â€” Education & Credentials (10 pts)\n\n" +
+                    "## Section 4 — Education & Credentials (10 pts)\n\n" +
                     "### 4A. Degree (6 pts)\n" +
                     "6: BS/BA+ in CS or related field. 4: Unrelated BS/BA + bootcamp/self-taught evidence. 2: Bootcamp only. 0: None mentioned.\n" +
                     "Override: if >=5 years experience, floor at 4.\n\n" +
                     "### 4B. Certifications (4 pts)\n" +
                     "4: >=1 industry-recognized cert. 2: MOOCs/non-proctored certs. 0: None.\n\n" +
-                    "## Section 5 â€” Project Complexity (10 pts)\n" +
+                    "## Section 5 — Project Complexity (10 pts)\n" +
                     "Indicators: distributed systems, scale (>10K RPS, >1TB, 99.9%+ SLA, >100K users), architectural ownership, hard problems, cross-system integration.\n" +
                     "10: >=4 indicators in one project. 7: 2-3. 4: 1. 2: Projects but no indicators. 0: No projects described.\n\n" +
-                    "## Section 6 â€” Resume Quality & Parsability (10 pts)\n\n" +
+                    "## Section 6 — Resume Quality & Parsability (10 pts)\n\n" +
                     "### 6A. Structural Parsability (5 pts)\n" +
                     "5: Clear sections, standard dates, bullet points. 3: Minor issues. 1: Major issues. 0: Unparsable.\n\n" +
                     "### 6B. Conciseness & Signal Density (5 pts)\n" +
@@ -447,33 +457,12 @@ public class OpenAiService {
                     "\"total_score\":0,\"max_score\":100," +
                     "\"decision\":\"ADVANCE|HOLD|REJECT\",\"flags\":[],\"summary\":\"\"}";
 
+    // Model is part of the hash so cached scores are invalidated when the scoring model
+    // changes, not only when the prompt text changes.
     private static final String RESUME_SCORING_PROMPT_HASH =
-            HashUtil.sha256(RESUME_SCORING_SYSTEM_PROMPT + "\n\n" + RESUME_SCORING_RUBRIC);
+            HashUtil.sha256(SCORING_MODEL + "\n" + RESUME_SCORING_SYSTEM_PROMPT + "\n\n" + RESUME_SCORING_RUBRIC);
 
     public String getResumeScoringPromptHash() {
         return RESUME_SCORING_PROMPT_HASH;
-    }
-
-    public Mono<String> judgeGroundedness(String judgePrompt) {
-        String model = "gpt-4o";
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", model);
-        requestBody.put("messages", new Object[]{
-                Map.of("role", "system", "content",
-                        "You are an evaluation judge. Determine whether each rationale in a resume scoring " +
-                                "response is grounded — meaning it references information that actually appears in " +
-                                "the resume text provided.\n\n" +
-                                "A rationale is GROUNDED if it quotes or paraphrases text from the resume, " +
-                                "or states \"No evidence found\" when the resume has no relevant content.\n\n" +
-                                "A rationale is HALLUCINATED if it references technologies, companies, or outcomes " +
-                                "not present in the resume, or implies the resume demonstrates something it does not.\n\n" +
-                                "Return ONLY a JSON array. No preamble."),
-                Map.of("role", "user", "content", judgePrompt)
-        });
-        requestBody.put("max_tokens", 2000);
-        requestBody.put("temperature", 0.0);
-
-        return executeChatCompletion("eval_judge", model, judgePrompt.length(), requestBody,
-                "OpenAI judge error");
     }
 }

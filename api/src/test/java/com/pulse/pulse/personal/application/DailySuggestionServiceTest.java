@@ -10,7 +10,7 @@ import com.pulse.pulse.personal.infrastructure.persistence.DailySuggestionReposi
 import com.pulse.pulse.personal.infrastructure.persistence.RoadmapItemRepository;
 import com.pulse.pulse.personal.infrastructure.persistence.UserGoalRepository;
 import com.pulse.pulse.personal.infrastructure.persistence.UserProfileRepository;
-import com.pulse.pulse.platform.ai.OpenAiService;
+import com.pulse.pulse.platform.ai.AnthropicService;
 import com.pulse.pulse.platform.observability.PulseObservability;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.tck.TestObservationRegistry;
@@ -36,7 +36,7 @@ import static org.mockito.Mockito.when;
 class DailySuggestionServiceTest {
 
     private DailySuggestionRepository suggestionRepository;
-    private OpenAiService openAiService;
+    private AnthropicService anthropicService;
     private IntegrationService integrationService;
     private AiTaskRepository aiTaskRepo;
     private RoadmapItemRepository roadmapRepo;
@@ -47,7 +47,7 @@ class DailySuggestionServiceTest {
     @BeforeEach
     void setUp() {
         suggestionRepository = Mockito.mock(DailySuggestionRepository.class);
-        openAiService = Mockito.mock(OpenAiService.class);
+        anthropicService = Mockito.mock(AnthropicService.class);
         integrationService = Mockito.mock(IntegrationService.class);
         aiTaskRepo = Mockito.mock(AiTaskRepository.class);
         roadmapRepo = Mockito.mock(RoadmapItemRepository.class);
@@ -62,7 +62,7 @@ class DailySuggestionServiceTest {
                 Mockito.mock(UserProfileRepository.class),
                 Mockito.mock(UserGoalRepository.class),
                 Mockito.mock(DashboardService.class),
-                openAiService,
+                anthropicService,
                 new ObjectMapper(),
                 new PulseObservability(observationRegistry, meterRegistry),
                 integrationService,
@@ -96,7 +96,7 @@ class DailySuggestionServiceTest {
     void getSuggestionsForTodayGeneratesAndPersistsWhenCacheMisses() {
         when(suggestionRepository.findByUserIdAndSuggestionDate(eq(7L), any()))
                 .thenReturn(Optional.empty());
-        when(openAiService.generateDailySuggestions(any()))
+        when(anthropicService.generateDailySuggestions(any()))
                 .thenReturn(Mono.just("[{\"title\":\"Do thing\",\"priority\":0}]"));
         when(suggestionRepository.save(any(DailySuggestion.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -140,7 +140,7 @@ class DailySuggestionServiceTest {
         when(aiTaskRepo.findByUserIdOrderByAxisAscOrderIndexAsc(7L)).thenReturn(List.of(task1, task2));
 
         when(suggestionRepository.findByUserIdAndSuggestionDate(eq(7L), any())).thenReturn(Optional.empty());
-        when(openAiService.generateDailySuggestions(any()))
+        when(anthropicService.generateDailySuggestions(any()))
                 .thenReturn(Mono.just("[{\"title\":\"task\",\"priority\":0}]"));
         when(suggestionRepository.save(any(DailySuggestion.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -148,7 +148,7 @@ class DailySuggestionServiceTest {
         service.getSuggestionsForToday(7L);
 
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(openAiService).generateDailySuggestions(captor.capture());
+        verify(anthropicService).generateDailySuggestions(captor.capture());
         String context = captor.getValue();
 
         assertTrue(context.contains("=== STUDY PLAN (UNCOMPLETED TASKS) ==="));
@@ -163,7 +163,7 @@ class DailySuggestionServiceTest {
         when(integrationService.getObsidianVaultDiffs(7L)).thenReturn(sampleDiff);
 
         when(suggestionRepository.findByUserIdAndSuggestionDate(eq(7L), any())).thenReturn(Optional.empty());
-        when(openAiService.generateDailySuggestions(any()))
+        when(anthropicService.generateDailySuggestions(any()))
                 .thenReturn(Mono.just("[{\"title\":\"task\",\"priority\":0}]"));
         when(suggestionRepository.save(any(DailySuggestion.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -171,7 +171,7 @@ class DailySuggestionServiceTest {
         service.getSuggestionsForToday(7L);
 
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(openAiService).generateDailySuggestions(captor.capture());
+        verify(anthropicService).generateDailySuggestions(captor.capture());
         String context = captor.getValue();
 
         assertTrue(context.contains("=== OBSIDIAN DAILY NOTES (LAST 7 DAYS) ==="));
@@ -183,7 +183,7 @@ class DailySuggestionServiceTest {
         when(integrationService.getObsidianVaultDiffs(7L)).thenReturn(null);
 
         when(suggestionRepository.findByUserIdAndSuggestionDate(eq(7L), any())).thenReturn(Optional.empty());
-        when(openAiService.generateDailySuggestions(any()))
+        when(anthropicService.generateDailySuggestions(any()))
                 .thenReturn(Mono.just("[{\"title\":\"task\",\"priority\":0}]"));
         when(suggestionRepository.save(any(DailySuggestion.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -191,7 +191,7 @@ class DailySuggestionServiceTest {
         service.getSuggestionsForToday(7L);
 
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(openAiService).generateDailySuggestions(captor.capture());
+        verify(anthropicService).generateDailySuggestions(captor.capture());
 
         assertFalse(captor.getValue().contains("=== OBSIDIAN DAILY NOTES"));
     }
@@ -205,7 +205,7 @@ class DailySuggestionServiceTest {
         when(aiTaskRepo.findByUserIdOrderByAxisAscOrderIndexAsc(7L)).thenReturn(List.of(task1, task2));
 
         when(suggestionRepository.findByUserIdAndSuggestionDate(eq(7L), any())).thenReturn(Optional.empty());
-        when(openAiService.generateDailySuggestions(any()))
+        when(anthropicService.generateDailySuggestions(any()))
                 .thenReturn(Mono.just("[{\"title\":\"task\",\"priority\":0}]"));
         when(suggestionRepository.save(any(DailySuggestion.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -213,7 +213,7 @@ class DailySuggestionServiceTest {
         service.getSuggestionsForToday(7L);
 
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(openAiService).generateDailySuggestions(captor.capture());
+        verify(anthropicService).generateDailySuggestions(captor.capture());
         String context = captor.getValue();
 
         assertTrue(context.contains("(studyTaskId: " + taskId1 + ")"), "Should contain studyTaskId for task1");

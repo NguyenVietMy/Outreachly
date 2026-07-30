@@ -15,7 +15,7 @@ Four panels to start:
 - Request rate
 - Error rate
 - p95 latency
-- OpenAI call duration (`pulse.openai.call.duration`)
+- LLM call duration (`pulse.ai.call.duration` — renamed from `pulse.openai.call.duration` in the Anthropic switch)
 
 All this data is already being collected — just needs a dashboard to look at it.
 
