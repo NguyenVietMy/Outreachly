@@ -69,7 +69,14 @@
       "Bash(./mvnw test *)",
       "Bash(ffprobe *)",
       "PowerShell(Split-Path *)",
-      "Bash(awk -F: '{sum+=$2} END {print sum}')"
+      "Bash(awk -F: '{sum+=$2} END {print sum}')",
+      "Skill(claude-api)",
+      "PowerShell(Select-String *)",
+      "PowerShell(Select-String -Path 'C:\\\\Users\\\\VietM\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-VietM-OneDrive-Documents-VietMySpace-Pulse\\\\d0c5e28b-efc7-4a8c-b67b-794593cee5a3\\\\tasks\\\\bl0yibkmy.output' -Pattern 'ERROR|error:|BUILD|Tests run|cannot find|symbol' | Select-Object -First 50 | ForEach-Object { $_.Line.Trim\\(\\) })",
+      "PowerShell(Select-String -Path 'C:\\\\Users\\\\VietM\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-VietM-OneDrive-Documents-VietMySpace-Pulse\\\\d0c5e28b-efc7-4a8c-b67b-794593cee5a3\\\\tasks\\\\baex0txni.output' -Pattern 'ERROR|Tests run|Caused|at com.pulse' -Context 0,2 | Select-Object -First 30 | ForEach-Object { $_.Line.Trim\\(\\) })",
+      "PowerShell(Get-Content 'C:\\\\Users\\\\VietM\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-VietM-OneDrive-Documents-VietMySpace-Pulse\\\\d0c5e28b-efc7-4a8c-b67b-794593cee5a3\\\\tasks\\\\baex0txni.output' | Select-String -Pattern 'digest error' -Context 0,25 | Select-Object -First 1 | ForEach-Object { $_.Line; $_.Context.PostContext })",
+      "PowerShell(Select-String -Path 'C:\\\\Users\\\\VietM\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-VietM-OneDrive-Documents-VietMySpace-Pulse\\\\d0c5e28b-efc7-4a8c-b67b-794593cee5a3\\\\tasks\\\\bzaeuh78t.output' -Pattern 'Tests run: \\\\d+' | Select-Object -Last 3 | ForEach-Object { $_.Line.Trim\\(\\) })",
+      "PowerShell(Select-String -Path 'C:\\\\Users\\\\VietM\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-VietM-OneDrive-Documents-VietMySpace-Pulse\\\\d0c5e28b-efc7-4a8c-b67b-794593cee5a3\\\\tasks\\\\b7sdoy1yl.output' -Pattern '\\\\[EVAL\\\\]|EVAL SUMMARY|PASSED|FAILURES|Tests run|BUILD' | ForEach-Object { $_.Line.Trim\\(\\) })"
     ]
   }
 }
