@@ -94,13 +94,14 @@ what the eval harness's groundedness judge assumes.
 
 ## Acceptance criteria
 
-- [ ] Graph compiles; `.get_graph().draw_mermaid()` output committed to `agent/README.md`
-- [ ] A question answerable from one source terminates in **one** retrieval round
-- [ ] A question spanning resume + GitHub + notes triggers a **second** round via `reflect`
-- [ ] Iteration cap enforced (test with a deliberately unanswerable question)
-- [ ] Sources returned with real RRF scores; trajectory populated at every node
-- [ ] Grounding holds: a question with no supporting context yields "I don't have enough information"
-- [ ] `pytest` green including a graph-level test with mocked LLM + Qdrant
+- [x] Graph compiles; `.get_graph().draw_mermaid()` output committed to `agent/README.md`
+- [x] A question answerable from one source terminates in **one** retrieval round
+- [x] A question spanning resume + GitHub + notes triggers a **second** round via `reflect`
+      — see *What the loop actually fires on* below
+- [x] Iteration cap enforced (test with a deliberately unanswerable question)
+- [x] Sources returned with real RRF scores; trajectory populated at every node
+- [x] Grounding holds: a question with no supporting context yields "I don't have enough information"
+- [x] `pytest` green including a graph-level test with mocked LLM + Qdrant
 
 ## Verify
 
@@ -109,3 +110,38 @@ cd agent && uv run pytest tests/test_graph.py -v
 curl -X POST localhost:8001/chat -H "X-Internal-Token: dev" \
   -d '{"userId":1,"message":"How do my projects line up with my target role?","history":[]}'
 ```
+
+## Result
+
+`uv run pytest` — 16 passed. `uv run ruff check` — clean. Four real questions against user 5, with
+the Java API on :8081 and the live Qdrant cluster:
+
+| Question | Rounds | Trajectory |
+|---|---|---|
+| "What system design topics are on my study plan?" | 1 | plan → task 4 chunks / roadmap 1 chunk → reflect sufficient → answer |
+| "How do my projects line up with my target role?" | 1 | plan → github_readmes inline → github_readme 2 chunks → reflect sufficient → answer |
+| "What have I been studying in my notes lately, and how does that connect to the projects on my resume and GitHub?" | 1 | plan → resume + github inline → resume_section / github_readme / obsidian_diff → reflect sufficient → answer |
+| "Which of my goals am I furthest behind on, and is there anything in my study notes that explains why?" | **2** | plan → items inline, goal `no_results`, obsidian_diff 1 chunk → **reflect insufficient** → second search → reflect (cap) → answer |
+| "What was my manager's name at my last internship…" | **2** | plan → resume inline, resume_section 5 chunks → **reflect insufficient** → second search → reflect (cap) → answer: *"I don't have that information in your profile."* |
+
+### What the loop actually fires on
+
+Not "multi-source question" — **under-served** question. A question spanning resume + GitHub +
+notes terminates in one round when the planner picks all three up front, which is the outcome you
+want. The loop fires when the first round comes back thin: a source that returns nothing above the
+RRF floor, or material that does not contain what was asked. Both of those are in the table above,
+and `test_reflect_triggers_a_second_round` pins the behaviour deterministically.
+
+### Why `reflect` short-circuits at the cap
+
+The issue asks for both `iterations <= 2` and `<= 3` LLM calls. A second reflection could only ever
+route to `answer`, so once `iterations >= MAX_ITERATIONS` the node returns `sufficient=True` without
+calling the model. Worst case is therefore `plan` + one `reflect` + `answer` = 3, and the graph
+keeps the single conditional edge the issue's diagram specifies.
+
+### One prompt bug found by running it
+
+The first live run spent its second round hunting for the student's target role — which the answer
+node always has, because the profile header is unconditional. `reflect` was being shown only the
+retrieved chunks, not that header. Fixed in `_material`; covered by
+`test_reflect_sees_the_profile_header_and_the_chunks`.

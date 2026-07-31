@@ -3,9 +3,12 @@
 Start here to pick up work on `PRD-agentic.md` / `docs/issues/`. Written to be readable cold, by a
 fresh session or by you in three weeks.
 
-**Status as of 2026-07-31:** issues **01, 02, 03, 04, 09** landed. **V66 is applied** — the schema is
-at v66, `knowledge_chunks.embedding` is gone, and an authenticated chat turn was verified in the
-browser with sources still cited. The Qdrant track (A) is complete. Next up: 05/06 (unblocked).
+**Status as of 2026-07-31:** issues **01, 02, 03, 04, 05, 06, 07, 09** landed. **V66 is applied** —
+the schema is at v66, `knowledge_chunks.embedding` is gone, and an authenticated chat turn was
+verified in the browser with sources still cited. The Qdrant track (A) is complete, `agent/` runs a
+real LangGraph `StateGraph` end to end against live Qdrant + Anthropic, and the Java side serves
+`/internal/context/*`. Next up: **08** (`ChatService` → HTTP client) or **10** (Langfuse in Python);
+both of 07's dependents are now unblocked.
 
 ---
 
@@ -75,8 +78,7 @@ Paste something like:
 
 ## 2. Recommended order
 
-Issues **05**, **06**, **09** have no blockers. Do 05+06 first if you want momentum with zero
-regression risk to working code.
+Issue **06** has no blockers — greenfield, zero regression risk to working code.
 
 ```
 01 → 05 → 06 → 02 → 03 → 09 → 07 → 08 → 10 → 04 → 11
@@ -183,15 +185,73 @@ Residual, deliberately left: `PUBLIC` still holds `USAGE` on schema `public`, so
 `has_schema_privilege('anon','public','USAGE')` is still `t`. That is naming rights with no table
 privileges behind them; closing it means revoking from `PUBLIC`, which Supabase internals rely on.
 
-**`QDRANT_ENABLED` is now load-bearing, and prod does not set it.** It defaults to `false`
-(`application.properties:56`), and since issue 04 dropped the pgvector column there is no fallback —
-`HybridRetrievalService` refuses to retrieve and chat fails outright. `api/.env.local.properties`
-now sets it to `true` (added 2026-07-31, so a plain `./mvnw spring-boot:run` works). But
-`api/.env.prod.properties` carries **no `QDRANT_*` keys at all**. Before the issue-04 code reaches
-ECS, `QDRANT_ENABLED`, `QDRANT_URL`, and `QDRANT_API_KEY` must exist in AWS Secrets Manager, or prod
-chat breaks on deploy.
+**`QDRANT_ENABLED` is load-bearing — and ECS already sets it.** It defaults to `false`
+(`application.properties:56`), and since issue 04 dropped the pgvector column there is no fallback:
+`HybridRetrievalService` refuses to retrieve and chat fails outright. Deployment is already covered —
+issues 01/02 wired `QDRANT_ENABLED = "true"` into `extra_environment` and `QDRANT_URL` /
+`QDRANT_API_KEY` into `secret_arns` in `infra/environments/dev/main.tf`, all committed. **Do not
+read `api/.env.prod.properties` as the prod contract**; it carries no `QDRANT_*` keys, but ECS does
+not use it — Terraform and Secrets Manager define the task environment. `api/.env.local.properties`
+sets `QDRANT_ENABLED=true` (added 2026-07-31) so a plain `./mvnw spring-boot:run` works.
 
-**There is no `docker-compose.yml` yet.** Only `api/Dockerfile`. Issue 05 creates compose.
+**`docker-compose.yml` exists at the repo root** (issue 05) with two services, `api` (:8080) and
+`agent` (:8001). Qdrant is Qdrant Cloud, not a compose service. Both services read **gitignored** env
+files — `api/.env.local.properties` and `agent/.env` — so compose fails outright on a fresh clone
+until those exist. `agent/.env.example` lists what the agent needs; the four shared values are
+copied from the api file.
+
+**The `agent/` service is Python 3.12 + uv.** `uv sync` in `agent/`, `uv run pytest`, `uv run ruff
+check`. `uv.lock` is committed and the Dockerfile builds `--frozen`, so a dependency change means
+re-running `uv lock` or the image build fails. Two things about it a cold start will get wrong:
+
+- **`/health` is deliberately unauthenticated** — only `/chat` takes `X-Internal-Token`. Container
+  `HEALTHCHECK` and the issue-11 ALB target group cannot send headers. Do not "fix" this by moving
+  the dependency to global middleware.
+- **`INTERNAL_TOKEN` has no default** and `Settings` fails at import without it, so the agent will
+  not boot until it is set. This is intentional (fail closed on a shared secret), not a bug. The
+  Java side of that secret landed in issue 06.
+
+**The `/internal/**` API has its own security chain, and `INTERNAL_TOKEN` now exists on both sides.**
+`InternalApiSecurityConfig` registers a second `SecurityFilterChain` at `@Order(1)` matching
+`/internal/**` — stateless, anonymous disabled, `InternalTokenFilter` in front. It fails closed: a
+blank `pulse.internal.token` rejects everything, so a deployment that forgets the secret serves 401s
+rather than resume text. Three consequences a cold start should know:
+
+- **The 401 comes from the filter, not from authorization**, so `/internal` never redirects to
+  Google the way `/api` does. If you see a 302 there, you are talking to an old process.
+- **`INTERNAL_TOKEN=dev` locally** in *both* `api/.env.local.properties` and `agent/.env`; prod uses
+  a 256-bit value in `pulse/dev/INTERNAL_TOKEN`, wired into the api task's `secret_arns`.
+- **The public ALB listener answers `/internal/*` with a fixed 404**
+  (`aws_lb_listener_rule.block_internal`, priority 1) — issue 06 pulled that forward from issue 11.
+  It only exists after a manual `./spinup.ps1`; CI deploys the image, never Terraform.
+
+**Endpoint shapes are structured, not formatted.** `/internal/context/profile|items|github` return
+raw fields (`InternalContextService`'s records); the `=== GOALS ===` blob formatting belongs to the
+agent, in issue 07. `items` returns uncompleted tasks only, `github` returns only repos that have a
+README, truncated to 2000 chars — the same filtering `ChatService` does inline today, so the agent
+can reproduce the routing thresholds from list sizes and `resumeChars`.
+
+**The graph is real as of issue 07** — `POST /chat` runs `plan → retrieve → reflect ⇄ retrieve →
+answer` against live Qdrant, Anthropic and `/internal/context/*`. Four things about it a cold start
+will get wrong:
+
+- **The Python Qdrant client needs `cloud_inference=True`.** `models.Document(model="qdrant/bm25")`
+  is otherwise resolved *locally* by fastembed, which is not installed, and the query fails. The
+  Java client has no equivalent flag — this asymmetry is Python-only.
+- **`reflect` short-circuits at the iteration cap without an LLM call.** The issue asks for both
+  `iterations <= 2` and `<= 3` LLM calls; a second reflection could only route to `answer` anyway.
+  Do not "fix" this into a real model call — it breaks the cost bound.
+- **`reflect` must see the profile header.** It is unconditional in the answer's context, so if the
+  reflection prompt omits it the model burns a round hunting for the target role it already has.
+  Found by running it, fixed in `nodes._material`.
+- **The loop fires on under-served questions, not multi-source ones.** A resume + GitHub + notes
+  question terminates in one round when the planner picks all three up front. Issue 07's Result
+  table has the real trajectories.
+
+The four hard-coded thresholds are gone: the planner sees an **inventory** (list sizes, resume
+length, repo names — never content) and chooses search-vs-inline itself. `MIN_RRF_THRESHOLD = 0.008`
+and `RRF_K = 60` are carried over into `agent/` verbatim; they now exist in both languages, so a
+change to one is a change to two files until issue 08 deletes `HybridRetrievalService`.
 
 ---
 

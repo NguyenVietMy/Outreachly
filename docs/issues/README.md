@@ -11,9 +11,9 @@ and the facts a cold start gets wrong.
 | [02](02-java-qdrant-write-path.md) | Java write path → Qdrant (dual-write) | A · Qdrant | 01 | 4h | ☑ |
 | [03](03-java-qdrant-read-path.md) | Java read path → Qdrant hybrid RRF + parity harness | A · Qdrant | 02 | 6h | ☑ |
 | [04](04-drop-pgvector.md) | Drop pgvector column and dependency | A · Qdrant | 03 | 2h | ☑ |
-| [05](05-scaffold-agent-service.md) | Scaffold `agent/` FastAPI + docker-compose | B · Agent | — | 4h | ☐ |
-| [06](06-java-internal-context-api.md) | Java internal context API + auth | B · Agent | — | 3h | ☐ |
-| [07](07-langgraph-stategraph.md) | LangGraph `StateGraph` | B · Agent | 03, 05, 06 | 8h | ☐ |
+| [05](05-scaffold-agent-service.md) | Scaffold `agent/` FastAPI + docker-compose | B · Agent | — | 4h | ☑ |
+| [06](06-java-internal-context-api.md) | Java internal context API + auth | B · Agent | — | 3h | ☑ |
+| [07](07-langgraph-stategraph.md) | LangGraph `StateGraph` | B · Agent | 03, 05, 06 | 8h | ☑ |
 | [08](08-chatservice-http-client.md) | `ChatService` → HTTP client | B · Agent | 07 | 3h | ☐ |
 | [09](09-langfuse-java-otel.md) | Langfuse tracing from Java | C · Obs | — | 4h | ☑ |
 | [10](10-langfuse-python-trace-propagation.md) | Langfuse in Python + trace propagation | C · Obs | 07, 09 | 4h | ☐ |
@@ -21,8 +21,7 @@ and the facts a cold start gets wrong.
 
 **Total: ~45h.** Critical path: `01 → 02 → 03 → 07 → 08 → 10 → 11` (~34h).
 
-Issues **05**, **06**, and **09** have no blockers. Landing them early shortens the critical path and
-gives three independently shippable wins.
+Issue **06** has no blockers. Landing it early shortens the critical path.
 
 ## Suggested order
 

@@ -65,10 +65,11 @@ Pulse is a personal CS career development platform — SWE readiness assessments
 
 ## Repository Structure
 
-Monorepo with three top-level directories:
+Monorepo with four top-level directories:
 
 - **`api/`** — Spring Boot 3.5.5 backend (Java 17, Maven). Runs on port 8080.
 - **`app/`** — Next.js 14 frontend (TypeScript, App Router, Tailwind + shadcn/ui). Runs on port 3000.
+- **`agent/`** — FastAPI agentic RAG service (Python 3.12, uv). Runs on port 8001. See `agent/README.md`.
 - **`infra/`** — Terraform modules for AWS (VPC, ECS Fargate, SES).
 
 ## Build & Run Commands
@@ -93,12 +94,30 @@ npm start      # serve production build
 ```
 The API URL defaults to `http://localhost:8080` in development (set via `NEXT_PUBLIC_API_URL`).
 
+### Agent (agent/)
+```bash
+cd agent
+uv sync
+uv run uvicorn agent.main:app --reload --port 8001
+uv run pytest
+uv run ruff check
+```
+Config comes from `agent/.env` (gitignored; copy `agent/.env.example`). `INTERNAL_TOKEN` is required
+— the service will not start without it.
+
 ### Docker (api/)
 ```bash
 cd api
 docker build -t pulse-api .
 docker run -p 8080:8080 --env-file .env.local.properties pulse-api
 ```
+
+Or both services together, from the repo root:
+```bash
+docker compose up --build   # api on :8080, agent on :8001
+```
+Both read gitignored env files (`api/.env.local.properties`, `agent/.env`), which must exist first.
+Qdrant is Qdrant Cloud, not a compose service.
 
 ### Infrastructure (infra/)
 ```bash
@@ -151,3 +170,40 @@ Google OAuth2 with one registration: `google` (login: openid,profile,email). Bac
 - **Frontend**: Vercel (auto-deploys from main)
 - **Backend**: Docker → AWS ECR → ECS Fargate (0.25 vCPU / 512MB), behind ALB with HTTPS
 - **Secrets**: AWS Secrets Manager, injected at ECS task startup
+- **CI**: `.github/workflows/deploy-api.yml` builds and deploys on push to `main`. It does *not* run
+  Terraform — infrastructure changes are applied manually via the scripts below.
+
+### Spin up and tear down the dev environment
+
+`infra/environments/dev/` holds three **gitignored, local-only** files. They will not exist in a
+fresh clone, and a new machine has to recreate them before it can deploy:
+
+| File | Purpose |
+|---|---|
+| `spinup.ps1` | `terraform apply`, then push every secret value into Secrets Manager |
+| `teardown.ps1` | `terraform destroy` (one line, no confirmation of its own beyond Terraform's) |
+| `secrets.json` | Flat `{"pulse/dev/KEY": "value"}` map — the actual secret values |
+| `github-app-key.pem` | GitHub App private key, handled separately (multi-line PEM) |
+
+```powershell
+cd infra/environments/dev
+./spinup.ps1     # terraform apply + populate secrets, then push to main to deploy
+./teardown.ps1   # terraform destroy
+```
+
+Both use AWS profile `pulse` in `us-east-1`. `spinup.ps1` skips any key whose value is blank and
+skips `GITHUB_APP_PRIVATE_KEY` in the JSON loop, reading it from `github-app-key.pem` instead — so
+an empty entry is silently *not* an error. Check its per-key `OK:` / `SKIPPED:` output rather than
+assuming a clean exit means every secret landed.
+
+**Terraform is the source of truth for which env vars the task gets, not `secrets.json`.** In
+`main.tf`, `secret_arns` maps a name to a Secrets Manager ARN (value injected at task start) and
+`extra_environment` sets plain literals. Adding a secret means three edits: a
+`aws_secretsmanager_secret` resource, an entry in `secret_arns`, and a key in `secrets.json`.
+A key present in `secrets.json` but absent from `secret_arns` is written to Secrets Manager and
+never reaches the container.
+
+**`teardown.ps1` destroys real infrastructure** — VPC, ECS, ALB, and the Secrets Manager entries.
+It does not touch Supabase or Qdrant, which are external and hold all the data. Re-running
+`spinup.ps1` afterwards repopulates secrets from `secrets.json`, so that file is the thing whose
+loss would actually hurt; it is gitignored and exists on one machine.
