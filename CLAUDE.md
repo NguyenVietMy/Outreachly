@@ -151,3 +151,40 @@ Google OAuth2 with one registration: `google` (login: openid,profile,email). Bac
 - **Frontend**: Vercel (auto-deploys from main)
 - **Backend**: Docker → AWS ECR → ECS Fargate (0.25 vCPU / 512MB), behind ALB with HTTPS
 - **Secrets**: AWS Secrets Manager, injected at ECS task startup
+- **CI**: `.github/workflows/deploy-api.yml` builds and deploys on push to `main`. It does *not* run
+  Terraform — infrastructure changes are applied manually via the scripts below.
+
+### Spin up and tear down the dev environment
+
+`infra/environments/dev/` holds three **gitignored, local-only** files. They will not exist in a
+fresh clone, and a new machine has to recreate them before it can deploy:
+
+| File | Purpose |
+|---|---|
+| `spinup.ps1` | `terraform apply`, then push every secret value into Secrets Manager |
+| `teardown.ps1` | `terraform destroy` (one line, no confirmation of its own beyond Terraform's) |
+| `secrets.json` | Flat `{"pulse/dev/KEY": "value"}` map — the actual secret values |
+| `github-app-key.pem` | GitHub App private key, handled separately (multi-line PEM) |
+
+```powershell
+cd infra/environments/dev
+./spinup.ps1     # terraform apply + populate secrets, then push to main to deploy
+./teardown.ps1   # terraform destroy
+```
+
+Both use AWS profile `pulse` in `us-east-1`. `spinup.ps1` skips any key whose value is blank and
+skips `GITHUB_APP_PRIVATE_KEY` in the JSON loop, reading it from `github-app-key.pem` instead — so
+an empty entry is silently *not* an error. Check its per-key `OK:` / `SKIPPED:` output rather than
+assuming a clean exit means every secret landed.
+
+**Terraform is the source of truth for which env vars the task gets, not `secrets.json`.** In
+`main.tf`, `secret_arns` maps a name to a Secrets Manager ARN (value injected at task start) and
+`extra_environment` sets plain literals. Adding a secret means three edits: a
+`aws_secretsmanager_secret` resource, an entry in `secret_arns`, and a key in `secrets.json`.
+A key present in `secrets.json` but absent from `secret_arns` is written to Secrets Manager and
+never reaches the container.
+
+**`teardown.ps1` destroys real infrastructure** — VPC, ECS, ALB, and the Secrets Manager entries.
+It does not touch Supabase or Qdrant, which are external and hold all the data. Re-running
+`spinup.ps1` afterwards repopulates secrets from `secrets.json`, so that file is the thing whose
+loss would actually hurt; it is gitignored and exists on one machine.

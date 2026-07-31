@@ -183,13 +183,14 @@ Residual, deliberately left: `PUBLIC` still holds `USAGE` on schema `public`, so
 `has_schema_privilege('anon','public','USAGE')` is still `t`. That is naming rights with no table
 privileges behind them; closing it means revoking from `PUBLIC`, which Supabase internals rely on.
 
-**`QDRANT_ENABLED` is now load-bearing, and prod does not set it.** It defaults to `false`
-(`application.properties:56`), and since issue 04 dropped the pgvector column there is no fallback —
-`HybridRetrievalService` refuses to retrieve and chat fails outright. `api/.env.local.properties`
-now sets it to `true` (added 2026-07-31, so a plain `./mvnw spring-boot:run` works). But
-`api/.env.prod.properties` carries **no `QDRANT_*` keys at all**. Before the issue-04 code reaches
-ECS, `QDRANT_ENABLED`, `QDRANT_URL`, and `QDRANT_API_KEY` must exist in AWS Secrets Manager, or prod
-chat breaks on deploy.
+**`QDRANT_ENABLED` is load-bearing — and ECS already sets it.** It defaults to `false`
+(`application.properties:56`), and since issue 04 dropped the pgvector column there is no fallback:
+`HybridRetrievalService` refuses to retrieve and chat fails outright. Deployment is already covered —
+issues 01/02 wired `QDRANT_ENABLED = "true"` into `extra_environment` and `QDRANT_URL` /
+`QDRANT_API_KEY` into `secret_arns` in `infra/environments/dev/main.tf`, all committed. **Do not
+read `api/.env.prod.properties` as the prod contract**; it carries no `QDRANT_*` keys, but ECS does
+not use it — Terraform and Secrets Manager define the task environment. `api/.env.local.properties`
+sets `QDRANT_ENABLED=true` (added 2026-07-31) so a plain `./mvnw spring-boot:run` works.
 
 **There is no `docker-compose.yml` yet.** Only `api/Dockerfile`. Issue 05 creates compose.
 
