@@ -1,6 +1,5 @@
 package com.pulse.pulse.personal.application;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pulse.pulse.personal.domain.RoadmapItem;
 import com.pulse.pulse.personal.domain.UserProfile;
 import com.pulse.pulse.personal.infrastructure.persistence.AiTaskRepository;
@@ -41,8 +40,7 @@ class RoadmapServiceTest {
                 profileRepo,
                 Mockito.mock(UserGoalRepository.class),
                 Mockito.mock(AiTaskRepository.class),
-                anthropicService,
-                new ObjectMapper()
+                anthropicService
         );
     }
 

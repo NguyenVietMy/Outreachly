@@ -3,8 +3,9 @@
 Start here to pick up work on `PRD-agentic.md` / `docs/issues/`. Written to be readable cold, by a
 fresh session or by you in three weeks.
 
-**Status as of 2026-07-30:** issues **01, 02, 03, 09** landed. Retrieval now reads from Qdrant;
-Postgres is still dual-written and is dropped by issue 04. Next up: 05/06 (unblocked) or 04.
+**Status as of 2026-07-31:** issues **01, 02, 03, 04, 09** landed. **V66 is applied** — the schema is
+at v66, `knowledge_chunks.embedding` is gone, and an authenticated chat turn was verified in the
+browser with sources still cited. The Qdrant track (A) is complete. Next up: 05/06 (unblocked).
 
 ---
 
@@ -127,15 +128,17 @@ ANDs its terms, so `"Terraform ECS Fargate"` needs one chunk containing all thre
 nothing. Measured in issue 03: it returned rows on **3 of 20** frozen queries, never more than one
 row; Qdrant's disjunctive BM25 contributes on 19 of 20. The shipped "hybrid" search was effectively
 dense-only. This is why issue 03's fused parity landed at 77%, not ≥80% — see that issue's
-*Why the gate was not met*. It also makes issue 04's "keep `search_vector` as a fallback" question
-mostly moot: there is little there to fall back to.
+*Why the gate was not met*. It also made issue 04's "keep `search_vector` as a fallback" question
+mostly moot: there is little there to fall back to. Kept anyway, since a generated column costs only
+disk — but that is the reason it can be dropped without ceremony after issue 08.
 
 **`QdrantVectorStore` is gated on `qdrant.enabled` alone** and takes an `ObjectMapper` (it rebuilds
 the metadata JSON string `RetrievedChunk` used to get from jsonb). Reads must not depend on a
 write-side flag, so `pulse.vector.dual-write` moved into `KnowledgeIndexingService`.
 
 **Tagged tests need their profile.** Surefire's default `<excludedGroups>evals,langfuse,qdrant</excludedGroups>`
-is *not* overridden by `-Dtest=`. Run `./mvnw test -Pqdrant -Dtest=RetrievalParityTest`.
+is *not* overridden by `-Dtest=`. Run `./mvnw test -Pqdrant -Dtest=QdrantConnectivityTest`.
+(`RetrievalParityTest` was the other one; issue 04 deleted it with the pgvector column it queried.)
 
 **The frontend contract is the compatibility boundary.** These four records in `ChatService` must
 survive verbatim through issue 08:
@@ -160,6 +163,33 @@ existing UI with **no changes to `app/`**. This is the single most valuable acci
 **Pre-existing dead code — leave it.** `ChatService.java:17` imports `java.util.stream.Collectors`
 unused, *today*, before any of our changes. `CLAUDE.md` says mention, don't delete. Noted here so it
 isn't re-litigated in every issue.
+
+**There is no dev database — local *is* prod.** `api/.env.local.properties` and
+`api/.env.prod.properties` carry the identical `SUPABASE_SESSION_POOLER`, host, `postgres` database
+and `DB_USER`. Running the app locally, running a migration, or running the tagged tests all touch
+production data. Found in issue 04, whose acceptance criteria asked for "a copy of the dev database".
+Postgres has transactional DDL, so the way to prove a migration out is `BEGIN; …; ROLLBACK;` over
+psql before letting Flyway commit it.
+
+**Supabase `anon`/`authenticated` were revoked on 2026-07-31 — do not re-grant.** Supabase ships
+every project with the PostgREST Data API live and `ALTER DEFAULT PRIVILEGES` granting full
+`arwdDxtm` on new tables to `anon` and `authenticated`. Pulse does not use PostgREST — it connects
+as `postgres` (which has `rolbypassrls`, so RLS would be inert anyway) — so every Flyway table was
+carrying an unused public-facing grant, including `user_profiles` (resume text) and
+`user_integrations` (OAuth tokens). Both roles now hold **zero** table grants, and the `postgres`-
+owned default ACLs no longer name them, so tables created by future migrations stay closed.
+`service_role` is untouched (91 grants) — its key is a genuine secret and nothing here uses it.
+Residual, deliberately left: `PUBLIC` still holds `USAGE` on schema `public`, so
+`has_schema_privilege('anon','public','USAGE')` is still `t`. That is naming rights with no table
+privileges behind them; closing it means revoking from `PUBLIC`, which Supabase internals rely on.
+
+**`QDRANT_ENABLED` is now load-bearing, and prod does not set it.** It defaults to `false`
+(`application.properties:56`), and since issue 04 dropped the pgvector column there is no fallback —
+`HybridRetrievalService` refuses to retrieve and chat fails outright. `api/.env.local.properties`
+now sets it to `true` (added 2026-07-31, so a plain `./mvnw spring-boot:run` works). But
+`api/.env.prod.properties` carries **no `QDRANT_*` keys at all**. Before the issue-04 code reaches
+ECS, `QDRANT_ENABLED`, `QDRANT_URL`, and `QDRANT_API_KEY` must exist in AWS Secrets Manager, or prod
+chat breaks on deploy.
 
 **There is no `docker-compose.yml` yet.** Only `api/Dockerfile`. Issue 05 creates compose.
 
@@ -186,7 +216,8 @@ From `PRD-agentic.md` §9:
 - [x] Retrieval parity measured and recorded in issue 03 — **77% fused / 99.5% dense arm**. The
       ≥80% target was not met and was deliberately not chased; the gap is Postgres's broken keyword
       arm, not the migration. Read issue 03's *Why the gate was not met* before citing this number.
-- [ ] `embedding vector(1536)` dropped; `pgvector` gone from `api/pom.xml`
+- [x] `embedding vector(1536)` dropped; `pgvector` gone from `api/pom.xml` — issue 04. V66 applied
+      2026-07-31; post-migration backfill read 124 Postgres rows = 124 Qdrant points.
 - [ ] One Langfuse trace per chat spanning Java → Python → Anthropic, with token counts and
       **zero raw resume text**
 - [ ] Chat p95 within +40% of the pre-migration baseline
@@ -202,10 +233,18 @@ that collapse under questioning.
 
 Not blockers, but decide them when you reach the issue:
 
-- **Issue 04:** does `findByKeywordSearch` + the `search_vector` column get removed with the embedding
-  column, or kept one release as a fallback? Recommendation in the issue: keep, then remove.
+- ~~**Issue 04:** does `findByKeywordSearch` + the `search_vector` column get removed with the
+  embedding column, or kept one release as a fallback?~~ **Decided in issue 04: kept.** Remove both,
+  plus the GIN index, once issue 08 has the agent path serving prod chat.
 - **Issue 08:** once `ChatService` becomes an HTTP client, `HybridRetrievalService` has zero Java
-  callers. Delete it, or keep it powering the issue-03 parity harness? Recommendation: keep until 04
-  closes, then delete separately.
+  callers — the issue-03 parity harness that also used to hold it alive was deleted by issue 04.
+  Delete it in 08.
+- **Left by issue 04:** `pulse.vector.dual-write` is now misnamed and unsafe. With pgvector gone,
+  `VECTOR_DUAL_WRITE=false` writes vectors nowhere instead of falling back. Delete the flag or make
+  `false` refuse to start.
+- ~~**Found while verifying issue 04:** every service parsed raw model output with a strict
+  `ObjectMapper`, so a ```` ```json ```` fence or a trailing comma returned a 500.~~ **Fixed** —
+  `platform/ai/ModelJson.java` strips the fence and tolerates trailing commas, and all five
+  model-output call sites go through it. The injected `ObjectMapper` stays strict for HTTP bodies.
 - **Issue 11:** Cloud Map service discovery vs. an internal ALB listener for api → agent.
   Recommendation: Cloud Map — the agent should have no public listener at all.

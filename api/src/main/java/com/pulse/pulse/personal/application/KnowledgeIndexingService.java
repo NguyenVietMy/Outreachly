@@ -252,7 +252,10 @@ public class KnowledgeIndexingService {
                 embedding, metadata)));
     }
 
-    /** The single write seam: Postgres is authoritative, Qdrant is mirrored in one batched call. */
+    /**
+     * The single write seam. Postgres holds content and metadata; since issue 04 dense vectors live
+     * only in Qdrant, which is mirrored in one batched call.
+     */
     private void upsertChunks(List<ChunkPoint> chunks) {
         for (ChunkPoint chunk : chunks) {
             String metadataStr;
@@ -262,7 +265,7 @@ public class KnowledgeIndexingService {
                 metadataStr = "{}";
             }
             chunkRepo.upsertChunk(chunk.userId(), chunk.sourceType(), chunk.sourceKey(), chunk.chunkIndex(),
-                    chunk.content(), EmbeddingService.toVectorString(chunk.denseVector()), metadataStr);
+                    chunk.content(), metadataStr);
         }
         mirror("upsert of " + chunks.size() + " chunk(s)", store -> store.upsertBatch(chunks));
     }

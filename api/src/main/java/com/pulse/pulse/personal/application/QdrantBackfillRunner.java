@@ -21,9 +21,10 @@ import java.util.List;
  *
  * <pre>./mvnw spring-boot:run -Dspring-boot.run.arguments=--pulse.vector.backfill=true</pre>
  *
- * <p>Content and metadata come from Postgres. Dense vectors are re-embedded rather than read back
- * out of the pgvector column — text-embedding-3-small is deterministic, and a few thousand chunks
- * cost cents at $0.02/1M tokens. Point ids are deterministic, so re-running is harmless.
+ * <p>Content and metadata come from Postgres. Dense vectors are re-embedded — since issue 04 dropped
+ * the pgvector column there is nowhere else to read them from, and text-embedding-3-small is
+ * deterministic, so a few thousand chunks cost cents at $0.02/1M tokens. Point ids are
+ * deterministic, so re-running is harmless. This is also the recovery path if Qdrant is ever lost.
  */
 @Slf4j
 @Component

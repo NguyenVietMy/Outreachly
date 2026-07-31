@@ -37,34 +37,23 @@ public interface KnowledgeChunkRepository extends JpaRepository<KnowledgeChunk, 
 
     @Modifying
     @Query(value = """
-        INSERT INTO knowledge_chunks (id, user_id, source_type, source_key, chunk_index, content, embedding, metadata, embedded_at, created_at, updated_at)
-        VALUES (gen_random_uuid(), :userId, :sourceType, :sourceKey, :chunkIndex, :content, :embedding\\:\\:vector, :metadata\\:\\:jsonb, now(), now(), now())
+        INSERT INTO knowledge_chunks (id, user_id, source_type, source_key, chunk_index, content, metadata, embedded_at, created_at, updated_at)
+        VALUES (gen_random_uuid(), :userId, :sourceType, :sourceKey, :chunkIndex, :content, :metadata\\:\\:jsonb, now(), now(), now())
         ON CONFLICT (user_id, source_type, source_key, chunk_index)
-        DO UPDATE SET content = EXCLUDED.content, embedding = EXCLUDED.embedding, metadata = EXCLUDED.metadata, embedded_at = now(), updated_at = now()
+        DO UPDATE SET content = EXCLUDED.content, metadata = EXCLUDED.metadata, embedded_at = now(), updated_at = now()
         """, nativeQuery = true)
     void upsertChunk(@Param("userId") Long userId,
                      @Param("sourceType") String sourceType,
                      @Param("sourceKey") String sourceKey,
                      @Param("chunkIndex") int chunkIndex,
                      @Param("content") String content,
-                     @Param("embedding") String embedding,
                      @Param("metadata") String metadata);
 
-    @Query(value = """
-        SELECT id, user_id, source_type, source_key, chunk_index, content, metadata,
-               1 - (embedding <=> :queryEmbedding\\:\\:vector) AS similarity
-        FROM knowledge_chunks
-        WHERE user_id = :userId
-          AND (:sourceTypes IS NULL OR source_type = ANY(string_to_array(:sourceTypes, ',')))
-          AND embedding IS NOT NULL
-        ORDER BY embedding <=> :queryEmbedding\\:\\:vector
-        LIMIT :topK
-        """, nativeQuery = true)
-    List<Object[]> findByVectorSimilarity(@Param("userId") Long userId,
-                                           @Param("queryEmbedding") String queryEmbedding,
-                                           @Param("sourceTypes") String sourceTypes,
-                                           @Param("topK") int topK);
-
+    /**
+     * No live caller since issue 03 moved keyword retrieval to Qdrant's BM25. Kept for one release
+     * alongside the {@code search_vector} column as an emergency fallback — see
+     * {@code docs/issues/04-drop-pgvector.md}.
+     */
     @Query(value = """
         SELECT id, user_id, source_type, source_key, chunk_index, content, metadata,
                ts_rank_cd(search_vector, plainto_tsquery('english', :query)) AS rank
