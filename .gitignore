@@ -98,6 +98,13 @@ ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 
+# Python (agent/)
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
 # Node.js (if you have any frontend components)
 node_modules/
 npm-debug.log*

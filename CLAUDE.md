@@ -65,10 +65,11 @@ Pulse is a personal CS career development platform — SWE readiness assessments
 
 ## Repository Structure
 
-Monorepo with three top-level directories:
+Monorepo with four top-level directories:
 
 - **`api/`** — Spring Boot 3.5.5 backend (Java 17, Maven). Runs on port 8080.
 - **`app/`** — Next.js 14 frontend (TypeScript, App Router, Tailwind + shadcn/ui). Runs on port 3000.
+- **`agent/`** — FastAPI agentic RAG service (Python 3.12, uv). Runs on port 8001. See `agent/README.md`.
 - **`infra/`** — Terraform modules for AWS (VPC, ECS Fargate, SES).
 
 ## Build & Run Commands
@@ -93,12 +94,30 @@ npm start      # serve production build
 ```
 The API URL defaults to `http://localhost:8080` in development (set via `NEXT_PUBLIC_API_URL`).
 
+### Agent (agent/)
+```bash
+cd agent
+uv sync
+uv run uvicorn agent.main:app --reload --port 8001
+uv run pytest
+uv run ruff check
+```
+Config comes from `agent/.env` (gitignored; copy `agent/.env.example`). `INTERNAL_TOKEN` is required
+— the service will not start without it.
+
 ### Docker (api/)
 ```bash
 cd api
 docker build -t pulse-api .
 docker run -p 8080:8080 --env-file .env.local.properties pulse-api
 ```
+
+Or both services together, from the repo root:
+```bash
+docker compose up --build   # api on :8080, agent on :8001
+```
+Both read gitignored env files (`api/.env.local.properties`, `agent/.env`), which must exist first.
+Qdrant is Qdrant Cloud, not a compose service.
 
 ### Infrastructure (infra/)
 ```bash

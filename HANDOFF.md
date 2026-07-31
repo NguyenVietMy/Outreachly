@@ -3,9 +3,10 @@
 Start here to pick up work on `PRD-agentic.md` / `docs/issues/`. Written to be readable cold, by a
 fresh session or by you in three weeks.
 
-**Status as of 2026-07-31:** issues **01, 02, 03, 04, 09** landed. **V66 is applied** — the schema is
-at v66, `knowledge_chunks.embedding` is gone, and an authenticated chat turn was verified in the
-browser with sources still cited. The Qdrant track (A) is complete. Next up: 05/06 (unblocked).
+**Status as of 2026-07-31:** issues **01, 02, 03, 04, 05, 09** landed. **V66 is applied** — the schema
+is at v66, `knowledge_chunks.embedding` is gone, and an authenticated chat turn was verified in the
+browser with sources still cited. The Qdrant track (A) is complete, and `agent/` is a running
+container. Next up: **06** (unblocked), then 07.
 
 ---
 
@@ -75,8 +76,7 @@ Paste something like:
 
 ## 2. Recommended order
 
-Issues **05**, **06**, **09** have no blockers. Do 05+06 first if you want momentum with zero
-regression risk to working code.
+Issue **06** has no blockers — greenfield, zero regression risk to working code.
 
 ```
 01 → 05 → 06 → 02 → 03 → 09 → 07 → 08 → 10 → 04 → 11
@@ -192,7 +192,26 @@ read `api/.env.prod.properties` as the prod contract**; it carries no `QDRANT_*`
 not use it — Terraform and Secrets Manager define the task environment. `api/.env.local.properties`
 sets `QDRANT_ENABLED=true` (added 2026-07-31) so a plain `./mvnw spring-boot:run` works.
 
-**There is no `docker-compose.yml` yet.** Only `api/Dockerfile`. Issue 05 creates compose.
+**`docker-compose.yml` exists at the repo root** (issue 05) with two services, `api` (:8080) and
+`agent` (:8001). Qdrant is Qdrant Cloud, not a compose service. Both services read **gitignored** env
+files — `api/.env.local.properties` and `agent/.env` — so compose fails outright on a fresh clone
+until those exist. `agent/.env.example` lists what the agent needs; the four shared values are
+copied from the api file.
+
+**The `agent/` service is Python 3.12 + uv.** `uv sync` in `agent/`, `uv run pytest`, `uv run ruff
+check`. `uv.lock` is committed and the Dockerfile builds `--frozen`, so a dependency change means
+re-running `uv lock` or the image build fails. Two things about it a cold start will get wrong:
+
+- **`/health` is deliberately unauthenticated** — only `/chat` takes `X-Internal-Token`. Container
+  `HEALTHCHECK` and the issue-11 ALB target group cannot send headers. Do not "fix" this by moving
+  the dependency to global middleware.
+- **`INTERNAL_TOKEN` has no default** and `Settings` fails at import without it, so the agent will
+  not boot until it is set. This is intentional (fail closed on a shared secret), not a bug. The
+  Java side of that secret arrives in issue 06.
+
+**Nothing in `agent/` talks to Anthropic or the Java API yet.** `clients/embeddings.py`,
+`clients/pulse_api.py` and `graph/` are scaffolding; `/chat` returns a hardcoded payload in the
+PRD §6.1 shape. Issue 07 fills in the graph, issue 06 fills in the endpoints `pulse_api.py` calls.
 
 ---
 
