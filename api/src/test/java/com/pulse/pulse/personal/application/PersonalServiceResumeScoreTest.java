@@ -1,6 +1,5 @@
 package com.pulse.pulse.personal.application;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pulse.pulse.activity.application.DashboardService;
 import com.pulse.pulse.identity.application.UserService;
 import com.pulse.pulse.integrations.application.IntegrationService;
@@ -66,7 +65,6 @@ class PersonalServiceResumeScoreTest {
                 anthropicService,
                 Mockito.mock(LeetCodeService.class),
                 Mockito.mock(ResumeService.class),
-                new ObjectMapper(),
                 new PulseObservability(observationRegistry, meterRegistry),
                 Mockito.mock(KnowledgeIndexingService.class)
         );

@@ -1,7 +1,6 @@
 package com.pulse.pulse.personal.application;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pulse.pulse.personal.domain.AiTask;
 import com.pulse.pulse.personal.domain.RoadmapItem;
 import com.pulse.pulse.personal.domain.UserGoal;
@@ -11,6 +10,7 @@ import com.pulse.pulse.personal.infrastructure.persistence.RoadmapItemRepository
 import com.pulse.pulse.personal.infrastructure.persistence.UserGoalRepository;
 import com.pulse.pulse.personal.infrastructure.persistence.UserProfileRepository;
 import com.pulse.pulse.platform.ai.AnthropicService;
+import com.pulse.pulse.platform.ai.ModelJson;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -33,7 +33,6 @@ public class RoadmapService {
     private final UserGoalRepository goalRepo;
     private final AiTaskRepository aiTaskRepo;
     private final AnthropicService anthropicService;
-    private final ObjectMapper objectMapper;
 
     public List<RoadmapItemView> getRoadmap(Long userId) {
         return roadmapRepo.findByUserIdOrderByFocusRankAsc(userId).stream()
@@ -66,7 +65,7 @@ public class RoadmapService {
 
         List<Map<String, Object>> items;
         try {
-            items = objectMapper.readValue(raw, new TypeReference<>() {});
+            items = ModelJson.parse(raw, new TypeReference<>() {});
         } catch (Exception e) {
             log.error("Failed to parse roadmap response: {}", raw, e);
             throw new RuntimeException("Failed to parse roadmap", e);

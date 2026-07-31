@@ -1,6 +1,5 @@
 package com.pulse.pulse.personal.application;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pulse.pulse.activity.application.DashboardService;
 import com.pulse.pulse.integrations.application.IntegrationService;
 import com.pulse.pulse.personal.domain.AiTask;
@@ -63,7 +62,6 @@ class DailySuggestionServiceTest {
                 Mockito.mock(UserGoalRepository.class),
                 Mockito.mock(DashboardService.class),
                 anthropicService,
-                new ObjectMapper(),
                 new PulseObservability(observationRegistry, meterRegistry),
                 integrationService,
                 aiTaskRepo,

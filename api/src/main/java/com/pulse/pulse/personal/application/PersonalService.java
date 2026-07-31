@@ -1,7 +1,6 @@
 package com.pulse.pulse.personal.application;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pulse.pulse.activity.application.ActivityEventView;
 import com.pulse.pulse.activity.application.DashboardService;
 import com.pulse.pulse.identity.application.CurrentUserView;
@@ -19,6 +18,7 @@ import com.pulse.pulse.personal.infrastructure.persistence.UserGoalRepository;
 import com.pulse.pulse.personal.infrastructure.persistence.UserProfileRepository;
 import com.pulse.pulse.personal.infrastructure.resume.ResumeService;
 import com.pulse.pulse.platform.ai.AnthropicService;
+import com.pulse.pulse.platform.ai.ModelJson;
 import com.pulse.pulse.platform.observability.PulseObservability;
 import com.pulse.pulse.platform.util.HashUtil;
 import io.micrometer.observation.Observation;
@@ -50,7 +50,6 @@ public class PersonalService {
     private final AnthropicService anthropicService;
     private final LeetCodeService leetCodeService;
     private final ResumeService resumeService;
-    private final ObjectMapper objectMapper;
     private final PulseObservability observability;
     private final KnowledgeIndexingService knowledgeIndexingService;
 
@@ -221,7 +220,7 @@ public class PersonalService {
                 String raw = anthropicService.scoreResume(profile.getResumeText()).block();
                 Map<String, Object> breakdown;
                 try {
-                    breakdown = objectMapper.readValue(raw, new TypeReference<>() {
+                    breakdown = ModelJson.parse(raw, new TypeReference<>() {
                     });
                 } catch (Exception e) {
                     throw new RuntimeException("Failed to parse resume score", e);
@@ -558,7 +557,7 @@ public class PersonalService {
                 }
 
                 String raw = anthropicService.generateSectionTasks(context.toString()).block();
-                List<Map<String, Object>> tasks = objectMapper.readValue(raw, new TypeReference<>() {
+                List<Map<String, Object>> tasks = ModelJson.parse(raw, new TypeReference<>() {
                 });
 
                 aiTaskRepo.deleteByUserIdAndAxisAndSectionId(userId, axis, sectionId);
@@ -595,7 +594,7 @@ public class PersonalService {
         }, () -> {
             try {
                 String raw = anthropicService.generateEventTasks(eventContext).block();
-                List<Map<String, Object>> tasks = objectMapper.readValue(raw, new TypeReference<>() {
+                List<Map<String, Object>> tasks = ModelJson.parse(raw, new TypeReference<>() {
                 });
 
                 aiTaskRepo.deleteByUserIdAndSource(userId, source);

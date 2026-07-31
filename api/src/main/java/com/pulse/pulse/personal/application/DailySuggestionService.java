@@ -1,7 +1,6 @@
 package com.pulse.pulse.personal.application;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pulse.pulse.activity.application.ActivityEventView;
 import com.pulse.pulse.activity.application.DashboardService;
 import com.pulse.pulse.activity.application.RepositorySnapshotView;
@@ -16,6 +15,7 @@ import com.pulse.pulse.personal.infrastructure.persistence.RoadmapItemRepository
 import com.pulse.pulse.personal.infrastructure.persistence.UserGoalRepository;
 import com.pulse.pulse.personal.infrastructure.persistence.UserProfileRepository;
 import com.pulse.pulse.platform.ai.AnthropicService;
+import com.pulse.pulse.platform.ai.ModelJson;
 import com.pulse.pulse.platform.observability.PulseObservability;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.observation.Observation;
@@ -41,7 +41,6 @@ public class DailySuggestionService {
     private final UserGoalRepository goalRepo;
     private final DashboardService dashboardService;
     private final AnthropicService anthropicService;
-    private final ObjectMapper objectMapper;
     private final PulseObservability observability;
     private final IntegrationService integrationService;
     private final AiTaskRepository aiTaskRepo;
@@ -55,7 +54,6 @@ public class DailySuggestionService {
                                   UserGoalRepository goalRepo,
                                   DashboardService dashboardService,
                                   AnthropicService anthropicService,
-                                  ObjectMapper objectMapper,
                                   PulseObservability observability,
                                   IntegrationService integrationService,
                                   AiTaskRepository aiTaskRepo,
@@ -65,7 +63,6 @@ public class DailySuggestionService {
         this.goalRepo = goalRepo;
         this.dashboardService = dashboardService;
         this.anthropicService = anthropicService;
-        this.objectMapper = objectMapper;
         this.observability = observability;
         this.integrationService = integrationService;
         this.aiTaskRepo = aiTaskRepo;
@@ -175,7 +172,7 @@ public class DailySuggestionService {
 
             List<Map<String, Object>> tasks;
             try {
-                tasks = objectMapper.readValue(response, new TypeReference<>() {
+                tasks = ModelJson.parse(response, new TypeReference<>() {
                 });
             } catch (Exception e) {
                 log.error("Failed to parse daily suggestions response: {}", response, e);
