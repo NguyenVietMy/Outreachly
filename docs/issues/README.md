@@ -12,7 +12,7 @@ and the facts a cold start gets wrong.
 | [03](03-java-qdrant-read-path.md) | Java read path → Qdrant hybrid RRF + parity harness | A · Qdrant | 02 | 6h | ☑ |
 | [04](04-drop-pgvector.md) | Drop pgvector column and dependency | A · Qdrant | 03 | 2h | ☑ |
 | [05](05-scaffold-agent-service.md) | Scaffold `agent/` FastAPI + docker-compose | B · Agent | — | 4h | ☑ |
-| [06](06-java-internal-context-api.md) | Java internal context API + auth | B · Agent | — | 3h | ☐ |
+| [06](06-java-internal-context-api.md) | Java internal context API + auth | B · Agent | — | 3h | ☑ |
 | [07](07-langgraph-stategraph.md) | LangGraph `StateGraph` | B · Agent | 03, 05, 06 | 8h | ☐ |
 | [08](08-chatservice-http-client.md) | `ChatService` → HTTP client | B · Agent | 07 | 3h | ☐ |
 | [09](09-langfuse-java-otel.md) | Langfuse tracing from Java | C · Obs | — | 4h | ☑ |

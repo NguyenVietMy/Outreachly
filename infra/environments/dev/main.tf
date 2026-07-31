@@ -165,6 +165,7 @@ module "ecs_api" {
     LINEAR_CLIENT_SECRET             = aws_secretsmanager_secret.linear_client_secret.arn
     LINEAR_WEBHOOK_SECRET            = aws_secretsmanager_secret.linear_webhook_secret.arn
     OBSERVABILITY_OTLP_AUTHORIZATION = aws_secretsmanager_secret.observability_otlp_authorization.arn
+    INTERNAL_TOKEN                   = aws_secretsmanager_secret.internal_token.arn
   }
 
   extra_environment = {
@@ -194,6 +195,30 @@ resource "aws_lb_listener" "api_https" {
   default_action {
     type             = "forward"
     target_group_arn = module.ecs_api.tg_arn
+  }
+}
+
+# The /internal/** context API (issue 06) serves full resume and profile text by userId with no user
+# session. It is for service-to-service calls inside the VPC only, so the public listener refuses it
+# outright rather than relying on the shared-secret filter alone.
+resource "aws_lb_listener_rule" "block_internal" {
+  listener_arn = aws_lb_listener.api_https.arn
+  priority     = 1
+
+  condition {
+    path_pattern {
+      values = ["/internal/*"]
+    }
+  }
+
+  action {
+    type = "fixed-response"
+
+    fixed_response {
+      content_type = "application/json"
+      message_body = "{\"error\":\"Not found\"}"
+      status_code  = "404"
+    }
   }
 }
 
@@ -312,6 +337,11 @@ resource "aws_secretsmanager_secret" "langfuse_public_key" {
 
 resource "aws_secretsmanager_secret" "langfuse_secret_key" {
   name                    = "pulse/dev/LANGFUSE_SECRET_KEY"
+  recovery_window_in_days = 0
+}
+
+resource "aws_secretsmanager_secret" "internal_token" {
+  name                    = "pulse/dev/INTERNAL_TOKEN"
   recovery_window_in_days = 0
 }
 

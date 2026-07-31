@@ -3,10 +3,11 @@
 Start here to pick up work on `PRD-agentic.md` / `docs/issues/`. Written to be readable cold, by a
 fresh session or by you in three weeks.
 
-**Status as of 2026-07-31:** issues **01, 02, 03, 04, 05, 09** landed. **V66 is applied** — the schema
-is at v66, `knowledge_chunks.embedding` is gone, and an authenticated chat turn was verified in the
-browser with sources still cited. The Qdrant track (A) is complete, and `agent/` is a running
-container. Next up: **06** (unblocked), then 07.
+**Status as of 2026-07-31:** issues **01, 02, 03, 04, 05, 06, 09** landed. **V66 is applied** — the
+schema is at v66, `knowledge_chunks.embedding` is gone, and an authenticated chat turn was verified
+in the browser with sources still cited. The Qdrant track (A) is complete, `agent/` is a running
+container, and the Java side now serves `/internal/context/*`. Next up: **07** — every one of its
+blockers (03, 05, 06) is done.
 
 ---
 
@@ -207,11 +208,32 @@ re-running `uv lock` or the image build fails. Two things about it a cold start 
   the dependency to global middleware.
 - **`INTERNAL_TOKEN` has no default** and `Settings` fails at import without it, so the agent will
   not boot until it is set. This is intentional (fail closed on a shared secret), not a bug. The
-  Java side of that secret arrives in issue 06.
+  Java side of that secret landed in issue 06.
+
+**The `/internal/**` API has its own security chain, and `INTERNAL_TOKEN` now exists on both sides.**
+`InternalApiSecurityConfig` registers a second `SecurityFilterChain` at `@Order(1)` matching
+`/internal/**` — stateless, anonymous disabled, `InternalTokenFilter` in front. It fails closed: a
+blank `pulse.internal.token` rejects everything, so a deployment that forgets the secret serves 401s
+rather than resume text. Three consequences a cold start should know:
+
+- **The 401 comes from the filter, not from authorization**, so `/internal` never redirects to
+  Google the way `/api` does. If you see a 302 there, you are talking to an old process.
+- **`INTERNAL_TOKEN=dev` locally** in *both* `api/.env.local.properties` and `agent/.env`; prod uses
+  a 256-bit value in `pulse/dev/INTERNAL_TOKEN`, wired into the api task's `secret_arns`.
+- **The public ALB listener answers `/internal/*` with a fixed 404**
+  (`aws_lb_listener_rule.block_internal`, priority 1) — issue 06 pulled that forward from issue 11.
+  It only exists after a manual `./spinup.ps1`; CI deploys the image, never Terraform.
+
+**Endpoint shapes are structured, not formatted.** `/internal/context/profile|items|github` return
+raw fields (`InternalContextService`'s records); the `=== GOALS ===` blob formatting belongs to the
+agent, in issue 07. `items` returns uncompleted tasks only, `github` returns only repos that have a
+README, truncated to 2000 chars — the same filtering `ChatService` does inline today, so the agent
+can reproduce the routing thresholds from list sizes and `resumeChars`.
 
 **Nothing in `agent/` talks to Anthropic or the Java API yet.** `clients/embeddings.py`,
 `clients/pulse_api.py` and `graph/` are scaffolding; `/chat` returns a hardcoded payload in the
-PRD §6.1 shape. Issue 07 fills in the graph, issue 06 fills in the endpoints `pulse_api.py` calls.
+PRD §6.1 shape. The three endpoints `pulse_api.py` calls are live as of issue 06 — which did not
+have to touch that file; it already had the right paths and header. Issue 07 fills in the graph.
 
 ---
 
