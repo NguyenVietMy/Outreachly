@@ -9,7 +9,7 @@ and the facts a cold start gets wrong.
 |---|---|---|---|---|---|
 | [01](01-qdrant-provision-and-schema.md) | Provision Qdrant Cloud + collection schema | A · Qdrant | — | 1h | ☑ |
 | [02](02-java-qdrant-write-path.md) | Java write path → Qdrant (dual-write) | A · Qdrant | 01 | 4h | ☑ |
-| [03](03-java-qdrant-read-path.md) | Java read path → Qdrant hybrid RRF + parity harness | A · Qdrant | 02 | 6h | ☐ |
+| [03](03-java-qdrant-read-path.md) | Java read path → Qdrant hybrid RRF + parity harness | A · Qdrant | 02 | 6h | ☑ |
 | [04](04-drop-pgvector.md) | Drop pgvector column and dependency | A · Qdrant | 03 | 2h | ☐ |
 | [05](05-scaffold-agent-service.md) | Scaffold `agent/` FastAPI + docker-compose | B · Agent | — | 4h | ☐ |
 | [06](06-java-internal-context-api.md) | Java internal context API + auth | B · Agent | — | 3h | ☐ |

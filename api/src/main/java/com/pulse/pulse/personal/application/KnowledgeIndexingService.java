@@ -15,6 +15,7 @@ import com.pulse.pulse.platform.vector.QdrantVectorStore;
 import com.pulse.pulse.platform.vector.QdrantVectorStore.ChunkPoint;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,8 +44,16 @@ public class KnowledgeIndexingService {
     private final EmbeddingService embeddingService;
     private final ObjectMapper objectMapper;
     private final PulseObservability observability;
-    /** Empty unless dual-write is on; Postgres stays authoritative either way. */
+    /** Empty when {@code qdrant.enabled=false}; Postgres stays authoritative either way. */
     private final Optional<QdrantVectorStore> qdrantStore;
+
+    /**
+     * Whether to mirror writes into Qdrant. Held here rather than on the store since issue 03, which
+     * made the store the read path too — reads must not be gated on a write-side flag. Spring
+     * overwrites the initializer; the default keeps manually constructed instances mirroring.
+     */
+    @Value("${pulse.vector.dual-write:true}")
+    private boolean dualWrite = true;
 
     @Transactional
     public void indexGitHubReadme(Long userId, String repoFullName, String repoName,
@@ -274,8 +283,11 @@ public class KnowledgeIndexingService {
         mirror("delete of all chunks", store -> store.deleteByUser(userId));
     }
 
-    /** A failing mirror must never fail the Postgres write; issue 03 still reads from pgvector. */
+    /** A failing mirror must never fail the Postgres write, which stays authoritative. */
     private void mirror(String operation, Consumer<QdrantVectorStore> write) {
+        if (!dualWrite) {
+            return;
+        }
         qdrantStore.ifPresent(store -> {
             try {
                 write.accept(store);

@@ -1,5 +1,6 @@
 package com.pulse.pulse.platform.vector;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.qdrant.client.QdrantClient;
 import io.qdrant.client.grpc.Common.Filter;
 import org.junit.jupiter.api.Tag;
@@ -32,7 +33,7 @@ class QdrantVectorStoreWriteTest {
 
         try (client) {
             new QdrantSchemaInitializer(client).ensureCollection();
-            QdrantVectorStore store = new QdrantVectorStore(client);
+            QdrantVectorStore store = new QdrantVectorStore(client, new ObjectMapper());
             store.deleteByUser(TEST_USER);
 
             store.upsert(TEST_USER, "resume_section", "experience", 0, "Built a hybrid retrieval service",
