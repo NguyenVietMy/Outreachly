@@ -40,9 +40,6 @@ public class KnowledgeChunk {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
-    @Column(columnDefinition = "vector(1536)", insertable = false, updatable = false)
-    private String embedding;
-
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb", nullable = false)
     @Builder.Default

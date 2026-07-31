@@ -72,7 +72,7 @@ class KnowledgeIndexingDualWriteTest {
         service.indexGitHubReadme(USER_ID, "viet/pulse", "pulse", "Java", "x".repeat(100));
 
         verify(chunkRepo).upsertChunk(Mockito.eq(USER_ID), Mockito.eq("github_readme"),
-                Mockito.eq("viet/pulse"), Mockito.eq(0), anyString(), anyString(), anyString());
+                Mockito.eq("viet/pulse"), Mockito.eq(0), anyString(), anyString());
 
         List<ChunkPoint> mirrored = captureUpsert();
         assertEquals(1, mirrored.size());
@@ -89,7 +89,7 @@ class KnowledgeIndexingDualWriteTest {
                 service.indexObsidianDiff(USER_ID, "2026-07-30", "studied graph algorithms"));
 
         verify(chunkRepo).upsertChunk(Mockito.eq(USER_ID), Mockito.eq("obsidian_diff"),
-                Mockito.eq("2026-07-30"), anyInt(), anyString(), anyString(), anyString());
+                Mockito.eq("2026-07-30"), anyInt(), anyString(), anyString());
     }
 
     @Test
