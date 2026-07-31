@@ -3,11 +3,12 @@
 Start here to pick up work on `PRD-agentic.md` / `docs/issues/`. Written to be readable cold, by a
 fresh session or by you in three weeks.
 
-**Status as of 2026-07-31:** issues **01, 02, 03, 04, 05, 06, 09** landed. **V66 is applied** — the
-schema is at v66, `knowledge_chunks.embedding` is gone, and an authenticated chat turn was verified
-in the browser with sources still cited. The Qdrant track (A) is complete, `agent/` is a running
-container, and the Java side now serves `/internal/context/*`. Next up: **07** — every one of its
-blockers (03, 05, 06) is done.
+**Status as of 2026-07-31:** issues **01, 02, 03, 04, 05, 06, 07, 09** landed. **V66 is applied** —
+the schema is at v66, `knowledge_chunks.embedding` is gone, and an authenticated chat turn was
+verified in the browser with sources still cited. The Qdrant track (A) is complete, `agent/` runs a
+real LangGraph `StateGraph` end to end against live Qdrant + Anthropic, and the Java side serves
+`/internal/context/*`. Next up: **08** (`ChatService` → HTTP client) or **10** (Langfuse in Python);
+both of 07's dependents are now unblocked.
 
 ---
 
@@ -230,10 +231,27 @@ agent, in issue 07. `items` returns uncompleted tasks only, `github` returns onl
 README, truncated to 2000 chars — the same filtering `ChatService` does inline today, so the agent
 can reproduce the routing thresholds from list sizes and `resumeChars`.
 
-**Nothing in `agent/` talks to Anthropic or the Java API yet.** `clients/embeddings.py`,
-`clients/pulse_api.py` and `graph/` are scaffolding; `/chat` returns a hardcoded payload in the
-PRD §6.1 shape. The three endpoints `pulse_api.py` calls are live as of issue 06 — which did not
-have to touch that file; it already had the right paths and header. Issue 07 fills in the graph.
+**The graph is real as of issue 07** — `POST /chat` runs `plan → retrieve → reflect ⇄ retrieve →
+answer` against live Qdrant, Anthropic and `/internal/context/*`. Four things about it a cold start
+will get wrong:
+
+- **The Python Qdrant client needs `cloud_inference=True`.** `models.Document(model="qdrant/bm25")`
+  is otherwise resolved *locally* by fastembed, which is not installed, and the query fails. The
+  Java client has no equivalent flag — this asymmetry is Python-only.
+- **`reflect` short-circuits at the iteration cap without an LLM call.** The issue asks for both
+  `iterations <= 2` and `<= 3` LLM calls; a second reflection could only route to `answer` anyway.
+  Do not "fix" this into a real model call — it breaks the cost bound.
+- **`reflect` must see the profile header.** It is unconditional in the answer's context, so if the
+  reflection prompt omits it the model burns a round hunting for the target role it already has.
+  Found by running it, fixed in `nodes._material`.
+- **The loop fires on under-served questions, not multi-source ones.** A resume + GitHub + notes
+  question terminates in one round when the planner picks all three up front. Issue 07's Result
+  table has the real trajectories.
+
+The four hard-coded thresholds are gone: the planner sees an **inventory** (list sizes, resume
+length, repo names — never content) and chooses search-vs-inline itself. `MIN_RRF_THRESHOLD = 0.008`
+and `RRF_K = 60` are carried over into `agent/` verbatim; they now exist in both languages, so a
+change to one is a change to two files until issue 08 deletes `HybridRetrievalService`.
 
 ---
 

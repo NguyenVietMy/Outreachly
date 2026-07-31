@@ -1,4 +1,23 @@
+import pytest
 from fastapi.testclient import TestClient
+
+from agent.models import ChatResponse, SourceCitation, TrajectoryStep
+
+
+@pytest.fixture(autouse=True)
+def stub_graph(monkeypatch):
+    """These tests are about the HTTP contract; the graph itself is covered by test_graph.py."""
+
+    async def fake_run_chat(graph, user_id, message, history):
+        return ChatResponse(
+            message="answer",
+            sources=[
+                SourceCitation(source_type="resume_section", source_key="experience", score=0.031)
+            ],
+            trajectory=[TrajectoryStep(source_type="plan", decision="retrieve", reason="because")],
+        )
+
+    monkeypatch.setattr("agent.main.run_chat", fake_run_chat)
 
 
 def test_health_is_open_and_ok(client: TestClient) -> None:
