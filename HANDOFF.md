@@ -3,12 +3,12 @@
 Start here to pick up work on `PRD-agentic.md` / `docs/issues/`. Written to be readable cold, by a
 fresh session or by you in three weeks.
 
-**Status as of 2026-07-31:** issues **01, 02, 03, 04, 05, 06, 07, 09** landed. **V66 is applied** —
-the schema is at v66, `knowledge_chunks.embedding` is gone, and an authenticated chat turn was
-verified in the browser with sources still cited. The Qdrant track (A) is complete, `agent/` runs a
-real LangGraph `StateGraph` end to end against live Qdrant + Anthropic, and the Java side serves
-`/internal/context/*`. Next up: **08** (`ChatService` → HTTP client) or **10** (Langfuse in Python);
-both of 07's dependents are now unblocked.
+**Status as of 2026-08-01:** issues **01, 02, 03, 04, 05, 06, 07, 08, 09** landed. **V66 is
+applied** — the schema is at v66, `knowledge_chunks.embedding` is gone, and an authenticated chat
+turn was verified in the browser with sources still cited. The Qdrant track (A) is complete,
+`agent/` runs a real LangGraph `StateGraph` end to end against live Qdrant + Anthropic, and the
+Java side is now a **client** of it: `ChatService` assembles no context and calls no model.
+Next up: **10** (Langfuse in Python), then **11** (deploy).
 
 ---
 
@@ -250,8 +250,26 @@ will get wrong:
 
 The four hard-coded thresholds are gone: the planner sees an **inventory** (list sizes, resume
 length, repo names — never content) and chooses search-vs-inline itself. `MIN_RRF_THRESHOLD = 0.008`
-and `RRF_K = 60` are carried over into `agent/` verbatim; they now exist in both languages, so a
-change to one is a change to two files until issue 08 deletes `HybridRetrievalService`.
+and `RRF_K = 60` are now **only** in `agent/` — issue 08 deleted `HybridRetrievalService`, so they
+live in one language again.
+
+**Java no longer retrieves or generates for chat — issue 08 cut it over.** `ChatService` is
+`chunkRepo` (for `getIndexStatus`) plus `AgentClient` plus the four contract records, and nothing
+else. Four things a cold start should know:
+
+- **Prod chat is degraded until issue 11 deploys the agent.** `pulse.agent.url` defaults to
+  `http://localhost:8001`, and ECS runs no agent yet, so every prod chat turn now returns the
+  "temporarily unavailable" fallback instead of an answer. That is by design (08 before 11), not a
+  bug — but do not leave it sitting there. Issue 11 must set `AGENT_URL` in `extra_environment`.
+- **The fallback lives in `AgentClient`, and it swallows every `RuntimeException`** — unreachable,
+  timeout, 4xx, 5xx, decode failure all become the same degraded `ChatResponse`. A silent "the
+  assistant is temporarily unavailable" in the UI means: read the API log, the cause is only there.
+- **The traceparent header is not set by hand.** `AgentClient` builds on the injected
+  `WebClient.Builder`, which Boot has already customised with client observations; those are what
+  inject `traceparent`. Setting it manually would fight the instrumentation issue 10 depends on.
+- **`QdrantVectorStore.hybridSearch` and `HybridQuery` are now dead in Java** — reachable from
+  nothing since `HybridRetrievalService` went. Left deliberately (out of 08's scope); the write
+  path in the same class is very much alive, so delete the two members, not the class.
 
 ---
 
@@ -295,10 +313,11 @@ Not blockers, but decide them when you reach the issue:
 
 - ~~**Issue 04:** does `findByKeywordSearch` + the `search_vector` column get removed with the
   embedding column, or kept one release as a fallback?~~ **Decided in issue 04: kept.** Remove both,
-  plus the GIN index, once issue 08 has the agent path serving prod chat.
-- **Issue 08:** once `ChatService` becomes an HTTP client, `HybridRetrievalService` has zero Java
+  plus the GIN index, once the agent path serves prod chat — issue 08 cut the Java code over, so
+  this is waiting on issue 11 deploying the agent, not on more code.
+- ~~**Issue 08:** once `ChatService` becomes an HTTP client, `HybridRetrievalService` has zero Java
   callers — the issue-03 parity harness that also used to hold it alive was deleted by issue 04.
-  Delete it in 08.
+  Delete it in 08.~~ **Done — deleted in 08.**
 - **Left by issue 04:** `pulse.vector.dual-write` is now misnamed and unsafe. With pgvector gone,
   `VECTOR_DUAL_WRITE=false` writes vectors nowhere instead of falling back. Delete the flag or make
   `false` refuse to start.

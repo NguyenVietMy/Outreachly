@@ -5,6 +5,9 @@ services:
       - "8080:8080"
     env_file:
       - ./api/.env.local.properties
+    environment:
+      # Reach the agent over the compose network, not localhost.
+      AGENT_URL: http://agent:8001
 
   agent:
     build: ./agent
