@@ -18,8 +18,13 @@ and the facts a cold start gets wrong.
 | [09](09-langfuse-java-otel.md) | Langfuse tracing from Java | C · Obs | — | 4h | ☑ |
 | [10](10-langfuse-python-trace-propagation.md) | Langfuse in Python + trace propagation | C · Obs | 07, 09 | 4h | ☑ |
 | [11](11-deploy-agent-to-ecs.md) | Deploy `agent/` to ECS | D · Deploy | 08, 10 | 6h | ☐ |
+| [12](12-cheap-always-on-hosting.md) | Move always-on hosting to a ~$3–5/mo single host | D · Deploy | 11 | 5h | ☐ |
 
-**Total: ~45h.** Critical path: `01 → 02 → 03 → 07 → 08 → 10 → 11` (~34h).
+**Total: ~50h.** Critical path: `01 → 02 → 03 → 07 → 08 → 10 → 11` (~34h).
+
+Issue **12** is a follow-on, not part of the PRD: issue 11 proves the ECS deployment and records the
+bill, then 12 moves the 24/7 home somewhere it costs ~$4/mo. The AWS Terraform stays in the repo,
+applied once and then torn down.
 
 Issue **06** has no blockers. Landing it early shortens the critical path.
 
@@ -34,6 +39,7 @@ Issue **06** has no blockers. Landing it early shortens the critical path.
 7. **10** — the payoff trace
 8. **04** — delete pgvector only after everything above is proven
 9. **11** — ship it
+10. **12** — then make keeping it shipped cost ~$4/mo instead of ~$75
 
 Note 04 is deliberately late: there is no reason to drop the old column until the new path is
 serving real traffic.

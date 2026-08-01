@@ -41,6 +41,22 @@ resource "aws_security_group" "ecs" {
     security_groups = [aws_security_group.alb.id]
   }
 
+  # The agent calls back into /internal/context/* (issue 06), which the public listener 404s. That
+  # return hop is scoped by CIDR rather than by the agent's security group: referencing it here
+  # while the agent's rule references this group is a Terraform cycle, and inline rules cannot be
+  # split out without the provider fighting a standalone aws_security_group_rule. The private
+  # subnets hold only these two tasks, and /internal/** additionally requires the shared secret.
+  dynamic "ingress" {
+    for_each = length(var.internal_ingress_cidrs) > 0 ? [1] : []
+
+    content {
+      from_port   = var.container_port
+      to_port     = var.container_port
+      protocol    = "tcp"
+      cidr_blocks = var.internal_ingress_cidrs
+    }
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -221,6 +237,16 @@ resource "aws_ecs_service" "api" {
     target_group_arn = aws_lb_target_group.api.arn
     container_name   = "api"
     container_port   = var.container_port
+  }
+
+  # Registered in Cloud Map so the agent can resolve the API by name for the /internal/context/*
+  # return hop, without going out to the public ALB.
+  dynamic "service_registries" {
+    for_each = var.service_registry_arn != "" ? [1] : []
+
+    content {
+      registry_arn = var.service_registry_arn
+    }
   }
 
   depends_on = [aws_lb_listener.http]

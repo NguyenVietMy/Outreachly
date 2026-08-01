@@ -162,6 +162,7 @@ Thumbs.db
 .terraform.lock.hcl
 tfplan
 *.tfplan
+tfplan.out
 *.auto.tfvars
 teardown.ps1
 spinup.ps1

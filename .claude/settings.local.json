@@ -78,5 +78,7 @@
       "PowerShell(Select-String -Path 'C:\\\\Users\\\\VietM\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-VietM-OneDrive-Documents-VietMySpace-Pulse\\\\d0c5e28b-efc7-4a8c-b67b-794593cee5a3\\\\tasks\\\\bzaeuh78t.output' -Pattern 'Tests run: \\\\d+' | Select-Object -Last 3 | ForEach-Object { $_.Line.Trim\\(\\) })",
       "PowerShell(Select-String -Path 'C:\\\\Users\\\\VietM\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-VietM-OneDrive-Documents-VietMySpace-Pulse\\\\d0c5e28b-efc7-4a8c-b67b-794593cee5a3\\\\tasks\\\\b7sdoy1yl.output' -Pattern '\\\\[EVAL\\\\]|EVAL SUMMARY|PASSED|FAILURES|Tests run|BUILD' | ForEach-Object { $_.Line.Trim\\(\\) })"
     ]
-  }
+  },
+  "prefersReducedMotion": true,
+  "outputStyle": "Explanatory"
 }
