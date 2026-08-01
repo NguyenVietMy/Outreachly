@@ -1,22 +1,20 @@
-name: Deploy API
+name: Deploy Agent
 
 on:
   push:
     branches: [main]
     paths:
-      - "api/**"
-      - ".github/workflows/deploy-api.yml"
-  # After ./spinup.ps1 the ECR repository is empty and the service cannot pull an image. Nothing
-  # under api/ has necessarily changed, so seeding it needs a manual trigger rather than a no-op
-  # commit.
+      - "agent/**"
+      - ".github/workflows/deploy-agent.yml"
+  # Same reason as deploy-api.yml: seed an empty ECR repository after a spinup.
   workflow_dispatch:
 
 env:
   AWS_REGION: us-east-1
-  ECR_REPOSITORY: pulse/api
+  ECR_REPOSITORY: pulse/agent
   ECS_CLUSTER: pulse-dev-api-cluster
-  ECS_SERVICE: pulse-dev-api-svc
-  TASK_FAMILY: pulse-dev-api-td
+  ECS_SERVICE: pulse-dev-agent-svc
+  TASK_FAMILY: pulse-dev-agent-td
 
 permissions:
   id-token: write
@@ -27,24 +25,28 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: api
+        working-directory: agent
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - uses: astral-sh/setup-uv@v5
         with:
-          distribution: temurin
-          java-version: "17"
-          cache: maven
+          enable-cache: true
 
-      - run: mvn test
+      # --frozen so a stale uv.lock fails here rather than in the image build.
+      - run: uv sync --frozen
+
+      - run: uv run ruff check
+
+      # tests/conftest.py sets INTERNAL_TOKEN before agent.config imports, so no env is needed here.
+      - run: uv run pytest
 
   deploy:
     needs: test
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: api
+        working-directory: agent
     steps:
       - uses: actions/checkout@v4
 
@@ -57,15 +59,6 @@ jobs:
       - name: Login to ECR
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-          cache: maven
-
-      - name: Build JAR
-        run: mvn clean package -DskipTests
 
       - name: Build and push Docker image
         id: build

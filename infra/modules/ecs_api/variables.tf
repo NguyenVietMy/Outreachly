@@ -45,3 +45,15 @@ variable "alarm_actions" {
   description = "Optional CloudWatch alarm action ARNs"
   default     = []
 }
+
+variable "internal_ingress_cidrs" {
+  type        = list(string)
+  description = "CIDRs allowed to reach the API on container_port from inside the VPC (the agent)"
+  default     = []
+}
+
+variable "service_registry_arn" {
+  type        = string
+  description = "Cloud Map service ARN to register tasks with. Empty disables registration."
+  default     = ""
+}
