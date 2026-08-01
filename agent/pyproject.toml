@@ -14,7 +14,12 @@ dependencies = [
     "openai>=1.60",
     "langgraph>=0.3",
     "langchain-anthropic>=0.3",
+    # Only langchain-core is used directly; langfuse.langchain's CallbackHandler imports the
+    # `langchain` package itself to branch on its major version, and fails without it.
+    "langchain>=1.0",
     "langfuse>=3.0",
+    # Imported directly for W3C traceparent extraction; langfuse pulls it in too.
+    "opentelemetry-api>=1.30",
 ]
 
 [dependency-groups]

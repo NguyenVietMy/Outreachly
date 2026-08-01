@@ -196,8 +196,11 @@ overlap ≥80%, and any disagreement must be explainable. Measured in issue 03.
 - [ ] `mvn test` green; new Python test suite green
 - [ ] Retrieval parity ≥80% top-5 overlap (§7)
 - [ ] `embedding vector(1536)` column dropped; `pgvector` dependency removed from `api/pom.xml`
-- [ ] One Langfuse trace per chat request contains Java span → Python span → Anthropic generation,
-      with input/output token counts, and **zero raw resume text**
+- [x] One Langfuse trace per chat request contains Java span → Python span → Anthropic generation,
+      with input/output token counts, and **zero raw resume text** — issue 10. Trace
+      `ce5d1e1aaee404fd23e8153bc63d52a3`: 21 observations, `pulse.rag.chat` → `http post` →
+      `POST /chat` → nodes → `ChatAnthropic`; `input`/`output` null on all 55 observations across
+      three audited traces.
 - [ ] Chat p95 latency within +40% of the pre-migration baseline
 - [ ] Both services healthy on ECS; prod chat served by the agent path
 - [ ] Frontend unchanged and still rendering routing decisions

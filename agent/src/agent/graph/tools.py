@@ -7,6 +7,8 @@ judge has seen.
 
 from typing import Any
 
+from langfuse import get_client, observe
+
 from agent.clients import embeddings, pulse_api, qdrant
 from agent.graph.state import RetrievedChunk
 
@@ -17,6 +19,9 @@ MIN_RRF_THRESHOLD = 0.008
 README_INLINE_CHARS = 2000
 
 
+# Bodies are redacted on export anyway (see agent/observability.py), so the retrieval span earns
+# its keep through what it records instead: which sources came back, and at what score.
+@observe(as_type="retriever", capture_input=False, capture_output=False)
 async def search_knowledge(
     user_id: int, query: str, source_types: list[str], top_k: int
 ) -> list[RetrievedChunk]:
@@ -32,7 +37,7 @@ async def search_knowledge(
         prefetch_limit=top_k * 2,
         limit=top_k,
     )
-    return [
+    chunks = [
         RetrievedChunk(
             source_type=point.payload["source_type"],
             source_key=point.payload["source_key"],
@@ -43,6 +48,20 @@ async def search_knowledge(
         for point in points
         if point.score >= MIN_RRF_THRESHOLD
     ]
+
+    get_client().update_current_span(
+        metadata={
+            "retrieval.top_k": top_k,
+            "retrieval.source_types": source_types,
+            "retrieval.hit_count": len(chunks),
+            "retrieval.top_rrf_score": max((chunk.score for chunk in chunks), default=0.0),
+            "retrieval.sources": [
+                f"{chunk.source_type}:{chunk.source_key}#{chunk.chunk_index}@{chunk.score:.4f}"
+                for chunk in chunks
+            ],
+        }
+    )
+    return chunks
 
 
 async def get_profile(user_id: int) -> dict[str, Any]:
