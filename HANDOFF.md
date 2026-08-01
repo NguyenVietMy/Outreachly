@@ -3,12 +3,14 @@
 Start here to pick up work on `PRD-agentic.md` / `docs/issues/`. Written to be readable cold, by a
 fresh session or by you in three weeks.
 
-**Status as of 2026-08-01:** issues **01, 02, 03, 04, 05, 06, 07, 08, 09** landed. **V66 is
+**Status as of 2026-08-01:** issues **01–10** landed. **V66 is
 applied** — the schema is at v66, `knowledge_chunks.embedding` is gone, and an authenticated chat
 turn was verified in the browser with sources still cited. The Qdrant track (A) is complete,
 `agent/` runs a real LangGraph `StateGraph` end to end against live Qdrant + Anthropic, and the
 Java side is now a **client** of it: `ChatService` assembles no context and calls no model.
-Next up: **10** (Langfuse in Python), then **11** (deploy).
+Observability track (C) is done: one Langfuse trace now spans Java → Python → each graph node →
+Anthropic, with prompt and completion bodies stripped on both sides.
+Next up: **11** (deploy `agent/` to ECS).
 
 ---
 
@@ -267,9 +269,36 @@ else. Four things a cold start should know:
 - **The traceparent header is not set by hand.** `AgentClient` builds on the injected
   `WebClient.Builder`, which Boot has already customised with client observations; those are what
   inject `traceparent`. Setting it manually would fight the instrumentation issue 10 depends on.
+  Verified end to end in issue 10 — see below.
 - **`QdrantVectorStore.hybridSearch` and `HybridQuery` are now dead in Java** — reachable from
   nothing since `HybridRetrievalService` went. Left deliberately (out of 08's scope); the write
   path in the same class is very much alive, so delete the two members, not the class.
+
+**One trace spans both services — issue 10 finished the observability track.** Five things a cold
+start will get wrong:
+
+- **There is an `http post` span in the middle.** The chain is `pulse.rag.chat` → `http post` →
+  `POST /chat`, not `pulse.rag.chat` → `POST /chat`. `traceparent` names the WebClient *client*
+  span, so the Python root parents to that. Nothing is broken; the diagram just has three levels.
+- **Nothing free-text is exported, from either side.** `agent/observability.py`'s `mask_otel_spans`
+  deletes the Langfuse input/output attributes from every span at export. It uses the export-stage
+  hook rather than `mask` on purpose: that is the only one that also catches spans created by
+  `CallbackHandler`, which is where retrieved resume text would otherwise sit. Debug through the
+  structured attributes (`retrieval.*`, `agent.*`, model, tokens, cost) — the prompts are gone.
+- **`retrieval.sources` is not de-identified.** It carries values like
+  `github_readme:NguyenVietMy/Outreachly#0@0.0331`. That is metadata, not chunk content, and it is
+  deliberate — you cannot debug retrieval blind — but it is not anonymous.
+- **`langchain` is a dependency that nothing imports.** `langfuse.langchain` imports it purely to
+  branch on its major version and raises `ModuleNotFoundError` without it. The code here uses
+  `langchain-core` and `langchain-anthropic`. Do not "clean it up".
+- **`agent/.env` needs the `LANGFUSE_*` keys too**, matching `api/.env.local.properties`. Blank keys
+  disable tracing silently rather than failing to boot, so a half-traced request means the agent's
+  copy is missing — and if the keys differ, the two halves land in different projects.
+
+Verifying the hop needs no browser: `cd api && ./mvnw test -Plangfuse -Dtest=AgentTracePropagationTest`
+drives one real chat through `AgentClient` at the running agent and prints the trace id. It is
+tagged `langfuse`, so `mvn test` skips it. `/api/personal/chat` is behind Google OAuth, which is
+why there is no headless path through the controller.
 
 ---
 
@@ -282,7 +311,7 @@ else. Four things a cold start should know:
 - All schema changes go through Flyway. `ddl-auto=none`.
 - **Redact resume text in traces.** Hard requirement in issues 09 and 10, verified by *looking at a
   real trace in the Langfuse UI*, not by reading the code.
-- Keep `PLAN.md` checkboxes in sync — Phase 2.2 is satisfied by issue 09.
+- Keep `PLAN.md` checkboxes in sync — Phase 2.2 is satisfied by issues 09 and 10.
 
 ---
 
@@ -296,8 +325,9 @@ From `PRD-agentic.md` §9:
       arm, not the migration. Read issue 03's *Why the gate was not met* before citing this number.
 - [x] `embedding vector(1536)` dropped; `pgvector` gone from `api/pom.xml` — issue 04. V66 applied
       2026-07-31; post-migration backfill read 124 Postgres rows = 124 Qdrant points.
-- [ ] One Langfuse trace per chat spanning Java → Python → Anthropic, with token counts and
-      **zero raw resume text**
+- [x] One Langfuse trace per chat spanning Java → Python → Anthropic, with token counts and
+      **zero raw resume text** — issue 10. Trace `ce5d1e1aaee404fd23e8153bc63d52a3`, 21
+      observations; `input`/`output` null on all 55 observations across three audited traces.
 - [ ] Chat p95 within +40% of the pre-migration baseline
 - [ ] Both services healthy on ECS; prod chat served by the agent path
 - [ ] `app/` unchanged and still rendering routing decisions

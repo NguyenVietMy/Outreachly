@@ -1,3 +1,5 @@
+from langfuse import get_client
+from langfuse.langchain import CallbackHandler
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
@@ -10,6 +12,9 @@ from agent.graph.nodes import (
 )
 from agent.graph.state import AgentState
 from agent.models import ChatMessage, ChatResponse, SourceCitation
+
+# Trajectory decisions that mean the agent actually went and fetched that source.
+QUERIED_DECISIONS = frozenset({"retrieved", "no_results", "inline"})
 
 
 def build_graph() -> CompiledStateGraph:
@@ -55,8 +60,24 @@ async def run_chat(
             "sufficient": False,
             "trajectory": [],
             "answer": "",
+        },
+        # One span per node, for free — this is what makes the retrieval loop visible in Langfuse.
+        config={"callbacks": [CallbackHandler()]},
+    )
+
+    get_client().update_current_span(
+        metadata={
+            "agent.iterations": final["iterations"],
+            "agent.sources_queried": sorted(
+                {
+                    step.source_type
+                    for step in final["trajectory"]
+                    if step.decision in QUERIED_DECISIONS
+                }
+            ),
         }
     )
+
     return ChatResponse(
         message=final["answer"],
         sources=[

@@ -68,7 +68,9 @@ The eval harness already exists and is further along than it looks:
 - [x] **2.2 Langfuse tracing.** Export OTel traces (GenAI semantic conventions) from the existing
       Micrometer Observation setup to Langfuse Cloud's OTLP endpoint. Redact/truncate resume text.
       Landed via issue 09. Spans carry no prompt/completion bodies at all, verified by fetching
-      6 traces back through `langfuse-cli`. **2.1 is now trivial:** `AnthropicService.recordUsage`
+      6 traces back through `langfuse-cli`. Issue 10 extended the same treatment to `agent/` and
+      joined the two into one trace per chat, Java → Python → node → Anthropic. **2.1 is now
+      trivial:** `AnthropicService.recordUsage`
       already reads `usage.inputTokens()`/`outputTokens()` — 2.1 is just emitting those as
       Micrometer counters. Note Langfuse already computes dollar cost server-side, so the pricing
       table 2.1 calls for is only needed for the Prometheus path.

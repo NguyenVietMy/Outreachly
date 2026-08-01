@@ -75,7 +75,43 @@ Copy `.env.example` to `.env` (gitignored) and fill it in — the values match
 | `ANTHROPIC_API_KEY` | Generation — `claude-haiku-4-5` on every node, matching `AnthropicService.FAST_MODEL`. |
 | `OPENAI_API_KEY` | **Embeddings only** — `text-embedding-3-small`, matching the Java `EmbeddingService`. Anthropic has no embeddings API, so the `openai` dependency here is deliberate and not a provider mixup. |
 | `PULSE_API_URL` | Java internal context API (issue 06). Defaults to `http://localhost:8080`; compose overrides it to `http://api:8080`. |
-| `LANGFUSE_*` | Wired in issue 10. |
+| `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` | Tracing. Blank keys disable tracing instead of failing to boot. Must match the api's, or the two halves of a chat trace land in different projects. |
+
+## Tracing
+
+One Langfuse trace spans both services. The Java API starts `pulse.rag.chat` and its WebClient
+observations put a W3C `traceparent` on the outbound call; `agent/observability.py` attaches that
+context before the observed handler runs, so everything below joins the same trace:
+
+```
+pulse.rag.chat (Java)
+└── http post (Java, the WebClient client observation — this is the span traceparent names)
+    └── POST /chat
+        └── LangGraph
+            ├── plan     → Anthropic generation
+            ├── retrieve → search_knowledge (retriever)
+            ├── reflect  → Anthropic generation
+            └── answer   → Anthropic generation
+```
+
+Per-node and per-generation spans come from `langfuse.langchain.CallbackHandler`, passed to
+`graph.ainvoke`. `search_knowledge` adds `retrieval.top_k`, `retrieval.hit_count`,
+`retrieval.top_rrf_score` and `retrieval.sources` (source keys and scores); `run_chat` adds
+`agent.iterations` and `agent.sources_queried`.
+
+In the real trace `search_knowledge` is a *sibling* of `LangGraph` rather than a child of the
+`retrieve` node that called it: LangGraph runs each node in its own asyncio task, which copies the
+OTel context before `CallbackHandler` attaches the node span, so `@observe` still sees `POST /chat`
+as current. All the attributes are there; only the depth is off.
+
+**No prompt or completion body is exported.** `mask_otel_spans` deletes the Langfuse input/output
+attributes from every span at export time and marks it `pulse.redacted=true`. The agent's prompts
+contain retrieved chunks and, when the planner inlines it, the whole resume, so the choice is the
+same one the Java side made in issue 09: nothing free-text leaves the process, and the trace is
+debugged through the structured attributes above instead.
+
+The `langchain` dependency exists only because `langfuse.langchain` imports it to branch on its
+major version — the code here uses `langchain-core` and `langchain-anthropic`.
 
 ## Local run
 

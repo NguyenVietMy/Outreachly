@@ -22,7 +22,7 @@ class Settings(BaseSettings):
 
     pulse_api_url: str = "http://localhost:8080"
 
-    # Wired in issue 10.
+    # Tracing is disabled, not fatal, when the keys are blank.
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""
     langfuse_host: str = "https://us.cloud.langfuse.com"

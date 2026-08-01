@@ -16,7 +16,7 @@ and the facts a cold start gets wrong.
 | [07](07-langgraph-stategraph.md) | LangGraph `StateGraph` | B · Agent | 03, 05, 06 | 8h | ☑ |
 | [08](08-chatservice-http-client.md) | `ChatService` → HTTP client | B · Agent | 07 | 3h | ☑ |
 | [09](09-langfuse-java-otel.md) | Langfuse tracing from Java | C · Obs | — | 4h | ☑ |
-| [10](10-langfuse-python-trace-propagation.md) | Langfuse in Python + trace propagation | C · Obs | 07, 09 | 4h | ☐ |
+| [10](10-langfuse-python-trace-propagation.md) | Langfuse in Python + trace propagation | C · Obs | 07, 09 | 4h | ☑ |
 | [11](11-deploy-agent-to-ecs.md) | Deploy `agent/` to ECS | D · Deploy | 08, 10 | 6h | ☐ |
 
 **Total: ~45h.** Critical path: `01 → 02 → 03 → 07 → 08 → 10 → 11` (~34h).
